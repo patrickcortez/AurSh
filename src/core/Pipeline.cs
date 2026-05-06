@@ -85,10 +85,7 @@ public static class Pipeline
     {
         string? executable = ResolveCommand(cmd.Name, workingDirectory);
         if (executable == null)
-        {
-            Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
-            return 127;
-        }
+            return ExecuteViaShell(cmd, env, workingDirectory, background);
 
         var psi = new ProcessStartInfo
         {
@@ -275,8 +272,24 @@ public static class Pipeline
                 string? executable = ResolveCommand(cmd.Name, workingDirectory);
                 if (executable == null)
                 {
-                    Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
-                    return 127;
+                    executable = Utils.Platform.DefaultShell;
+                    var shellPsi = CreateShellDelegatedStartInfo(cmd, env, workingDirectory);
+
+                    if (!isFirst)
+                        shellPsi.RedirectStandardInput = true;
+
+                    if (!isLast)
+                        shellPsi.RedirectStandardOutput = true;
+
+                    ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams, isLast);
+
+                    processes[i] = Process.Start(shellPsi);
+                    if (processes[i] == null)
+                    {
+                        Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
+                        return 127;
+                    }
+                    continue;
                 }
 
                 var psi = CreateProcessStartInfo(executable, cmd, env, workingDirectory);
@@ -393,5 +406,167 @@ public static class Pipeline
         }
 
         return Utils.Platform.FindExecutableInPath(name);
+    }
+
+    private static int ExecuteViaShell(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(cmd.Name);
+        foreach (string arg in cmd.Args)
+        {
+            sb.Append(' ');
+            if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
+            {
+                sb.Append('"');
+                sb.Append(arg.Replace("\"", "\\\""));
+                sb.Append('"');
+            }
+            else
+            {
+                sb.Append(arg);
+            }
+        }
+
+        string fullCommand = sb.ToString();
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = Utils.Platform.DefaultShell,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = false
+        };
+
+        psi.ArgumentList.Add(Utils.Platform.ShellFlag);
+        psi.ArgumentList.Add(fullCommand);
+
+        foreach (var kv in env.Variables)
+            psi.Environment[kv.Key] = kv.Value;
+
+        FileStream? stdoutFile = null;
+        FileStream? stderrFile = null;
+        FileStream? stdinFile = null;
+        bool redirectStdout = false;
+        bool redirectStderr = false;
+        bool redirectStdin = false;
+        bool errToOut = false;
+
+        foreach (var redir in cmd.Redirections)
+        {
+            string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
+            switch (redir.Type)
+            {
+                case RedirectType.Out:
+                    stdoutFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    psi.RedirectStandardOutput = true;
+                    redirectStdout = true;
+                    break;
+                case RedirectType.Append:
+                    stdoutFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    psi.RedirectStandardOutput = true;
+                    redirectStdout = true;
+                    break;
+                case RedirectType.In:
+                    stdinFile = new FileStream(target, FileMode.Open, FileAccess.Read);
+                    psi.RedirectStandardInput = true;
+                    redirectStdin = true;
+                    break;
+                case RedirectType.Err:
+                    stderrFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    psi.RedirectStandardError = true;
+                    redirectStderr = true;
+                    break;
+                case RedirectType.ErrAppend:
+                    stderrFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    psi.RedirectStandardError = true;
+                    redirectStderr = true;
+                    break;
+                case RedirectType.ErrToOut:
+                    psi.RedirectStandardError = true;
+                    errToOut = true;
+                    break;
+            }
+        }
+
+        try
+        {
+            using var process = Process.Start(psi);
+            if (process == null)
+            {
+                Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
+                return 127;
+            }
+
+            if (redirectStdin && stdinFile != null)
+            {
+                stdinFile.CopyTo(process.StandardInput.BaseStream);
+                process.StandardInput.Close();
+            }
+
+            if (background)
+            {
+                Console.WriteLine($"[bg] {process.Id}");
+                return 0;
+            }
+
+            if (redirectStdout && stdoutFile != null)
+                process.StandardOutput.BaseStream.CopyTo(stdoutFile);
+
+            if (errToOut)
+                process.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput());
+            else if (redirectStderr && stderrFile != null)
+                process.StandardError.BaseStream.CopyTo(stderrFile);
+
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: {cmd.Name}: {ex.Message}");
+            return 127;
+        }
+        finally
+        {
+            stdoutFile?.Dispose();
+            stderrFile?.Dispose();
+            stdinFile?.Dispose();
+        }
+    }
+
+    private static ProcessStartInfo CreateShellDelegatedStartInfo(
+        CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(cmd.Name);
+        foreach (string arg in cmd.Args)
+        {
+            sb.Append(' ');
+            if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
+            {
+                sb.Append('"');
+                sb.Append(arg.Replace("\"", "\\\""));
+                sb.Append('"');
+            }
+            else
+            {
+                sb.Append(arg);
+            }
+        }
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = Utils.Platform.DefaultShell,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = false
+        };
+
+        psi.ArgumentList.Add(Utils.Platform.ShellFlag);
+        psi.ArgumentList.Add(sb.ToString());
+
+        foreach (var kv in env.Variables)
+            psi.Environment[kv.Key] = kv.Value;
+
+        return psi;
     }
 }

@@ -1,9 +1,7 @@
 # AurSh
 
 A cross compatible shell developed in C# by Tezzz, is a system shell
-similar to most shells like bash, zsh and fish. What makes it different is its
-SAAO or Sessions As An Object which allows a user to run multiple sessions of Aursh
-and switch between them.
+similar to most shells like bash, zsh and fish.
 
 This is basically just Linuxify but cross compatible between different Operating Systems.
 It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature.
@@ -15,6 +13,20 @@ Has:
 - ghost text and auto suggestions
 - Persistent History
 - Environmental variable handling.
+- resolves commands to native OS shells.
+
+---
+
+## Installation
+
+Make sure you have make and the .NET SDK installed.
+Once you have them installed simply run `make install-user` for non admin previlege and `make install` for system dir.
+
+---
+
+## Uninstall
+
+To uninstall you can simply run `make uninstall`
 
 
 ---

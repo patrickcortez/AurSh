@@ -1,0 +1,15 @@
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.AssemblyInfoInputs.cache
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.AssemblyInfo.cs
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.csproj.CoreCompileInputs.cache
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\aursh.exe
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\aursh.deps.json
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\aursh.runtimeconfig.json
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\aursh.dll
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\aursh.pdb
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.sourcelink.json
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\aursh.dll
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\refint\aursh.dll
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\aursh.pdb
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\AurShell.genruntimeconfig.cache
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Debug\ref\aursh.dll

@@ -3,8 +3,9 @@
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
-This is basically just Linuxify but cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux.
-It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature.
+This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
+
+It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua to allow you to extend the shell with custom features.
 
 Has:
 - Shell Scripting: .aur scripts
@@ -15,7 +16,7 @@ Has:
 - Environmental variable handling.
 - resolves commands to native OS Commands.
 - Job control.
-- Plug-in system with lua
+- Plug-in system using lua
 
 ---
 

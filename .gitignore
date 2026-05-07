@@ -1,3 +1,5 @@
 bin/*
 .agents/*
 docs/syntax.md
+.gitignore
+publish/*

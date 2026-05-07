@@ -18,6 +18,10 @@ public class ShellEnvironment
 
     public int ShellPid => System.Environment.ProcessId;
 
+    public JobTable Jobs { get; } = new();
+
+    public Plugins.PluginManager? PluginManager { get; set; }
+
     public IReadOnlyDictionary<string, string> Variables => _variables;
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
     public IReadOnlyDictionary<string, string> Aliases => _aliases;

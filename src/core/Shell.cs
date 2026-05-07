@@ -1,3 +1,5 @@
+using AurShell.Plugins;
+
 namespace AurShell.Core;
 
 public class Shell
@@ -7,12 +9,14 @@ public class Shell
     private readonly History _history;
     private readonly Prompt _prompt;
     private readonly InputHandler _inputHandler;
+    private readonly PluginManager _pluginManager;
     private bool _running;
     private bool _interrupted;
 
     public ShellEnvironment Environment => _env;
     public Executor Executor => _executor;
     public History History => _history;
+    public PluginManager PluginManager => _pluginManager;
     public string WorkingDirectory => _executor.WorkingDirectory;
 
     public Shell()
@@ -34,10 +38,14 @@ public class Shell
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
         _inputHandler = new InputHandler(_history, _env);
+        _pluginManager = new PluginManager(_env, _executor);
+        _env.PluginManager = _pluginManager;
         _running = true;
 
         InitializeDefaultVariables();
+        RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
+        LoadPlugins();
     }
 
     public Shell(ShellEnvironment env, string workingDirectory)
@@ -47,10 +55,14 @@ public class Shell
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
         _inputHandler = new InputHandler(_history, _env);
+        _pluginManager = new PluginManager(_env, _executor);
+        _env.PluginManager = _pluginManager;
         _running = true;
 
         InitializeDefaultVariables();
+        RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
+        LoadPlugins();
     }
 
     public void Run()
@@ -63,11 +75,14 @@ public class Shell
         try
         {
             Console.Write(Utils.Ansi.Reset);
+            Banner.Print(_env);
 
             while (_running)
             {
                 _interrupted = false;
                 _env.Set("PWD", _executor.WorkingDirectory);
+
+                NotifyFinishedJobs();
 
                 string promptText = _prompt.Render(_executor.WorkingDirectory, _env.LastExitCode);
                 Console.Write(Utils.Ansi.SetTitle($"aursh: {Utils.Platform.ShortenPath(_executor.WorkingDirectory)}"));
@@ -137,6 +152,12 @@ public class Shell
         rcLoader.LoadConfigDir();
     }
 
+    private void LoadPlugins()
+    {
+        try { _pluginManager.LoadAll(); }
+        catch (Exception ex) { Console.Error.WriteLine($"aursh: plugin load error: {ex.Message}"); }
+    }
+
     private void InitializeDefaultVariables()
     {
         _env.Set("SHELL", "aursh");
@@ -157,5 +178,28 @@ public class Shell
     {
         e.Cancel = true;
         _interrupted = true;
+    }
+
+    private void NotifyFinishedJobs()
+    {
+        var finished = _env.Jobs.CollectFinished();
+        foreach (var job in finished)
+        {
+            string stateStr = job.State switch
+            {
+                JobState.Done => "Done",
+                JobState.Killed => "Killed",
+                _ => "Exited"
+            };
+
+            string dimFg = Utils.Ansi.FgRgb(100, 100, 130);
+            string statusFg = job.ExitCode == 0
+                ? Utils.Ansi.FgRgb(100, 230, 150)
+                : Utils.Ansi.FgRgb(255, 130, 100);
+
+            Console.WriteLine(
+                $"{dimFg}[{job.Id}]{Utils.Ansi.Reset}  {statusFg}{stateStr}{Utils.Ansi.Reset}  {dimFg}{job.Command}{Utils.Ansi.Reset}"
+            );
+        }
     }
 }

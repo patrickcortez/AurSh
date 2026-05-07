@@ -78,6 +78,11 @@ public static class Pipeline
             }
         }
 
+        if (env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
+        {
+            return env.PluginManager.ExecutePluginCommand(cmd.Name, cmd.Args.ToList());
+        }
+
         return ExecuteExternal(cmd, env, workingDirectory, background);
     }
 
@@ -163,7 +168,8 @@ public static class Pipeline
 
             if (background)
             {
-                Console.WriteLine($"[bg] {process.Id}");
+                int jobId = env.Jobs.Add(process, cmd.Name + (cmd.Args.Count > 0 ? " " + string.Join(" ", cmd.Args) : ""));
+                Console.WriteLine($"[{jobId}] {process.Id}");
                 return 0;
             }
 
@@ -333,7 +339,11 @@ public static class Pipeline
             {
                 var lastProc = processes[count - 1];
                 if (lastProc != null)
-                    Console.WriteLine($"[bg] {lastProc.Id}");
+                {
+                    string fullCmd = string.Join(" | ", commands.Select(c => c.Name));
+                    int jobId = env.Jobs.Add(lastProc, fullCmd);
+                    Console.WriteLine($"[{jobId}] {lastProc.Id}");
+                }
             }
 
             return lastExit;
@@ -505,7 +515,8 @@ public static class Pipeline
 
             if (background)
             {
-                Console.WriteLine($"[bg] {process.Id}");
+                int jobId = env.Jobs.Add(process, cmd.Name + (cmd.Args.Count > 0 ? " " + string.Join(" ", cmd.Args) : ""));
+                Console.WriteLine($"[{jobId}] {process.Id}");
                 return 0;
             }
 

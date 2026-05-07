@@ -3,7 +3,7 @@
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
-This is basically just Linuxify but cross compatible between different Operating Systems.
+This is basically just Linuxify but cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux.
 It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature.
 
 Has:

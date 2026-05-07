@@ -8,7 +8,8 @@ public static class BuiltinCommands
     {
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
-        "true", "false", "shift", "read", "test", "return"
+        "true", "false", "shift", "read", "test", "return",
+        "jobs", "fg", "kill", "aursh-plugin"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -36,6 +37,10 @@ public static class BuiltinCommands
             "read" => ExecuteRead(cmd, env),
             "test" => ExecuteTest(cmd),
             "return" => ExecuteReturn(cmd, env),
+            "jobs" => ExecuteJobs(cmd, env),
+            "fg" => ExecuteFg(cmd, env),
+            "kill" => ExecuteKill(cmd, env),
+            "aursh-plugin" => ExecuteAurshPlugin(cmd, env),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -545,5 +550,216 @@ public static class BuiltinCommands
             }
         }
         return sb.ToString();
+    }
+
+    private static int ExecuteJobs(CommandNode cmd, ShellEnvironment env)
+    {
+        var allJobs = env.Jobs.GetAll();
+
+        if (allJobs.Count == 0)
+        {
+            return 0;
+        }
+
+        bool showPids = cmd.Args.Contains("-l");
+
+        foreach (var job in allJobs)
+        {
+            string stateStr = job.State switch
+            {
+                JobState.Running => "Running",
+                JobState.Done => "Done",
+                JobState.Killed => "Killed",
+                _ => "Unknown"
+            };
+
+            if (showPids)
+                Console.WriteLine($"[{job.Id}]  {job.Pid,-8} {stateStr,-12} {job.Command}");
+            else
+                Console.WriteLine($"[{job.Id}]  {stateStr,-12} {job.Command}");
+        }
+
+        return 0;
+    }
+
+    private static int ExecuteFg(CommandNode cmd, ShellEnvironment env)
+    {
+        int jobId;
+
+        if (cmd.Args.Count == 0)
+        {
+            var recent = env.Jobs.GetMostRecent();
+            if (recent == null)
+            {
+                Console.Error.WriteLine("aursh: fg: no current job");
+                return 1;
+            }
+            jobId = recent.Id;
+        }
+        else
+        {
+            string arg = cmd.Args[0];
+            if (arg.StartsWith("%"))
+                arg = arg.Substring(1);
+
+            if (!int.TryParse(arg, out jobId))
+            {
+                Console.Error.WriteLine($"aursh: fg: {cmd.Args[0]}: no such job");
+                return 1;
+            }
+        }
+
+        var job = env.Jobs.GetById(jobId);
+        if (job == null)
+        {
+            Console.Error.WriteLine($"aursh: fg: %{jobId}: no such job");
+            return 1;
+        }
+
+        if (job.State != JobState.Running)
+        {
+            Console.Error.WriteLine($"aursh: fg: %{jobId}: job has already completed");
+            env.Jobs.Remove(jobId);
+            return job.ExitCode;
+        }
+
+        Console.WriteLine(job.Command);
+        int exitCode = env.Jobs.ForegroundWait(jobId);
+        return exitCode;
+    }
+
+    private static int ExecuteKill(CommandNode cmd, ShellEnvironment env)
+    {
+        if (cmd.Args.Count == 0)
+        {
+            Console.Error.WriteLine("aursh: kill: usage: kill %job_id or kill PID");
+            return 1;
+        }
+
+        int result = 0;
+
+        foreach (string arg in cmd.Args)
+        {
+            if (arg.StartsWith("%"))
+            {
+                string idStr = arg.Substring(1);
+                if (int.TryParse(idStr, out int jobId))
+                {
+                    if (env.Jobs.Kill(jobId))
+                    {
+                        var job = env.Jobs.GetById(jobId);
+                        if (job != null)
+                            Console.WriteLine($"[{job.Id}]  Killed  {job.Command}");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"aursh: kill: %{jobId}: no such job");
+                        result = 1;
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine($"aursh: kill: {arg}: invalid job spec");
+                    result = 1;
+                }
+            }
+            else
+            {
+                if (int.TryParse(arg, out int pid))
+                {
+                    var jobByPid = env.Jobs.GetByPid(pid);
+                    if (jobByPid != null)
+                    {
+                        env.Jobs.Kill(jobByPid.Id);
+                        Console.WriteLine($"[{jobByPid.Id}]  Killed  {jobByPid.Command}");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var proc = System.Diagnostics.Process.GetProcessById(pid);
+                            proc.Kill();
+                            Console.WriteLine($"Killed process {pid}");
+                        }
+                        catch
+                        {
+                            Console.Error.WriteLine($"aursh: kill: ({pid}) - No such process");
+                            result = 1;
+                        }
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine($"aursh: kill: {arg}: invalid argument");
+                    result = 1;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static int ExecuteAurshPlugin(CommandNode cmd, ShellEnvironment env)
+    {
+        if (cmd.Args.Count == 0)
+        {
+            Console.WriteLine("Usage: aursh-plugin <list|add|del|init> [args]");
+            Console.WriteLine("  list           List installed plugins");
+            Console.WriteLine("  add <path>     Install plugin from directory");
+            Console.WriteLine("  del <name>     Remove a plugin");
+            Console.WriteLine("  init <name>    Create a new plugin template");
+            return 0;
+        }
+
+        string action = cmd.Args[0].ToLowerInvariant();
+        var pm = env.PluginManager;
+        if (pm == null)
+        {
+            Console.Error.WriteLine("aursh: plugin system not initialized");
+            return 1;
+        }
+
+        switch (action)
+        {
+            case "list":
+                var plugins = pm.Plugins;
+                if (plugins.Count == 0)
+                {
+                    Console.WriteLine("No plugins installed.");
+                    Console.WriteLine($"Plugin directory: {pm.PluginsDirectory}");
+                    return 0;
+                }
+                foreach (var p in plugins)
+                {
+                    string cmds = p.RegisteredCommands.Count > 0
+                        ? string.Join(", ", p.RegisteredCommands.Keys)
+                        : "(none)";
+                    Console.WriteLine($"  {p.Manifest.Name} v{p.Manifest.Version} by {p.Manifest.Author}");
+                    Console.WriteLine($"    {p.Manifest.Description}");
+                    Console.WriteLine($"    Commands: {cmds}");
+                }
+                Console.WriteLine($"\nPlugin directory: {pm.PluginsDirectory}");
+                return 0;
+
+            case "add":
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin add <path>"); return 1; }
+                return pm.InstallPlugin(cmd.Args[1]);
+
+            case "del":
+            case "remove":
+            case "rm":
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin del <name>"); return 1; }
+                return pm.RemovePlugin(cmd.Args[1]);
+
+            case "init":
+            case "create":
+            case "new":
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin init <name>"); return 1; }
+                return pm.InitPlugin(cmd.Args[1]);
+
+            default:
+                Console.Error.WriteLine($"aursh: aursh-plugin: unknown action '{action}'");
+                return 1;
+        }
     }
 }

@@ -677,7 +677,8 @@ public class InputHandler
             {
                 "cd", "export", "unset", "exit", "history", "clear", "echo",
                 "pwd", "type", "alias", "unalias", "source", "set", "env",
-                "true", "false", "read", "test", "return"
+                "true", "false", "read", "test", "return",
+                "jobs", "fg", "kill", "aursh-plugin"
             })
             {
                 if (builtin.StartsWith(partial, StringComparison.OrdinalIgnoreCase))

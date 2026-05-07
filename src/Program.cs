@@ -7,6 +7,7 @@ public class Program
         Utils.Platform.EnableAnsiOnWindows();
         Utils.Platform.EnsureDirectoriesExist();
 
+
         if (args.Length == 0)
         {
             var shell = new Core.Shell();
@@ -53,6 +54,8 @@ public class Program
 
     private static void PrintUsage()
     {
+
+
         Console.WriteLine("Usage: aursh [options] [script [args...]]");
         Console.WriteLine();
         Console.WriteLine("Options:");

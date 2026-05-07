@@ -1,5 +1,6 @@
 using AurShell.Plugins;
 
+
 namespace AurShell.Core;
 
 public class Shell
@@ -42,6 +43,7 @@ public class Shell
         _env.PluginManager = _pluginManager;
         _running = true;
 
+
         InitializeDefaultVariables();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
@@ -65,6 +67,7 @@ public class Shell
         LoadPlugins();
     }
 
+
     public void Run()
     {
         _running = true;
@@ -77,6 +80,7 @@ public class Shell
             Console.Write(Utils.Ansi.Reset);
             Banner.Print(_env);
 
+
             while (_running)
             {
                 _interrupted = false;
@@ -85,7 +89,7 @@ public class Shell
                 NotifyFinishedJobs();
 
                 string promptText = _prompt.Render(_executor.WorkingDirectory, _env.LastExitCode);
-                Console.Write(Utils.Ansi.SetTitle($"aursh: {Utils.Platform.ShortenPath(_executor.WorkingDirectory)}"));
+                Console.Write(Utils.Ansi.SetTitle($"Aursh: {Utils.Platform.ShortenPath(_executor.WorkingDirectory)}"));
 
                 string? line = _inputHandler.ReadLine(promptText);
 

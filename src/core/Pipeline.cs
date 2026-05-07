@@ -88,6 +88,13 @@ public static class Pipeline
 
     private static int ExecuteExternal(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
     {
+        if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
+        {
+            var tempCmd = new CommandNode { Name = assocCmd };
+            foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+            return ExecuteViaShell(tempCmd, env, workingDirectory, background);
+        }
+
         string? executable = ResolveCommand(cmd.Name, workingDirectory);
         if (executable == null)
             return ExecuteViaShell(cmd, env, workingDirectory, background);
@@ -272,6 +279,29 @@ public static class Pipeline
                         builtinTask.Wait();
                     }
 
+                    continue;
+                }
+
+                if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
+                {
+                    var tempCmd = new CommandNode { Name = assocCmd };
+                    foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+                    var assocPsi = CreateShellDelegatedStartInfo(tempCmd, env, workingDirectory);
+
+                    if (!isFirst)
+                        assocPsi.RedirectStandardInput = true;
+
+                    if (!isLast)
+                        assocPsi.RedirectStandardOutput = true;
+
+                    ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams, isLast);
+
+                    processes[i] = Process.Start(assocPsi);
+                    if (processes[i] == null)
+                    {
+                        Console.Error.WriteLine($"aursh: {cmd.Name}: failed to start associated process");
+                        return 126;
+                    }
                     continue;
                 }
 
@@ -579,5 +609,46 @@ public static class Pipeline
             psi.Environment[kv.Key] = kv.Value;
 
         return psi;
+    }
+
+    private static bool TryGetAssociationShellCommand(CommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)
+    {
+        shellCommand = "";
+        
+        if (string.IsNullOrEmpty(cmd.Name))
+            return false;
+
+        bool isFilePath = cmd.Name.Contains('/') || cmd.Name.Contains('\\') || cmd.Name.StartsWith(".");
+        if (!isFilePath)
+        {
+            string fullTestPath = Utils.FileSystem.ResolvePath(cmd.Name, workingDirectory);
+            if (File.Exists(fullTestPath))
+                isFilePath = true;
+        }
+
+        if (isFilePath)
+        {
+            string fullPath = Utils.FileSystem.ResolvePath(cmd.Name, workingDirectory);
+            if (File.Exists(fullPath))
+            {
+                string ext = Path.GetExtension(fullPath);
+                if (!string.IsNullOrEmpty(ext))
+                {
+                    string? template = env.Associator.GetAssociation(ext);
+                    if (template != null)
+                    {
+                        if (!template.Contains("{0}"))
+                        {
+                            template += " \"{0}\" {1}";
+                        }
+                        
+                        string newArgsStr = string.Join(" ", cmd.Args);
+                        shellCommand = template.Replace("{0}", fullPath).Replace("{1}", newArgsStr).Trim();
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

@@ -2,4 +2,4 @@ bin/*
 .agents/*
 docs/syntax.md
 .gitignore
-publish/*
+publish/win-x64/*

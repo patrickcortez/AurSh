@@ -18,7 +18,8 @@ Has:
 - Environmental variable handling.
 - resolves commands to native OS Commands.
 - Job control.
-- Plug-in system using lua
+- Plug-in system using lua (aursh-plugin <add,list,del,init>)
+- File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
 
 ---
 

@@ -31,7 +31,7 @@ Has:
 aursh-plugin <add,list,del,init,debug> : plugin system of the shell 
 aursh-assoc <extension> <command> : file association
 aursh-reload : reloads shell
-aursh-history <clear,show,filter=<pattern>> : TUI history
+aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
 
 ---
 

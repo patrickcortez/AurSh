@@ -13,7 +13,9 @@ Has:
 - ghost text and auto suggestions
 - Persistent History
 - Environmental variable handling.
-- resolves commands to native OS shells.
+- resolves commands to native OS Commands.
+- Job control.
+- Plug-in system with lua
 
 ---
 
@@ -26,8 +28,7 @@ Once you have them installed simply run `make install-user` for non admin previl
 
 ## Uninstall
 
-To uninstall you can simply run `make uninstall`
-
+To uninstall you can simply run `make uninstall`.
 
 ---
 

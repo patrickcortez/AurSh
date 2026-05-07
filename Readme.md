@@ -26,15 +26,15 @@ Has:
 
 **Windows**
 
-[Windows](/Assets/Images/Windows.png)
+![Windows](/Assets/Images/Windows.png)
 
 **Linux**
 
-[Linux](/Assets/Images/Linux.png)
+![Linux](/Assets/Images/Linux.png)
 
 **Android**
 
-[Android](/Assets/Images/Android.jpg)
+![Android](/Assets/Images/Android.jpg)
 
 ---
 

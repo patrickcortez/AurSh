@@ -22,6 +22,11 @@ public class Executor
         if (string.IsNullOrWhiteSpace(input))
             return 0;
 
+        if (input.Contains('\n'))
+        {
+            return ExecuteMultilineAsNativeScript(input);
+        }
+
         string expanded = ResolveAliases(input);
 
         var lexer = new Lexer(expanded, _env);
@@ -141,5 +146,59 @@ public class Executor
                 _workingDirectory = envCwd;
         }
         catch { }
+    }
+
+    private int ExecuteMultilineAsNativeScript(string input)
+    {
+        string ext = Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows ? ".ps1" : ".sh";
+        string tempFile = Path.Combine(Path.GetTempPath(), $"aursh_script_{Guid.NewGuid()}{ext}");
+        
+        try
+        {
+            File.WriteAllText(tempFile, input);
+            
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows ? "powershell.exe" : Utils.Platform.DefaultShell,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+                WorkingDirectory = _workingDirectory
+            };
+
+            if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
+            {
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-ExecutionPolicy");
+                psi.ArgumentList.Add("Bypass");
+                psi.ArgumentList.Add("-File");
+                psi.ArgumentList.Add(tempFile);
+            }
+            else
+            {
+                psi.ArgumentList.Add(tempFile);
+            }
+
+            foreach (var kv in _env.Variables)
+                psi.Environment[kv.Key] = kv.Value;
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process != null)
+            {
+                process.WaitForExit();
+                _env.LastExitCode = process.ExitCode;
+                return process.ExitCode;
+            }
+            return 127;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: multiline execution failed: {ex.Message}");
+            return 126;
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+            SyncWorkingDirectory();
+        }
     }
 }

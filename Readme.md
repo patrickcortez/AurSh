@@ -5,9 +5,11 @@ similar to most shells like bash, zsh and fish.
 
 This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
 
-It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua to allow you to extend the shell with custom features.
+It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands or create new behaviors for the shell.
 
-Make sure you have the font JetBrainsMono Nerd Font installed for the prompt to look the way it good.
+It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
+
+Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good.
 
 Has:
 - Shell Scripting: .aur scripts
@@ -20,6 +22,16 @@ Has:
 - Job control.
 - Plug-in system using lua (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
+
+
+---
+
+## Built-ins
+
+aursh-plugin <add,list,del,init,debug> : plugin system of the shell 
+aursh-assoc <extension> <command> : file association
+aursh-reload : reloads shell
+aursh-history <clear,show,filter=<pattern>> : TUI history
 
 ---
 

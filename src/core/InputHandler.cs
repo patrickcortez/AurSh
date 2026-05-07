@@ -69,6 +69,37 @@ public class InputHandler
 
             if (key.Key == ConsoleKey.Enter)
             {
+                if (Console.KeyAvailable)
+                {
+                    _buffer.Insert(_cursorPos, '\n');
+                    _cursorPos++;
+                    
+                    while (Console.KeyAvailable)
+                    {
+                        var nextKey = Console.ReadKey(true);
+                        if (nextKey.Key == ConsoleKey.Enter)
+                        {
+                            _buffer.Insert(_cursorPos, '\n');
+                            _cursorPos++;
+                        }
+                        else if (!char.IsControl(nextKey.KeyChar))
+                        {
+                            _buffer.Insert(_cursorPos, nextKey.KeyChar);
+                            _cursorPos++;
+                        }
+                    }
+                    ClearGhostText();
+                    Console.WriteLine();
+                    
+                    string pasted = _buffer.ToString();
+                    int firstNewline = pasted.IndexOf('\n');
+                    if (firstNewline >= 0 && firstNewline < pasted.Length - 1)
+                    {
+                        Console.WriteLine(pasted.Substring(firstNewline + 1));
+                    }
+                    return pasted;
+                }
+
                 ClearGhostText();
                 Console.WriteLine();
                 return _buffer.ToString();

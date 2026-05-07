@@ -221,9 +221,7 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
 	@echo [install] Installed to $(INSTALL_DIR)/$(EXE)
 	@cmd /c "echo."
-	@echo   To add to PATH (run once in elevated PowerShell):
-	@echo   [System.Environment]::SetEnvironmentVariable('PATH',
-	@echo     [System.Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';$(INSTALL_DIR)', 'Machine')
+	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@cmd /c "echo."
 else ifeq ($(DETECTED_OS),Windows)
 	@echo "[install] Installing to $(INSTALL_DIR)..."
@@ -231,14 +229,19 @@ else ifeq ($(DETECTED_OS),Windows)
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE)"
 	@echo ""
-	@echo "  Add to PATH if not already present:"
-	@echo "  [System.Environment]::SetEnvironmentVariable('PATH', "
-	@echo "    [System.Environment]::GetEnvironmentVariable('PATH', 'User') + ';$(INSTALL_DIR)', 'User')"
+	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@echo ""
 else
 	@echo "[install] Installing to $(INSTALL_DIR)/$(EXE)..."
 	install -d "$(INSTALL_DIR)"
 	install -m 755 "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
+	@if [ -w "$(PREFIX)/etc/shells" ] && ! grep -Fxq "$(INSTALL_DIR)/$(EXE)" "$(PREFIX)/etc/shells"; then \
+		echo "$(INSTALL_DIR)/$(EXE)" >> "$(PREFIX)/etc/shells"; \
+		echo "[install] Added $(INSTALL_DIR)/$(EXE) to $(PREFIX)/etc/shells"; \
+	elif [ -w /etc/shells ] && ! grep -Fxq "$(INSTALL_DIR)/$(EXE)" /etc/shells; then \
+		echo "$(INSTALL_DIR)/$(EXE)" >> /etc/shells; \
+		echo "[install] Added $(INSTALL_DIR)/$(EXE) to /etc/shells"; \
+	fi
 	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE)"
 	@echo "[install] Run 'aursh' to start."
 endif
@@ -259,9 +262,7 @@ else ifeq ($(DETECTED_OS),Windows)
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
 	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE)"
 	@echo ""
-	@echo "  Add to PATH if not already present:"
-	@echo "  [System.Environment]::SetEnvironmentVariable('PATH', "
-	@echo "    [System.Environment]::GetEnvironmentVariable('PATH', 'User') + ';$(USER_INSTALL_DIR)', 'User')"
+	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated (User). Restart your terminal.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
 	@echo ""
 	@echo "[install] Done. Run 'aursh' to start."
 else

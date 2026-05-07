@@ -67,29 +67,43 @@ public class PluginManager
         var interpreter = new LuaInterpreter();
         var plugin = new LoadedPlugin(manifest, interpreter);
 
-        RegisterAurshApi(plugin);
-        RegisterRequire(plugin);
+        if (manifest.Type.ToLowerInvariant() == "lua")
+        {
+            RegisterAurshApi(plugin);
+            RegisterRequire(plugin);
 
-        try
-        {
-            string source = File.ReadAllText(entryPath);
-            interpreter.Execute(source, manifest.Entry);
-        }
-        catch (LuaError ex)
-        {
-            Console.Error.WriteLine($"aursh: plugin '{manifest.Name}': {ex.Message}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"aursh: plugin '{manifest.Name}': unexpected error: {ex.Message}");
-            return false;
+            try
+            {
+                string source = File.ReadAllText(entryPath);
+                interpreter.Execute(source, manifest.Entry);
+            }
+            catch (LuaError ex)
+            {
+                Console.Error.WriteLine($"aursh: plugin '{manifest.Name}': {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"aursh: plugin '{manifest.Name}': unexpected error: {ex.Message}");
+                return false;
+            }
         }
 
         _plugins.Add(plugin);
 
-        foreach (var kv in plugin.RegisteredCommands)
-            _commandMap[kv.Key] = plugin;
+        if (manifest.Invokable)
+        {
+            if (manifest.Type.ToLowerInvariant() == "lua")
+            {
+                foreach (var kv in plugin.RegisteredCommands)
+                    _commandMap[kv.Key] = plugin;
+            }
+            else if (manifest.Type.ToLowerInvariant() == "binary")
+            {
+                foreach (var cmd in manifest.Commands)
+                    _commandMap[cmd] = plugin;
+            }
+        }
 
         return true;
     }
@@ -101,9 +115,21 @@ public class PluginManager
 
         foreach (var cmd in plugin.RegisteredCommands.Keys)
             _commandMap.Remove(cmd);
+        
+        foreach (var cmd in plugin.Manifest.Commands)
+            _commandMap.Remove(cmd);
 
         _plugins.Remove(plugin);
         return true;
+    }
+
+    public void UnloadAll()
+    {
+        var names = _plugins.Select(p => p.Manifest.Name).ToList();
+        foreach (var name in names)
+        {
+            UnloadPlugin(name);
+        }
     }
 
     public bool IsPluginCommand(string name) => _commandMap.ContainsKey(name);
@@ -134,6 +160,18 @@ public class PluginManager
             Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}': {ex.Message}");
             return 1;
         }
+    }
+
+    public string? GetPluginBinaryPath(string name)
+    {
+        if (_commandMap.TryGetValue(name, out var plugin))
+        {
+            if (plugin.Manifest.Type.ToLowerInvariant() == "binary")
+            {
+                return Path.Combine(plugin.Manifest.PluginDir, plugin.Manifest.Entry);
+            }
+        }
+        return null;
     }
 
     public int InstallPlugin(string sourcePath)
@@ -205,10 +243,9 @@ public class PluginManager
         }
     }
 
-    public int InitPlugin(string name)
+    public int InitPlugin(string name, string workingDirectory)
     {
-        EnsurePluginsDir();
-        string pluginDir = Path.Combine(_pluginsDir, name);
+        string pluginDir = Path.Combine(workingDirectory, name);
 
         if (Directory.Exists(pluginDir))
         {
@@ -227,6 +264,8 @@ public class PluginManager
                 Author = Utils.Platform.UserName,
                 Description = $"A custom AurShell plugin",
                 Entry = "init.lua",
+                Type = "lua",
+                Invokable = true,
                 Commands = new List<string> { name }
             };
 
@@ -253,6 +292,46 @@ aursh.print(""[plugin] {name} loaded"")
         catch (Exception ex)
         {
             Console.Error.WriteLine($"aursh: plugin init failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    public int DebugPlugin(string fileOrName, string workingDirectory)
+    {
+        string filePath = Utils.FileSystem.ResolvePath(fileOrName, workingDirectory);
+        if (!File.Exists(filePath))
+        {
+            string pluginDir = Path.Combine(_pluginsDir, fileOrName);
+            if (Directory.Exists(pluginDir))
+            {
+                filePath = Path.Combine(pluginDir, "init.lua");
+                if (!File.Exists(filePath))
+                {
+                    Console.Error.WriteLine($"aursh: debug: no init.lua found for plugin '{fileOrName}'");
+                    return 1;
+                }
+            }
+            else
+            {
+                Console.Error.WriteLine($"aursh: debug: file or plugin '{fileOrName}' not found");
+                return 1;
+            }
+        }
+
+        try
+        {
+            string source = File.ReadAllText(filePath);
+            var lexer = new LuaLexer(source);
+            var tokens = lexer.Tokenize();
+            var parser = new LuaParser(tokens);
+            parser.ParseBlock();
+            
+            Console.WriteLine($"Syntax OK: {filePath}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Syntax Error in {filePath}:\n{ex.Message}");
             return 1;
         }
     }

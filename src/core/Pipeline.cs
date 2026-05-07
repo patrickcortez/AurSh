@@ -80,6 +80,14 @@ public static class Pipeline
 
         if (env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
         {
+            string? binPath = env.PluginManager.GetPluginBinaryPath(cmd.Name);
+            if (binPath != null)
+            {
+                var tempCmd = new CommandNode { Name = binPath };
+                foreach (var arg in cmd.Args) tempCmd.Args.Add(arg);
+                foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+                return ExecuteExternal(tempCmd, env, workingDirectory, background);
+            }
             return env.PluginManager.ExecutePluginCommand(cmd.Name, cmd.Args.ToList());
         }
 
@@ -306,6 +314,11 @@ public static class Pipeline
                 }
 
                 string? executable = ResolveCommand(cmd.Name, workingDirectory);
+                if (executable == null && env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
+                {
+                    executable = env.PluginManager.GetPluginBinaryPath(cmd.Name);
+                }
+
                 if (executable == null)
                 {
                     executable = Utils.Platform.DefaultShell;

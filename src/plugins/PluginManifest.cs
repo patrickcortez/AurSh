@@ -23,6 +23,12 @@ public class PluginManifest
     [JsonPropertyName("entry")]
     public string Entry { get; set; } = "init.lua";
 
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "lua";
+
+    [JsonPropertyName("invokable")]
+    public bool Invokable { get; set; } = true;
+
     [JsonPropertyName("commands")]
     public List<string> Commands { get; set; } = new();
 

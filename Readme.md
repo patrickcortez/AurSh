@@ -5,10 +5,8 @@
 
 
 <p align="center">
- <img height="512" width="512" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
-</p>
-
-A cross compatible shell developed in C# by Tezzz, is a system shell
+    
+    A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
 This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
@@ -18,6 +16,16 @@ It has a two line prompt with modern looking UI like PowerLevel10k thats verbose
 It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
 
 Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good.
+
+</p>
+
+<p align="center">
+ <img height="512" width="512" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
+</p>
+
+---
+
+## Features
 
 Has:
 - Shell Scripting: .aur scripts

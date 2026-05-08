@@ -1,6 +1,6 @@
 <h1 align="center">AurSh</h1>
 
-> A cross platform shell to make the command line aesthetically pleasing
+<h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
 ![badge](https://shields.io/badge/Aursh-lightblue) ![badge2](https://shields.io/badge/Ver_0.1-pink) ![badge3](https://shields.io/badge/Cross_Platform-lightgreen)
 

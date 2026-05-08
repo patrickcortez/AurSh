@@ -1,4 +1,8 @@
+using System.Reflection;
+using System.Reflection.PortableExecutable;
+using System.Runtime.InteropServices;
 using System.Text;
+using AurShell.Utils;
 
 namespace AurShell.Core;
 
@@ -9,7 +13,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -43,8 +47,62 @@ public static class BuiltinCommands
             "aursh-plugin" => ExecuteAurshPlugin(cmd, env, workingDirectory),
             "aursh-assoc" => ExecuteAssoc(cmd, env),
             "aursh-reload" => ExecuteReload(env),
+            "aursh-about" => ExecuteAbout(cmd),
             _ => ExecuteFallback(cmd)
         };
+    }
+
+    private static string GetPlatform()
+    {
+        string os = string.Empty;
+
+        if (OperatingSystem.IsWindows())
+        {
+            os = "Windows";
+        }else if (OperatingSystem.IsLinux())
+        {
+            os = "Linux";
+        }else if (OperatingSystem.IsAndroid())
+        {
+            os = "Android";
+        }else if (OperatingSystem.IsMacOS())
+        {
+            os = "MacOS";
+        }
+        else
+        {
+            os = "Unknown";
+        }
+
+        return os;
+    }
+
+    private static Architecture GetArch()
+    {
+        return RuntimeInformation.OSArchitecture;
+    }
+
+    private static int ExecuteAbout(CommandNode cmd)
+    {
+
+        string about = $@"
+        {Ansi.FgBrightCyan}-------------------------------------------------------------------------------------------------------
+        
+        {Ansi.FgBrightBlue}                 About:
+                            - This Shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
+                            As a cross platform shell with a purpose to make the command-line
+                            look aesthetically pleasing. This Shell is under the license of
+                            {Ansi.FgBrightCyan}GNU General Public License. 
+
+                            {Ansi.FgBrightBlue}Current Platform: {GetPlatform()}
+                            Current Architecture: {GetArch().ToString()}
+
+       {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
+        ";
+
+        Console.WriteLine(about);
+
+        return 0;
     }
 
     private static int ExecuteCd(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)

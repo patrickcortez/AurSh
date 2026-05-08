@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A cross-platform system shell with SAAO, modern prompt, and scripting support.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0+b7fd427308ed061be6e581a0b032c35e16a2744f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.0+ed6adfb6e97355e663b357f236792a231f8b3773")]
 [assembly: System.Reflection.AssemblyProductAttribute("AurShell")]
 [assembly: System.Reflection.AssemblyTitleAttribute("aursh")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.1.0.0")]

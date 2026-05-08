@@ -56,7 +56,13 @@ Has:
 
 **MacOS**
 
-(Image Unavailable because I dont own a Mac)
+> (Image Unavailable because I dont own a Mac)
+
+---
+
+## Icon
+
+![icon](/Assets/Images/aura-icon.png)
 
 ---
 

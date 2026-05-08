@@ -37,7 +37,7 @@ if %ERRORLEVEL% EQU 0 (
 
     echo Committing changes...
 
-    git commit -m %~1
+    git commit -m %1
 
 ) else (
 

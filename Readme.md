@@ -1,13 +1,15 @@
-<h1 align="center">AurSh</h1>
+<h2 align="center">AurSh</h2>
 
 <h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
+<p align="center">
 ![badge](https://shields.io/badge/Aursh-lightblue) ![badge2](https://shields.io/badge/Ver_0.1-pink) ![badge3](https://shields.io/badge/Cross_Platform-lightgreen)
+</p>
 
 <p align="center">
  <img height="256" width="256" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
 </p>
-
+<div align="center">
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
@@ -18,6 +20,7 @@ It has a two line prompt with modern looking UI like PowerLevel10k thats verbose
 It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
 
 Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good.
+</div>
 
 Has:
 - Shell Scripting: .aur scripts

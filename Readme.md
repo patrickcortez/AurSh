@@ -1,5 +1,8 @@
 # AurSh
 
+
+![badge](https://shields.io/badge/Aursh-lightblue) ![badge2](https://shields.io/badge/Ver_0.1-pink) ![badge3](https://shields.io/badge/Cross_Platform-lightgreen)
+
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
@@ -49,12 +52,17 @@ aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
 
 ![Android](/Assets/Images/Android.jpg)
 
+**MacOS**
+
+(Image Unavailable because I dont own a Mac)
+
 ---
 
 ## Installation
 
-Make sure you have make and the .NET SDK installed.
-Once you have them installed simply run `make install-user` for non admin previlege and `make install` for system dir.
+Make sure you have *make* and the *.NET SDK* installed.
+
+Once you have them installed simply run `make install-user` for current user installation and `make install` for system wide installation.
 
 ---
 

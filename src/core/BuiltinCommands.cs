@@ -91,11 +91,11 @@ public static class BuiltinCommands
         {Ansi.FgBrightBlue}                 About:
                             - This Shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
                             As a cross platform shell with a purpose to make the command-line
-                            look aesthetically pleasing. This Shell is under the license of
-                            {Ansi.FgBrightCyan}GNU General Public License. 
+                            look aesthetically pleasing while working. This Shell is under the license of
+                            {Ansi.FgBrightCyan}GNU General Public License.
 
-                            {Ansi.FgBrightBlue}Current Platform: {GetPlatform()}
-                            Current Architecture: {GetArch().ToString()}
+                            {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}
+                            {Ansi.FgBrightBlue}Current Architecture: {Ansi.FgBrightMagenta}{GetArch().ToString()}
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

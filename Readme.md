@@ -1,11 +1,10 @@
 <h1 align="center">AurSh<h1>
 
+<p align="center">
+ <img height="256" width="256" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
+</p>
 
 ![badge](https://shields.io/badge/Aursh-lightblue) ![badge2](https://shields.io/badge/Ver_0.1-pink) ![badge3](https://shields.io/badge/Cross_Platform-lightgreen)
-
-<p align="center">
- <img height="512" width="512" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
-</p>
 
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.

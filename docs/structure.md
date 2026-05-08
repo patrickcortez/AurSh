@@ -1,7 +1,7 @@
 # Structure
 
 *src* contains the source code for AurSh. Whilst *bin* contains 
-the binaries of Aursh and *docs* contains its documentation. *Assets* contains its fonts and images.
+the binaries of Aursh and *docs* contains its documentation. *Assets* contains its fonts,icons and images.
 
 ## AurSh Structure
 
@@ -12,5 +12,4 @@ AurSh -> OS
 AurSh also has its plug-in system using lua for it to have extensible functionality.
 
 plugins & .aurc -> aursh -> OS
-
 

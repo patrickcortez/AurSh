@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>aursh</id>
+    <version>0.1.0</version>
+    <authors>Tezzz</authors>
+    <description>A cross-platform system shell with aesthetically pleasing UI, modern prompt, and scripting support.</description>
+    <packageTypes>
+      <packageType name="DotnetTool" />
+    </packageTypes>
+    <repository type="git" commit="0b00ad931a63f5d291729793991349f4f4b6d6bc" />
+  </metadata>
+  <files>
+    <file src="C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\DotnetToolSettings.xml" target="tools\net8.0\any\DotnetToolSettings.xml" />
+    <file src="C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.deps.json" target="tools\net8.0\any\aursh.deps.json" />
+    <file src="C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.dll" target="tools\net8.0\any\aursh.dll" />
+    <file src="C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.pdb" target="tools\net8.0\any\aursh.pdb" />
+    <file src="C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.runtimeconfig.json" target="tools\net8.0\any\aursh.runtimeconfig.json" />
+  </files>
+</package>

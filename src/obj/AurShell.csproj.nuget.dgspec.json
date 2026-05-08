@@ -8,7 +8,7 @@
       "version": "0.1.0",
       "restore": {
         "projectUniqueName": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
-        "projectName": "aursh",
+        "projectName": "Aursh",
         "projectPath": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
         "packagesPath": "C:\\Users\\Cortez\\.nuget\\packages\\",
         "outputPath": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\obj\\",
@@ -53,14 +53,6 @@
         "net8.0": {
           "framework": "net8.0",
           "targetAlias": "net8.0",
-          "dependencies": {
-            "Microsoft.NET.ILLink.Tasks": {
-              "suppressParent": "All",
-              "target": "Package",
-              "version": "[8.0.24, )",
-              "autoReferenced": true
-            }
-          },
           "imports": [
             "net461",
             "net462",
@@ -78,10 +70,6 @@
               "version": "[8.0.24, 8.0.24]"
             },
             {
-              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
-              "version": "[8.0.24, 8.0.24]"
-            },
-            {
               "name": "Microsoft.NETCore.App.Host.win-x64",
               "version": "[8.0.24, 8.0.24]"
             },
@@ -90,15 +78,7 @@
               "version": "[8.0.24, 8.0.24]"
             },
             {
-              "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[8.0.24, 8.0.24]"
-            },
-            {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.24, 8.0.24]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
               "version": "[8.0.24, 8.0.24]"
             }
           ],
@@ -108,11 +88,6 @@
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\11.0.100-preview.2.26159.112/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
         }
       }
     }

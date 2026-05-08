@@ -1,0 +1,5 @@
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.exe
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.dll
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.deps.json
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.runtimeconfig.json
+C:\Users\Cortez\Documents\Projects\Aurshell\bin\publish\aursh.pdb

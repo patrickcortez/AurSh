@@ -2,4 +2,5 @@ bin/*
 .agents/*
 docs/syntax.md
 .gitignore
-publish/win-x64/*
+publish/win-x64
+nupkg

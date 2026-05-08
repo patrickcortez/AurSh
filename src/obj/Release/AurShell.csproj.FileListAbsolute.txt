@@ -8,7 +8,6 @@ C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.AssemblyInf
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.AssemblyInfo.cs
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.csproj.CoreCompileInputs.cache
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.sourcelink.json
-C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.csproj.Up2Date
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\aursh.dll
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\refint\aursh.dll
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\aursh.pdb

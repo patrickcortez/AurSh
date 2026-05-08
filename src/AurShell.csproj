@@ -16,7 +16,11 @@
     <Version>0.1.0</Version>
     <Authors>Tezzz</Authors>
     <Product>AurShell</Product>
-    <Description>A cross-platform system shell with SAAO, modern prompt, and scripting support.</Description>
+    <Description>A cross-platform system shell with aesthetically pleasing UI, modern prompt, and scripting support.</Description>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>Aursh</ToolCommandName>
+    <PackageOutputPath>../nupkg</PackageOutputPath>
+    <PackageId>Aursh</PackageId>
   </PropertyGroup>
 
 </Project>

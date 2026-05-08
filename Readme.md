@@ -31,10 +31,12 @@ Has:
 
 ## Built-ins
 
-aursh-plugin <add,list,del,init,debug> : plugin system of the shell 
-aursh-assoc <extension> <command> : file association
-aursh-reload : reloads shell
-aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
+- aursh-plugin <add,list,del,init,debug> : plugin system of the shell 
+- aursh-assoc <extension> <command> : file association
+- aursh-reload : reloads shell
+- aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
+- aursh-about : basic info about AurSh
+
 
 ---
 

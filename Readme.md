@@ -44,6 +44,7 @@ Has:
 - aursh-reload : reloads shell
 - aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
 - aursh-about : basic info about AurSh
+- aursh-ls : A TUI file system explorer.
 
 
 ---

@@ -13,3 +13,4 @@ C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\refint\aursh.dll
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\aursh.pdb
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.genruntimeconfig.cache
 C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\ref\aursh.dll
+C:\Users\Cortez\Documents\Projects\Aurshell\src\obj\Release\AurShell.csproj.Up2Date

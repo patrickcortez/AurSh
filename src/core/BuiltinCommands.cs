@@ -13,7 +13,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -48,6 +48,7 @@ public static class BuiltinCommands
             "aursh-assoc" => ExecuteAssoc(cmd, env),
             "aursh-reload" => ExecuteReload(env),
             "aursh-about" => ExecuteAbout(cmd),
+            "aursh-ls" => ExecuteLs(cmd,ref workingDirectory),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -149,6 +150,88 @@ public static class BuiltinCommands
 
         return 0;
     }
+
+private static int ExecuteLs(CommandNode cmd, ref string workingDirectory)
+{
+    string targetPath = workingDirectory;
+    
+    if (cmd.Args.Count >= 1)
+    {
+        if (Path.IsPathRooted(cmd.Args[0]))
+            targetPath = cmd.Args[0];
+        else
+            targetPath = Path.Combine(workingDirectory, cmd.Args[0]);
+    }
+
+    if (!Directory.Exists(targetPath))
+    {
+        Console.Error.WriteLine($"aursh: ls: cannot access '{targetPath}': No such file or directory");
+        return 1;
+    }
+
+    var entries = Directory.EnumerateFileSystemEntries(targetPath).ToList();
+    
+    if (entries.Count == 0)
+    {
+        return 0;
+    }
+
+    // Calculate the maximum filename length
+    var fileNames = entries.Select(Path.GetFileName).ToList();
+    int maxWidth = fileNames.Max(n => n.Length);
+    int columnGap = 4; // spaces between columns
+    int columnWidth = maxWidth + columnGap;
+    
+    int numColumns;
+    
+    if (entries.Count > 16)
+    {
+        numColumns = 2;
+    }
+    else
+    {
+        // Calculate how many columns fit in terminal
+        int terminalWidth = Console.WindowWidth;
+        numColumns = Math.Max(1, terminalWidth / columnWidth);
+    }
+    
+    int numRows = (int)Math.Ceiling((double)entries.Count / numColumns);
+
+    // Print in columns (top to bottom, then left to right)
+    for (int row = 0; row < numRows; row++)
+    {
+        for (int col = 0; col < numColumns; col++)
+        {
+            int index = col * numRows + row;
+            
+            if (index >= entries.Count)
+                break;
+
+            string fileName = fileNames[index];
+            FileAttributes attr = File.GetAttributes(entries[index]);
+            bool isDir = attr.HasFlag(FileAttributes.Directory);
+            bool isExe = Path.GetExtension(fileName).Equals(".exe", StringComparison.OrdinalIgnoreCase);
+            bool isAur = Path.GetExtension(fileName).Equals(".aur",StringComparison.OrdinalIgnoreCase);
+
+            // Set color
+            if (isDir)
+                Console.Write(Ansi.FgBrightBlue);
+            else if (isExe)
+                Console.Write(Ansi.FgBrightGreen);
+            else if (isAur)
+                Console.Write(Ansi.FgBrightYellow);
+            else
+                Console.Write(Ansi.FgBrightWhite);
+
+            // Print filename padded to column width
+            Console.Write(fileName.PadRight(columnWidth));
+        }
+        Console.WriteLine();
+    }
+
+    Console.Write(Ansi.Reset);
+    return 0;
+}
 
     private static int ExecuteExport(CommandNode cmd, ShellEnvironment env)
     {

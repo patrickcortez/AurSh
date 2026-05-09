@@ -52,7 +52,7 @@ Has:
 
 **Windows**
 
-![Windows](/Assets/Images/Windows.png)
+![Windows](/Assets/Images/Windows2.png)
 
 **Linux**
 

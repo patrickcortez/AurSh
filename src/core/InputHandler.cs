@@ -15,6 +15,9 @@ public class InputHandler
     private int _searchIndex = -1;
     private int _lastTermWidth;
     private string _currentPrompt = "";
+    private int _lastDisplayLines;
+    private int _pendingResizeWidth;
+    private long _resizeChangeTick;
 
     public InputHandler(History history, ShellEnvironment env)
     {
@@ -38,6 +41,7 @@ public class InputHandler
         _history.ResetNavigation();
 
         UpdateGhostText();
+        _lastDisplayLines = ComputeDisplayLines();
 
         while (true)
         {
@@ -496,6 +500,7 @@ public class InputHandler
         sb.Append(Utils.Ansi.CursorShow);
 
         Console.Write(sb.ToString());
+        _lastDisplayLines = ComputeDisplayLines();
     }
 
     private void ClearGhostText()
@@ -533,20 +538,53 @@ public class InputHandler
     private void CheckTerminalResize()
     {
         int currentWidth = Utils.Platform.TerminalWidth;
-        if (currentWidth != _lastTermWidth)
+
+        if (currentWidth == _lastTermWidth)
+        {
+            _pendingResizeWidth = 0;
+            return;
+        }
+
+        if (currentWidth != _pendingResizeWidth)
+        {
+            _pendingResizeWidth = currentWidth;
+            _resizeChangeTick = Environment.TickCount64;
+            return;
+        }
+
+        long elapsed = Environment.TickCount64 - _resizeChangeTick;
+        if (elapsed >= 100)
         {
             _lastTermWidth = currentWidth;
-            FullRedraw();
+            _pendingResizeWidth = 0;
+            FullRedraw(clearPrevious: true);
         }
     }
 
-    private void FullRedraw()
+    private void FullRedraw(bool clearPrevious = false)
     {
         var prompt = new Prompt(_env);
         string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
         int exitCode = _env.LastExitCode;
         _currentPrompt = prompt.Render(cwd, exitCode);
         _promptVisibleLen = prompt.PromptVisibleLength(exitCode);
+
+        if (clearPrevious)
+        {
+            try
+            {
+                int currentLines = ComputeDisplayLines() + 2;
+                int currentRow = Console.CursorTop;
+                int targetRow = Math.Max(0, currentRow - (currentLines - 1));
+                Console.SetCursorPosition(0, targetRow);
+                Console.Write(Utils.Ansi.ClearScreenFromCursor);
+            }
+            catch
+            {
+                Console.Write('\r');
+                Console.Write(Utils.Ansi.ClearLine);
+            }
+        }
 
         var sb = new StringBuilder();
         sb.Append(_currentPrompt);
@@ -565,6 +603,8 @@ public class InputHandler
         sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
 
         Console.Write(sb.ToString());
+
+        _lastDisplayLines = ComputeDisplayLines();
     }
 
     private void EnterReverseSearch()
@@ -823,5 +863,32 @@ public class InputHandler
         if (lastNewline < 0)
             return stripped.Length;
         return stripped.Length - lastNewline - 1;
+    }
+
+    private int ComputeDisplayLines()
+    {
+        int termWidth = Utils.Platform.TerminalWidth;
+        if (termWidth <= 0) return 2;
+        return ComputeDisplayLinesAtWidth(termWidth);
+    }
+
+    private int ComputeDisplayLinesAtWidth(int width)
+    {
+        if (width <= 0) return 2;
+
+        string[] promptLines = _currentPrompt.Split('\n');
+        int totalLines = 0;
+
+        for (int i = 0; i < promptLines.Length - 1; i++)
+        {
+            int vis = Utils.Ansi.VisibleLength(promptLines[i]);
+            totalLines += Math.Max(1, (vis + width - 1) / width);
+        }
+
+        int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
+        int lastLineVis = lastPromptVis + _buffer.Length + _ghostText.Length;
+        totalLines += Math.Max(1, (lastLineVis + width - 1) / width);
+
+        return totalLines;
     }
 }

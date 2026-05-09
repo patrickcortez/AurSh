@@ -498,8 +498,8 @@ private static int ExecuteLs(CommandNode cmd, ref string workingDirectory)
 
     private static int ExecuteClear()
     {
-        Console.Write(Utils.Ansi.ClearScreen);
-        Console.Write(Utils.Ansi.SetCursorPosition(1, 1));
+        Console.Write("\x1b[2J\x1b[3J\x1b[H");
+        Console.Out.Flush();
         return 0;
     }
 

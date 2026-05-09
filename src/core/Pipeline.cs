@@ -34,27 +34,32 @@ public static class Pipeline
                     switch (redir.Type)
                     {
                         case RedirectType.Out:
-                            stdoutStream = new FileStream(target, FileMode.Create, FileAccess.Write);
+                            stdoutStream = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                            if (stdoutStream == null) return 1;
                             originalOut = Console.Out;
                             Console.SetOut(new StreamWriter(stdoutStream) { AutoFlush = true });
                             break;
                         case RedirectType.Append:
-                            stdoutStream = new FileStream(target, FileMode.Append, FileAccess.Write);
+                            stdoutStream = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                            if (stdoutStream == null) return 1;
                             originalOut = Console.Out;
                             Console.SetOut(new StreamWriter(stdoutStream) { AutoFlush = true });
                             break;
                         case RedirectType.In:
-                            stdinStream = new FileStream(target, FileMode.Open, FileAccess.Read);
+                            stdinStream = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
+                            if (stdinStream == null) return 1;
                             originalIn = Console.In;
                             Console.SetIn(new StreamReader(stdinStream));
                             break;
                         case RedirectType.Err:
-                            stderrStream = new FileStream(target, FileMode.Create, FileAccess.Write);
+                            stderrStream = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                            if (stderrStream == null) return 1;
                             originalErr = Console.Error;
                             Console.SetError(new StreamWriter(stderrStream) { AutoFlush = true });
                             break;
                         case RedirectType.ErrAppend:
-                            stderrStream = new FileStream(target, FileMode.Append, FileAccess.Write);
+                            stderrStream = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                            if (stderrStream == null) return 1;
                             originalErr = Console.Error;
                             Console.SetError(new StreamWriter(stderrStream) { AutoFlush = true });
                             break;
@@ -135,27 +140,32 @@ public static class Pipeline
             switch (redir.Type)
             {
                 case RedirectType.Out:
-                    stdoutFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stdoutFile == null) return 1;
                     psi.RedirectStandardOutput = true;
                     redirectStdout = true;
                     break;
                 case RedirectType.Append:
-                    stdoutFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stdoutFile == null) return 1;
                     psi.RedirectStandardOutput = true;
                     redirectStdout = true;
                     break;
                 case RedirectType.In:
-                    stdinFile = new FileStream(target, FileMode.Open, FileAccess.Read);
+                    stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
+                    if (stdinFile == null) return 1;
                     psi.RedirectStandardInput = true;
                     redirectStdin = true;
                     break;
                 case RedirectType.Err:
-                    stderrFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    stderrFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stderrFile == null) return 1;
                     psi.RedirectStandardError = true;
                     redirectStderr = true;
                     break;
                 case RedirectType.ErrAppend:
-                    stderrFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    stderrFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stderrFile == null) return 1;
                     psi.RedirectStandardError = true;
                     redirectStderr = true;
                     break;
@@ -188,14 +198,32 @@ public static class Pipeline
                 return 0;
             }
 
-            if (redirectStdout && stdoutFile != null)
-                process.StandardOutput.BaseStream.CopyTo(stdoutFile);
+            var tasks = new List<System.Threading.Tasks.Task>();
 
-            if (errToOut)
-                process.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput());
-            else if (redirectStderr && stderrFile != null)
-                process.StandardError.BaseStream.CopyTo(stderrFile);
+            if (errToOut && stdoutFile != null)
+            {
+                var fileLock = new object();
+                tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile, fileLock));
+                tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stdoutFile, fileLock));
+            }
+            else
+            {
+                if (redirectStdout && stdoutFile != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile));
+                }
 
+                if (errToOut && stdoutFile == null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, Console.OpenStandardOutput()));
+                }
+                else if (redirectStderr && stderrFile != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stderrFile));
+                }
+            }
+
+            System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
             process.WaitForExit();
             return process.ExitCode;
         }
@@ -218,6 +246,7 @@ public static class Pipeline
         int count = commands.Count;
         var processes = new Process?[count];
         var fileStreams = new List<FileStream>();
+        var redirInfos = new (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut)[count];
 
         try
         {
@@ -229,28 +258,81 @@ public static class Pipeline
 
                 if (isFirst && BuiltinCommands.IsBuiltin(cmd.Name))
                 {
-                    var pipePsi = new ProcessStartInfo
-                    {
-                        FileName = Utils.Platform.DefaultShell,
-                        WorkingDirectory = workingDirectory,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    };
-
                     var tempPipe = new System.IO.Pipes.AnonymousPipeServerStream(
                         System.IO.Pipes.PipeDirection.Out);
 
                     var builtinTask = System.Threading.Tasks.Task.Run(() =>
                     {
-                        var writer = new StreamWriter(tempPipe) { AutoFlush = true };
-                        var origOut = Console.Out;
-                        Console.SetOut(writer);
-                        BuiltinCommands.Execute(cmd, env, ref workingDirectory);
-                        Console.SetOut(origOut);
-                        writer.Flush();
-                        tempPipe.DisposeLocalCopyOfClientHandle();
-                        tempPipe.Close();
+                        StreamWriter? writer = null;
+                        TextWriter? origOut = null;
+                        TextWriter? origErr = null;
+                        Stream? stdoutFileStream = null;
+                        Stream? stderrFileStream = null;
+
+                        try
+                        {
+                            foreach (var r in cmd.Redirections)
+                            {
+                                if (r.Type == RedirectType.Out || r.Type == RedirectType.Append)
+                                {
+                                    string target = Utils.FileSystem.ResolvePath(r.Target, workingDirectory);
+                                    stdoutFileStream = SafeOpenFileStream(target,
+                                        r.Type == RedirectType.Out ? FileMode.Create : FileMode.Append,
+                                        FileAccess.Write);
+                                    if (stdoutFileStream != null)
+                                    {
+                                        origOut = Console.Out;
+                                        writer = new StreamWriter(stdoutFileStream) { AutoFlush = true };
+                                        Console.SetOut(writer);
+                                    }
+                                    break;
+                                }
+                            }
+
+                            foreach (var r in cmd.Redirections)
+                            {
+                                if (r.Type == RedirectType.Err || r.Type == RedirectType.ErrAppend || r.Type == RedirectType.ErrToOut)
+                                {
+                                    if (r.Type == RedirectType.ErrToOut)
+                                    {
+                                        origErr = Console.Error;
+                                        Console.SetError(Console.Out);
+                                    }
+                                    else
+                                    {
+                                        string target = Utils.FileSystem.ResolvePath(r.Target, workingDirectory);
+                                        stderrFileStream = SafeOpenFileStream(target,
+                                            r.Type == RedirectType.Err ? FileMode.Create : FileMode.Append,
+                                            FileAccess.Write);
+                                        if (stderrFileStream != null)
+                                        {
+                                            origErr = Console.Error;
+                                            Console.SetError(new StreamWriter(stderrFileStream) { AutoFlush = true });
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if (origOut == null)
+                            {
+                                writer = new StreamWriter(tempPipe) { AutoFlush = true };
+                                origOut = Console.Out;
+                                Console.SetOut(writer);
+                            }
+
+                            BuiltinCommands.Execute(cmd, env, ref workingDirectory);
+                        }
+                        finally
+                        {
+                            if (origOut != null) Console.SetOut(origOut);
+                            if (origErr != null) Console.SetError(origErr);
+                            writer?.Flush();
+                            stdoutFileStream?.Dispose();
+                            stderrFileStream?.Dispose();
+                            tempPipe.DisposeLocalCopyOfClientHandle();
+                            tempPipe.Close();
+                        }
                     });
 
                     if (i + 1 < count)
@@ -266,7 +348,7 @@ public static class Pipeline
 
                         var nextPsi = CreateProcessStartInfo(nextExe, nextCmd, env, workingDirectory);
                         nextPsi.RedirectStandardInput = true;
-                        ApplyRedirections(nextCmd, nextPsi, workingDirectory, fileStreams, i == count - 2);
+                        redirInfos[i + 1] = ApplyRedirections(nextCmd, nextPsi, workingDirectory, fileStreams);
 
                         var nextProc = Process.Start(nextPsi);
                         if (nextProc != null)
@@ -302,7 +384,7 @@ public static class Pipeline
                     if (!isLast)
                         assocPsi.RedirectStandardOutput = true;
 
-                    ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams, isLast);
+                    redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
 
                     processes[i] = Process.Start(assocPsi);
                     if (processes[i] == null)
@@ -330,7 +412,7 @@ public static class Pipeline
                     if (!isLast)
                         shellPsi.RedirectStandardOutput = true;
 
-                    ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams, isLast);
+                    redirInfos[i] = ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams);
 
                     processes[i] = Process.Start(shellPsi);
                     if (processes[i] == null)
@@ -349,7 +431,7 @@ public static class Pipeline
                 if (!isLast)
                     psi.RedirectStandardOutput = true;
 
-                ApplyRedirections(cmd, psi, workingDirectory, fileStreams, isLast);
+                redirInfos[i] = ApplyRedirections(cmd, psi, workingDirectory, fileStreams);
 
                 processes[i] = Process.Start(psi);
                 if (processes[i] == null)
@@ -359,14 +441,97 @@ public static class Pipeline
                 }
             }
 
-            for (int i = 0; i < count - 1; i++)
+            // Drain all streams concurrently to prevent deadlocks
+            var drainTasks = new List<System.Threading.Tasks.Task>();
+
+            for (int i = 0; i < count; i++)
             {
-                if (processes[i] != null && processes[i + 1] != null)
+                if (processes[i] == null) continue;
+                var (stdoutFile, stderrFile, stdinFile, errToOut) = redirInfos[i];
+
+                if (stdinFile != null)
                 {
-                    processes[i]!.StandardOutput.BaseStream.CopyTo(processes[i + 1]!.StandardInput.BaseStream);
-                    processes[i + 1]!.StandardInput.Close();
+                    var proc = processes[i]!;
+                    var file = stdinFile;
+                    drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                    {
+                        file.CopyTo(proc.StandardInput.BaseStream);
+                        proc.StandardInput.Close();
+                    }));
+                }
+
+                if (i < count - 1 && processes[i + 1] != null)
+                {
+                    // Not last: connect to next process unless file redirect overrides
+                    if (stdoutFile != null)
+                    {
+                        var proc = processes[i]!;
+                        var file = stdoutFile;
+                        drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file));
+                    }
+                    else
+                    {
+                        var proc = processes[i]!;
+                        var nextProc = processes[i + 1]!;
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            proc.StandardOutput.BaseStream.CopyTo(nextProc.StandardInput.BaseStream);
+                            nextProc.StandardInput.Close();
+                        }));
+                    }
+
+                    if (errToOut && stdoutFile == null)
+                    {
+                        var proc = processes[i]!;
+                        var nextProc = processes[i + 1]!;
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            proc.StandardError.BaseStream.CopyTo(nextProc.StandardInput.BaseStream);
+                        }));
+                    }
+                    else if (stderrFile != null)
+                    {
+                        var proc = processes[i]!;
+                        var file = stderrFile;
+                        drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file));
+                    }
+                }
+                else
+                {
+                    // Last process (or no next process)
+                    if (errToOut && stdoutFile != null)
+                    {
+                        var proc = processes[i]!;
+                        var file = stdoutFile;
+                        var fileLock = new object();
+                        drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file, fileLock));
+                        drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file, fileLock));
+                    }
+                    else
+                    {
+                        if (stdoutFile != null)
+                        {
+                            var proc = processes[i]!;
+                            var file = stdoutFile;
+                            drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file));
+                        }
+
+                        if (errToOut && stdoutFile == null)
+                        {
+                            var proc = processes[i]!;
+                            drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, Console.OpenStandardOutput()));
+                        }
+                        else if (stderrFile != null)
+                        {
+                            var proc = processes[i]!;
+                            var file = stderrFile;
+                            drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file));
+                        }
+                    }
                 }
             }
+
+            System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
 
             int lastExit = 0;
             for (int i = 0; i < count; i++)
@@ -420,34 +585,93 @@ public static class Pipeline
         return psi;
     }
 
-    private static void ApplyRedirections(
-        CommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<FileStream> streams, bool isLast)
+    private static (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut) ApplyRedirections(
+        CommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<FileStream> streams)
     {
+        FileStream? stdoutFile = null;
+        FileStream? stderrFile = null;
+        FileStream? stdinFile = null;
+        bool errToOut = false;
+
         foreach (var redir in cmd.Redirections)
         {
             string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
             switch (redir.Type)
             {
                 case RedirectType.Out:
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stdoutFile == null) continue;
                     psi.RedirectStandardOutput = true;
+                    streams.Add(stdoutFile);
                     break;
                 case RedirectType.Append:
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stdoutFile == null) continue;
                     psi.RedirectStandardOutput = true;
+                    streams.Add(stdoutFile);
                     break;
                 case RedirectType.In:
+                    stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
+                    if (stdinFile == null) continue;
                     psi.RedirectStandardInput = true;
+                    streams.Add(stdinFile);
                     break;
                 case RedirectType.Err:
+                    stderrFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stderrFile == null) continue;
                     psi.RedirectStandardError = true;
+                    streams.Add(stderrFile);
                     break;
                 case RedirectType.ErrAppend:
+                    stderrFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stderrFile == null) continue;
                     psi.RedirectStandardError = true;
+                    streams.Add(stderrFile);
                     break;
                 case RedirectType.ErrToOut:
                     psi.RedirectStandardError = true;
+                    errToOut = true;
                     break;
             }
         }
+
+        return (stdoutFile, stderrFile, stdinFile, errToOut);
+    }
+
+    private static FileStream? SafeOpenFileStream(string path, FileMode mode, FileAccess access)
+    {
+        try
+        {
+            return new FileStream(path, mode, access);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: cannot open {path}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static System.Threading.Tasks.Task PumpStreamAsync(Stream source, Stream destination, object? writeLock = null)
+    {
+        return System.Threading.Tasks.Task.Run(() =>
+        {
+            if (writeLock != null)
+            {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    lock (writeLock)
+                    {
+                        destination.Write(buffer, 0, read);
+                    }
+                }
+            }
+            else
+            {
+                source.CopyTo(destination);
+            }
+        });
     }
 
     public static string? ResolveCommand(string name, string workingDirectory)
@@ -510,27 +734,32 @@ public static class Pipeline
             switch (redir.Type)
             {
                 case RedirectType.Out:
-                    stdoutFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stdoutFile == null) return 1;
                     psi.RedirectStandardOutput = true;
                     redirectStdout = true;
                     break;
                 case RedirectType.Append:
-                    stdoutFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    stdoutFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stdoutFile == null) return 1;
                     psi.RedirectStandardOutput = true;
                     redirectStdout = true;
                     break;
                 case RedirectType.In:
-                    stdinFile = new FileStream(target, FileMode.Open, FileAccess.Read);
+                    stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
+                    if (stdinFile == null) return 1;
                     psi.RedirectStandardInput = true;
                     redirectStdin = true;
                     break;
                 case RedirectType.Err:
-                    stderrFile = new FileStream(target, FileMode.Create, FileAccess.Write);
+                    stderrFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
+                    if (stderrFile == null) return 1;
                     psi.RedirectStandardError = true;
                     redirectStderr = true;
                     break;
                 case RedirectType.ErrAppend:
-                    stderrFile = new FileStream(target, FileMode.Append, FileAccess.Write);
+                    stderrFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
+                    if (stderrFile == null) return 1;
                     psi.RedirectStandardError = true;
                     redirectStderr = true;
                     break;
@@ -563,14 +792,32 @@ public static class Pipeline
                 return 0;
             }
 
-            if (redirectStdout && stdoutFile != null)
-                process.StandardOutput.BaseStream.CopyTo(stdoutFile);
+            var tasks = new List<System.Threading.Tasks.Task>();
 
-            if (errToOut)
-                process.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput());
-            else if (redirectStderr && stderrFile != null)
-                process.StandardError.BaseStream.CopyTo(stderrFile);
+            if (errToOut && stdoutFile != null)
+            {
+                var fileLock = new object();
+                tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile, fileLock));
+                tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stdoutFile, fileLock));
+            }
+            else
+            {
+                if (redirectStdout && stdoutFile != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile));
+                }
 
+                if (errToOut && stdoutFile == null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, Console.OpenStandardOutput()));
+                }
+                else if (redirectStderr && stderrFile != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stderrFile));
+                }
+            }
+
+            System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
             process.WaitForExit();
             return process.ExitCode;
         }

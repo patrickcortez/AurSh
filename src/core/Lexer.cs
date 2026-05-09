@@ -177,16 +177,16 @@ public class Lexer
         {
             char c = _input[_pos];
 
-            if (char.IsWhiteSpace(c) && c != '\n' && !wasQuoted)
+            if (char.IsWhiteSpace(c) && c != '\n')
                 break;
 
             if (c == '\n' || c == ';' || c == '|' || c == '<')
                 break;
 
-            if (c == '>' && !wasQuoted)
+            if (c == '>')
                 break;
 
-            if (c == '&' && !wasQuoted)
+            if (c == '&')
                 break;
 
             if (c == '#' && sb.Length == 0)

@@ -34,18 +34,16 @@ Has:
 - Plug-in system using lua (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
 
-
 ---
 
 ## Built-ins
 
-- aursh-plugin <add,list,del,init,debug> : plugin system of the shell 
-- aursh-assoc <extension> <command> : file association
-- aursh-reload : reloads shell
-- aursh-history <clear,show,filter=<pattern>> : TUI history with query abilities
-- aursh-about : basic info about AurSh
-- aursh-ls : A TUI file system explorer.
-
+- `aursh-plugin` <add,list,del,init,debug> : plugin system of the shell 
+- `aursh-assoc` <extension> <command> : file association
+- `aursh-reload` : reloads shell
+- `aursh-history` <clear,show,filter=<pattern>> : TUI history with query abilities
+- `aursh-about` : basic info about AurSh
+- `aursh-ls` : A TUI file system explorer.
 
 ---
 
@@ -57,7 +55,7 @@ Has:
 
 **Linux**
 
-![Linux](/Assets/Images/Linux.png)
+![Linux](/Assets/Images/Linux2.png)
 
 **Android**
 

@@ -362,11 +362,12 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                                 System.IO.Pipes.PipeDirection.In,
                                 tempPipe.GetClientHandleAsString());
                             
-                            System.Threading.Tasks.Task.Run(() =>
+                            System.Threading.Tasks.Task.Run(async () =>
                             {
                                 try
                                 {
-                                    clientStream.CopyTo(nextProc.StandardInput.BaseStream);
+                                    await clientStream.CopyToAsync(nextProc.StandardInput.BaseStream);
+                                    await nextProc.StandardInput.BaseStream.FlushAsync();
                                 }
                                 catch (IOException) { }
                                 finally
@@ -458,11 +459,12 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                 if (stdinFile != null)
                 {
                     var proc = processes[i]!;
-                    drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                    drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                     {
                         try
                         {
-                            stdinFile.CopyTo(proc.StandardInput.BaseStream);
+                            await stdinFile.CopyToAsync(proc.StandardInput.BaseStream);
+                            await proc.StandardInput.BaseStream.FlushAsync();
                         }
                         catch (IOException) { }
                         finally
@@ -479,18 +481,26 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
 
                     if (stdoutFile != null)
                     {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try { proc.StandardOutput.BaseStream.CopyTo(stdoutFile); }
+                            try 
+                            { 
+                                await proc.StandardOutput.BaseStream.CopyToAsync(stdoutFile);
+                                await stdoutFile.FlushAsync();
+                            }
                             catch (IOException) { }
                             finally { nextProc.StandardInput.Close(); } 
                         }));
                     }
                     else
                     {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try { proc.StandardOutput.BaseStream.CopyTo(nextProc.StandardInput.BaseStream); }
+                            try 
+                            { 
+                                await proc.StandardOutput.BaseStream.CopyToAsync(nextProc.StandardInput.BaseStream);
+                                await nextProc.StandardInput.BaseStream.FlushAsync();
+                            }
                             catch (IOException) { }
                             finally { nextProc.StandardInput.Close(); }
                         }));
@@ -498,17 +508,25 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
 
                     if (errToOut && stdoutFile == null)
                     {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try { proc.StandardError.BaseStream.CopyTo(nextProc.StandardInput.BaseStream); }
+                            try 
+                            { 
+                                await proc.StandardError.BaseStream.CopyToAsync(nextProc.StandardInput.BaseStream);
+                                await nextProc.StandardInput.BaseStream.FlushAsync();
+                            }
                             catch (IOException) { }
                         }));
                     }
                     else if (stderrFile != null)
                     {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try { proc.StandardError.BaseStream.CopyTo(stderrFile); }
+                            try 
+                            { 
+                                await proc.StandardError.BaseStream.CopyToAsync(stderrFile);
+                                await stderrFile.FlushAsync();
+                            }
                             catch (IOException) { }
                         }));
                     }
@@ -519,29 +537,31 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                     {
                         var proc = processes[i]!;
                         var fileLock = new object();
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
                             try
                             {
                                 byte[] buffer = new byte[8192];
                                 int read;
-                                while ((read = proc.StandardOutput.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                                while ((read = await proc.StandardOutput.BaseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                                 {
                                     lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
                                 }
+                                await stdoutFile.FlushAsync();
                             }
                             catch (IOException) { }
                         }));
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
                             try
                             {
                                 byte[] buffer = new byte[8192];
                                 int read;
-                                while ((read = proc.StandardError.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                                while ((read = await proc.StandardError.BaseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                                 {
                                     lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
                                 }
+                                await stdoutFile.FlushAsync();
                             }
                             catch (IOException) { }
                         }));
@@ -551,9 +571,13 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                         if (stdoutFile != null)
                         {
                             var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try { proc.StandardOutput.BaseStream.CopyTo(stdoutFile); }
+                                try 
+                                { 
+                                    await proc.StandardOutput.BaseStream.CopyToAsync(stdoutFile);
+                                    await stdoutFile.FlushAsync();
+                                }
                                 catch (IOException) { }
                             }));
                         }
@@ -561,18 +585,25 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                         if (errToOut && stdoutFile == null)
                         {
                             var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try { proc.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput()); }
+                                try 
+                                { 
+                                    await proc.StandardError.BaseStream.CopyToAsync(Console.OpenStandardOutput());
+                                }
                                 catch (IOException) { }
                             }));
                         }
                         else if (stderrFile != null)
                         {
                             var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try { proc.StandardError.BaseStream.CopyTo(stderrFile); }
+                                try 
+                                { 
+                                    await proc.StandardError.BaseStream.CopyToAsync(stderrFile);
+                                    await stderrFile.FlushAsync();
+                                }
                                 catch (IOException) { }
                             }));
                         }

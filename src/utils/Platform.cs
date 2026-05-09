@@ -301,7 +301,7 @@ public static class Platform
             return pwsh;
 
         string systemRoot = System.Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows";
-        string builtinPwsh = Path.Combine(systemRoot, "System32", "WindowsPowerShell", "v1.1", "powershell.exe");
+        string builtinPwsh = Path.Combine(systemRoot, "System32", "WindowsPowerShell", "v1.2", "powershell.exe");
         if (File.Exists(builtinPwsh))
             return builtinPwsh;
 

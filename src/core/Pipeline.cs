@@ -240,7 +240,7 @@ public static class Pipeline
         }
     }
 
-private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
+    private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
     {
         var commands = pipeline.Commands;
         int count = commands.Count;
@@ -298,6 +298,14 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                 {
                     var tempPipe = new System.IO.Pipes.AnonymousPipeServerStream(
                         System.IO.Pipes.PipeDirection.Out);
+
+                    System.IO.Pipes.AnonymousPipeClientStream? clientStream = null;
+                    if (i + 1 < count)
+                    {
+                        clientStream = new System.IO.Pipes.AnonymousPipeClientStream(
+                            System.IO.Pipes.PipeDirection.In,
+                            tempPipe.GetClientHandleAsString());
+                    }
 
                     var builtinTask = System.Threading.Tasks.Task.Run(() =>
                     {
@@ -368,7 +376,7 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                             writer?.Flush();
                             stdoutFileStream?.Dispose();
                             stderrFileStream?.Dispose();
-                            tempPipe.DisposeLocalCopyOfClientHandle();
+                            try { tempPipe.DisposeLocalCopyOfClientHandle(); } catch { }
                             tempPipe.Close();
                         }
                     });
@@ -380,6 +388,7 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                         if (nextExe == null)
                         {
                             Console.Error.WriteLine($"aursh: {nextCmd.Name}: command not found");
+                            clientStream?.Dispose();
                             builtinTask.Wait();
                             return 127;
                         }
@@ -396,16 +405,17 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                         if (nextProc != null)
                         {
                             processes[i + 1] = nextProc;
-                            var clientStream = new System.IO.Pipes.AnonymousPipeClientStream(
-                                System.IO.Pipes.PipeDirection.In,
-                                tempPipe.GetClientHandleAsString());
                             
                             System.Threading.Tasks.Task.Run(async () =>
                             {
-                                await PumpStreamResilientAsync(clientStream, nextProc.StandardInput.BaseStream);
+                                await PumpStreamResilientAsync(clientStream!, nextProc.StandardInput.BaseStream);
                                 try { nextProc.StandardInput.Close(); } catch { }
-                                clientStream.Dispose();
+                                clientStream!.Dispose();
                             });
+                        }
+                        else
+                        {
+                            clientStream?.Dispose();
                         }
 
                         builtinTask.Wait();

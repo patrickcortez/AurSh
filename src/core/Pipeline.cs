@@ -240,7 +240,7 @@ public static class Pipeline
         }
     }
 
-    private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
+private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
     {
         var commands = pipeline.Commands;
         int count = commands.Count;
@@ -348,6 +348,10 @@ public static class Pipeline
 
                         var nextPsi = CreateProcessStartInfo(nextExe, nextCmd, env, workingDirectory);
                         nextPsi.RedirectStandardInput = true;
+                        
+                        if (i + 1 != count - 1)
+                            nextPsi.RedirectStandardOutput = true;
+
                         redirInfos[i + 1] = ApplyRedirections(nextCmd, nextPsi, workingDirectory, fileStreams);
 
                         var nextProc = Process.Start(nextPsi);
@@ -357,8 +361,20 @@ public static class Pipeline
                             var clientStream = new System.IO.Pipes.AnonymousPipeClientStream(
                                 System.IO.Pipes.PipeDirection.In,
                                 tempPipe.GetClientHandleAsString());
-                            clientStream.CopyTo(nextProc.StandardInput.BaseStream);
-                            nextProc.StandardInput.Close();
+                            
+                            System.Threading.Tasks.Task.Run(() =>
+                            {
+                                try
+                                {
+                                    clientStream.CopyTo(nextProc.StandardInput.BaseStream);
+                                }
+                                catch (IOException) { }
+                                finally
+                                {
+                                    nextProc.StandardInput.Close();
+                                    clientStream.Dispose();
+                                }
+                            });
                         }
 
                         builtinTask.Wait();
@@ -378,11 +394,8 @@ public static class Pipeline
                     foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
                     var assocPsi = CreateShellDelegatedStartInfo(tempCmd, env, workingDirectory);
 
-                    if (!isFirst)
-                        assocPsi.RedirectStandardInput = true;
-
-                    if (!isLast)
-                        assocPsi.RedirectStandardOutput = true;
+                    if (!isFirst) assocPsi.RedirectStandardInput = true;
+                    if (!isLast) assocPsi.RedirectStandardOutput = true;
 
                     redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
 
@@ -406,11 +419,8 @@ public static class Pipeline
                     executable = Utils.Platform.DefaultShell;
                     var shellPsi = CreateShellDelegatedStartInfo(cmd, env, workingDirectory);
 
-                    if (!isFirst)
-                        shellPsi.RedirectStandardInput = true;
-
-                    if (!isLast)
-                        shellPsi.RedirectStandardOutput = true;
+                    if (!isFirst) shellPsi.RedirectStandardInput = true;
+                    if (!isLast) shellPsi.RedirectStandardOutput = true;
 
                     redirInfos[i] = ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams);
 
@@ -425,11 +435,8 @@ public static class Pipeline
 
                 var psi = CreateProcessStartInfo(executable, cmd, env, workingDirectory);
 
-                if (!isFirst)
-                    psi.RedirectStandardInput = true;
-
-                if (!isLast)
-                    psi.RedirectStandardOutput = true;
+                if (!isFirst) psi.RedirectStandardInput = true;
+                if (!isLast) psi.RedirectStandardOutput = true;
 
                 redirInfos[i] = ApplyRedirections(cmd, psi, workingDirectory, fileStreams);
 
@@ -441,7 +448,6 @@ public static class Pipeline
                 }
             }
 
-            // Drain all streams concurrently to prevent deadlocks
             var drainTasks = new List<System.Threading.Tasks.Task>();
 
             for (int i = 0; i < count; i++)
@@ -454,47 +460,56 @@ public static class Pipeline
                     var proc = processes[i]!;
                     drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                     {
-                        stdinFile.CopyTo(proc.StandardInput.BaseStream);
-                        proc.StandardInput.Close();
+                        try
+                        {
+                            stdinFile.CopyTo(proc.StandardInput.BaseStream);
+                        }
+                        catch (IOException) { }
+                        finally
+                        {
+                            proc.StandardInput.Close();
+                        }
                     }));
                 }
 
                 if (i < count - 1 && processes[i + 1] != null)
                 {
+                    var proc = processes[i]!;
+                    var nextProc = processes[i + 1]!;
+
                     if (stdoutFile != null)
                     {
-                        var proc = processes[i]!;
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            proc.StandardOutput.BaseStream.CopyTo(stdoutFile);
+                            try { proc.StandardOutput.BaseStream.CopyTo(stdoutFile); }
+                            catch (IOException) { }
+                            finally { nextProc.StandardInput.Close(); } 
                         }));
                     }
                     else
                     {
-                        var proc = processes[i]!;
-                        var nextProc = processes[i + 1]!;
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            proc.StandardOutput.BaseStream.CopyTo(nextProc.StandardInput.BaseStream);
-                            nextProc.StandardInput.Close();
+                            try { proc.StandardOutput.BaseStream.CopyTo(nextProc.StandardInput.BaseStream); }
+                            catch (IOException) { }
+                            finally { nextProc.StandardInput.Close(); }
                         }));
                     }
 
                     if (errToOut && stdoutFile == null)
                     {
-                        var proc = processes[i]!;
-                        var nextProc = processes[i + 1]!;
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            proc.StandardError.BaseStream.CopyTo(nextProc.StandardInput.BaseStream);
+                            try { proc.StandardError.BaseStream.CopyTo(nextProc.StandardInput.BaseStream); }
+                            catch (IOException) { }
                         }));
                     }
                     else if (stderrFile != null)
                     {
-                        var proc = processes[i]!;
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            proc.StandardError.BaseStream.CopyTo(stderrFile);
+                            try { proc.StandardError.BaseStream.CopyTo(stderrFile); }
+                            catch (IOException) { }
                         }));
                     }
                 }
@@ -506,21 +521,29 @@ public static class Pipeline
                         var fileLock = new object();
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            byte[] buffer = new byte[8192];
-                            int read;
-                            while ((read = proc.StandardOutput.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                            try
                             {
-                                lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                                byte[] buffer = new byte[8192];
+                                int read;
+                                while ((read = proc.StandardOutput.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                                {
+                                    lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                                }
                             }
+                            catch (IOException) { }
                         }));
                         drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                         {
-                            byte[] buffer = new byte[8192];
-                            int read;
-                            while ((read = proc.StandardError.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                            try
                             {
-                                lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                                byte[] buffer = new byte[8192];
+                                int read;
+                                while ((read = proc.StandardError.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                                {
+                                    lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                                }
                             }
+                            catch (IOException) { }
                         }));
                     }
                     else
@@ -530,7 +553,8 @@ public static class Pipeline
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                             {
-                                proc.StandardOutput.BaseStream.CopyTo(stdoutFile);
+                                try { proc.StandardOutput.BaseStream.CopyTo(stdoutFile); }
+                                catch (IOException) { }
                             }));
                         }
 
@@ -539,7 +563,8 @@ public static class Pipeline
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                             {
-                                proc.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput());
+                                try { proc.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput()); }
+                                catch (IOException) { }
                             }));
                         }
                         else if (stderrFile != null)
@@ -547,14 +572,19 @@ public static class Pipeline
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                             {
-                                proc.StandardError.BaseStream.CopyTo(stderrFile);
+                                try { proc.StandardError.BaseStream.CopyTo(stderrFile); }
+                                catch (IOException) { }
                             }));
                         }
                     }
                 }
             }
 
-            System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
+            try
+            {
+                System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
+            }
+            catch (AggregateException) { }
 
             int lastExit = 0;
             for (int i = 0; i < count; i++)

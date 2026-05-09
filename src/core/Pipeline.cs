@@ -452,22 +452,22 @@ public static class Pipeline
                 if (stdinFile != null)
                 {
                     var proc = processes[i]!;
-                    var file = stdinFile;
                     drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
                     {
-                        file.CopyTo(proc.StandardInput.BaseStream);
+                        stdinFile.CopyTo(proc.StandardInput.BaseStream);
                         proc.StandardInput.Close();
                     }));
                 }
 
                 if (i < count - 1 && processes[i + 1] != null)
                 {
-                    // Not last: connect to next process unless file redirect overrides
                     if (stdoutFile != null)
                     {
                         var proc = processes[i]!;
-                        var file = stdoutFile;
-                        drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file));
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            proc.StandardOutput.BaseStream.CopyTo(stdoutFile);
+                        }));
                     }
                     else
                     {
@@ -492,40 +492,63 @@ public static class Pipeline
                     else if (stderrFile != null)
                     {
                         var proc = processes[i]!;
-                        var file = stderrFile;
-                        drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file));
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            proc.StandardError.BaseStream.CopyTo(stderrFile);
+                        }));
                     }
                 }
                 else
                 {
-                    // Last process (or no next process)
                     if (errToOut && stdoutFile != null)
                     {
                         var proc = processes[i]!;
-                        var file = stdoutFile;
                         var fileLock = new object();
-                        drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file, fileLock));
-                        drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file, fileLock));
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            byte[] buffer = new byte[8192];
+                            int read;
+                            while ((read = proc.StandardOutput.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                            {
+                                lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                            }
+                        }));
+                        drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                        {
+                            byte[] buffer = new byte[8192];
+                            int read;
+                            while ((read = proc.StandardError.BaseStream.Read(buffer, 0, buffer.Length)) > 0)
+                            {
+                                lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
+                            }
+                        }));
                     }
                     else
                     {
                         if (stdoutFile != null)
                         {
                             var proc = processes[i]!;
-                            var file = stdoutFile;
-                            drainTasks.Add(PumpStreamAsync(proc.StandardOutput.BaseStream, file));
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            {
+                                proc.StandardOutput.BaseStream.CopyTo(stdoutFile);
+                            }));
                         }
 
                         if (errToOut && stdoutFile == null)
                         {
                             var proc = processes[i]!;
-                            drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, Console.OpenStandardOutput()));
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            {
+                                proc.StandardError.BaseStream.CopyTo(Console.OpenStandardOutput());
+                            }));
                         }
                         else if (stderrFile != null)
                         {
                             var proc = processes[i]!;
-                            var file = stderrFile;
-                            drainTasks.Add(PumpStreamAsync(proc.StandardError.BaseStream, file));
+                            drainTasks.Add(System.Threading.Tasks.Task.Run(() =>
+                            {
+                                proc.StandardError.BaseStream.CopyTo(stderrFile);
+                            }));
                         }
                     }
                 }

@@ -260,7 +260,7 @@ public class PluginManager
             var manifest = new PluginManifest
             {
                 Name = name,
-                Version = "1.0.0",
+                Version = "1.1.0",
                 Author = Utils.Platform.UserName,
                 Description = $"A custom AurShell plugin",
                 Entry = "init.lua",

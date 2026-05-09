@@ -60,7 +60,7 @@ Has:
 
 **Android**
 
-![Android](/Assets/Images/Android.jpg)
+![Android](/Assets/Images/Screenshot_2026-05-09-21-57-45-17_84d3000e3f4017145260f7618db1d683.jpg)
 
 **MacOS**
 

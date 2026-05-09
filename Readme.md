@@ -44,6 +44,7 @@ Has:
 - `aursh-history` <clear,show,filter=<pattern>> : TUI history with query abilities
 - `aursh-about` : basic info about AurSh
 - `aursh-ls` : A TUI file system explorer.
+- `aursh-cat <options: -e> <file>` : A pipable file reader and a *vim-like* TUI text editor ( with `-e` flag ).
 
 ---
 

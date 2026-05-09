@@ -58,18 +58,58 @@ public static class BuiltinCommands
 
     public static int ExecuteCat(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
-        bool isReadOnly = cmd.Args.Count > 0;
-        string targetFile = isReadOnly ? Utils.FileSystem.ResolvePath(cmd.Args[0], workingDirectory) : "";
-        string displayFile = isReadOnly ? targetFile : "[New File]";
+        bool isEditorMode = false;
+        string targetFile = "";
 
-        if (isReadOnly && !File.Exists(targetFile))
+        if (cmd.Args.Count == 0)
         {
-            Console.Error.WriteLine($"aursh: aursh-cat: {cmd.Args[0]}: No such file or directory");
-            return 1;
+            isEditorMode = true;
+        }
+        else if (cmd.Args[0] == "-e")
+        {
+            isEditorMode = true;
+            if (cmd.Args.Count > 1)
+            {
+                targetFile = Utils.FileSystem.ResolvePath(cmd.Args[1], workingDirectory);
+            }
         }
 
+        if (!isEditorMode)
+        {
+            int streamExitCode = 0;
+            foreach (string arg in cmd.Args)
+            {
+                string resolvedPath = Utils.FileSystem.ResolvePath(arg, workingDirectory);
+                if (!File.Exists(resolvedPath))
+                {
+                    Console.Error.WriteLine($"aursh: aursh-cat: {arg}: No such file or directory");
+                    streamExitCode = 1;
+                    continue;
+                }
+
+                try
+                {
+                    using var stream = new FileStream(resolvedPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(stream);
+                    string? line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        Console.WriteLine(line);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: aursh-cat: {arg}: {ex.Message}");
+                    streamExitCode = 1;
+                }
+            }
+            return streamExitCode;
+        }
+
+        string displayFile = string.IsNullOrEmpty(targetFile) ? "[New File]" : targetFile;
         List<StringBuilder> buffer = new List<StringBuilder>();
-        if (isReadOnly)
+
+        if (!string.IsNullOrEmpty(targetFile) && File.Exists(targetFile))
         {
             string[] lines = Utils.FileSystem.ReadAllLinesSafe(targetFile);
             if (lines.Length == 0) 
@@ -91,6 +131,7 @@ public static class BuiltinCommands
         bool commandMode = false;
         string commandInput = "";
         string statusMessage = "";
+        string findQuery = "";
 
         bool running = true;
         int exitCode = 0;
@@ -122,7 +163,7 @@ public static class BuiltinCommands
                 if (cursorCol < scrollCol) scrollCol = cursorCol;
                 if (cursorCol >= scrollCol + maxTextWidth) scrollCol = cursorCol - maxTextWidth + 1;
 
-                Console.Write("\x1b[1;1H" + Utils.Ansi.ClearLine + "  AurSh Cat " + (isReadOnly ? "(Pager)" : "(Editor)"));
+                Console.Write("\x1b[1;1H" + Utils.Ansi.ClearLine + "  AurSh Cat (Editor)");
                 Console.Write("\x1b[2;1H" + Utils.Ansi.ClearLine + $"  {Utils.Ansi.FgBrightBlack}{displayFile}{Utils.Ansi.Reset}");
                 Console.Write("\x1b[3;1H" + Utils.Ansi.ClearLine + Utils.Ansi.FgBrightBlack + new string('\u2500', width - 1) + Utils.Ansi.Reset);
 
@@ -146,7 +187,14 @@ public static class BuiltinCommands
                             if (visible.Length > maxTextWidth) visible = visible.Substring(0, maxTextWidth);
                         }
 
-                        if (r == cursorRow && !isReadOnly && !commandMode)
+                        if (!string.IsNullOrEmpty(findQuery))
+                        {
+                            string highlight = Utils.Ansi.BgBrightYellow + Utils.Ansi.FgBlack;
+                            string reset = Utils.Ansi.Reset;
+                            visible = visible.Replace(findQuery, highlight + findQuery + reset);
+                        }
+
+                        if (r == cursorRow && !commandMode)
                         {
                             Console.Write(Utils.Ansi.FgBrightCyan + $" {lineNumStr} " + Utils.Ansi.FgBrightBlack + "\u2502 " + Utils.Ansi.Reset + visible);
                         }
@@ -175,7 +223,7 @@ public static class BuiltinCommands
                 }
                 else
                 {
-                    string info = isReadOnly ? "Press 'q' to quit | ':' for commands" : $"Ln {cursorRow + 1}, Col {cursorCol + 1} | Press ':' for commands";
+                    string info = $"Ln {cursorRow + 1}, Col {cursorCol + 1} | Press ':' for commands";
                     Console.Write(Utils.Ansi.FgRgb(150, 150, 150) + $"  {info}" + Utils.Ansi.Reset);
                 }
 
@@ -184,40 +232,16 @@ public static class BuiltinCommands
                     Console.Write($"\x1b[{height};{3 + commandInput.Length}H");
                     Console.Write("\x1b[?25h"); 
                 }
-                else if (!isReadOnly)
+                else
                 {
                     int screenRow = headerLines + (cursorRow - scrollRow) + 1;
                     int screenCol = prefixLen + (cursorCol - scrollCol) + 1;
                     Console.Write($"\x1b[{screenRow};{screenCol}H");
                     Console.Write("\x1b[?25h"); 
                 }
-                else
-                {
-                    Console.Write("\x1b[?25l"); 
-                }
 
                 var key = Console.ReadKey(true);
                 statusMessage = "";
-
-                if (isReadOnly && !commandMode)
-                {
-                    if (key.KeyChar == 'q' || key.KeyChar == 'Q' || key.Key == ConsoleKey.Escape)
-                    {
-                        running = false;
-                    }
-                    else if (key.KeyChar == ':')
-                    {
-                        commandMode = true;
-                        commandInput = "";
-                    }
-                    else if (key.Key == ConsoleKey.UpArrow) cursorRow--;
-                    else if (key.Key == ConsoleKey.DownArrow) cursorRow++;
-                    else if (key.Key == ConsoleKey.PageUp) cursorRow -= textHeight;
-                    else if (key.Key == ConsoleKey.PageDown) cursorRow += textHeight;
-                    else if (key.Key == ConsoleKey.Home) cursorRow = 0;
-                    else if (key.Key == ConsoleKey.End) cursorRow = buffer.Count - 1;
-                    continue;
-                }
 
                 if (commandMode)
                 {
@@ -229,6 +253,7 @@ public static class BuiltinCommands
                     {
                         commandMode = false;
                         string cmdStr = commandInput.Trim();
+                        
                         if (cmdStr == "q" || cmdStr == "q!")
                         {
                             running = false;
@@ -261,6 +286,71 @@ public static class BuiltinCommands
                                 {
                                     statusMessage = $"Save failed: {ex.Message}";
                                 }
+                            }
+                        }
+                        else if (cmdStr.StartsWith("find "))
+                        {
+                            string[] parts = cmdStr.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length > 1)
+                            {
+                                findQuery = parts[1];
+                                int count = 0;
+                                bool foundFirst = false;
+
+                                for (int r = 0; r < buffer.Count; r++)
+                                {
+                                    string s = buffer[r].ToString();
+                                    int idx = 0;
+                                    while ((idx = s.IndexOf(findQuery, idx, StringComparison.Ordinal)) != -1)
+                                    {
+                                        count++;
+                                        if (!foundFirst)
+                                        {
+                                            cursorRow = r;
+                                            cursorCol = idx;
+                                            foundFirst = true;
+                                        }
+                                        idx += findQuery.Length;
+                                    }
+                                }
+                                statusMessage = $"Found {count} occurrences of '{findQuery}'.";
+                            }
+                            else
+                            {
+                                statusMessage = "Error: No search term specified.";
+                                findQuery = "";
+                            }
+                        }
+                        else if (cmdStr == "find")
+                        {
+                            findQuery = "";
+                            statusMessage = "Search cleared.";
+                        }
+                        else if (cmdStr.StartsWith("replace "))
+                        {
+                            string[] parts = cmdStr.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 3)
+                            {
+                                string oldText = parts[1];
+                                string newText = parts[2];
+                                int totalReplaced = 0;
+                                
+                                foreach (var b in buffer)
+                                {
+                                    string s = b.ToString();
+                                    int lineCount = (s.Length - s.Replace(oldText, "").Length) / oldText.Length;
+                                    if (lineCount > 0)
+                                    {
+                                        totalReplaced += lineCount;
+                                        b.Replace(oldText, newText);
+                                    }
+                                }
+                                statusMessage = $"Replaced {totalReplaced} occurrences of '{oldText}'.";
+                                if (findQuery == oldText) findQuery = newText;
+                            }
+                            else
+                            {
+                                statusMessage = "Usage: :replace <old> <new>";
                             }
                         }
                         else
@@ -438,6 +528,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin management of AurSh.
                                 - {Ansi.FgBrightCyan}aursh-history : {Ansi.FgBrightBlue}TUI command history.
                                 - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
+                                - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

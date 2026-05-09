@@ -247,8 +247,44 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
         var processes = new Process?[count];
         var fileStreams = new List<FileStream>();
         var redirInfos = new (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut)[count];
-        using var cts = new System.Threading.CancellationTokenSource();
-        var token = cts.Token;
+
+        async System.Threading.Tasks.Task PumpStreamResilientAsync(Stream source, Stream? destination, object? writeLock = null)
+        {
+            byte[] buffer = new byte[81920];
+            int read;
+            bool destAlive = destination != null;
+
+            try
+            {
+                while ((read = await source.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    if (destAlive)
+                    {
+                        try
+                        {
+                            if (writeLock != null)
+                            {
+                                lock (writeLock)
+                                {
+                                    destination!.Write(buffer, 0, read);
+                                }
+                                await destination!.FlushAsync();
+                            }
+                            else
+                            {
+                                await destination!.WriteAsync(buffer, 0, read);
+                                await destination!.FlushAsync();
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            destAlive = false;
+                        }
+                    }
+                }
+            }
+            catch (Exception) { }
+        }
 
         try
         {
@@ -366,18 +402,10 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                             
                             System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try
-                                {
-                                    await clientStream.CopyToAsync(nextProc.StandardInput.BaseStream, token);
-                                    await nextProc.StandardInput.BaseStream.FlushAsync(token);
-                                }
-                                catch (Exception) { }
-                                finally
-                                {
-                                    nextProc.StandardInput.Close();
-                                    clientStream.Dispose();
-                                }
-                            }, token);
+                                await PumpStreamResilientAsync(clientStream, nextProc.StandardInput.BaseStream);
+                                try { nextProc.StandardInput.Close(); } catch { }
+                                clientStream.Dispose();
+                            });
                         }
 
                         builtinTask.Wait();
@@ -463,17 +491,9 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                     var proc = processes[i]!;
                     drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                     {
-                        try
-                        {
-                            await stdinFile.CopyToAsync(proc.StandardInput.BaseStream, token);
-                            await proc.StandardInput.BaseStream.FlushAsync(token);
-                        }
-                        catch (Exception) { }
-                        finally
-                        {
-                            proc.StandardInput.Close();
-                        }
-                    }, token));
+                        await PumpStreamResilientAsync(stdinFile, proc.StandardInput.BaseStream);
+                        try { proc.StandardInput.Close(); } catch { }
+                    }));
                 }
 
                 if (i < count - 1 && processes[i + 1] != null)
@@ -485,52 +505,32 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                     {
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try 
-                            { 
-                                await proc.StandardOutput.BaseStream.CopyToAsync(stdoutFile, token);
-                                await stdoutFile.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                            finally { nextProc.StandardInput.Close(); } 
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile);
+                            try { nextProc.StandardInput.Close(); } catch { }
+                        }));
                     }
                     else
                     {
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try 
-                            { 
-                                await proc.StandardOutput.BaseStream.CopyToAsync(nextProc.StandardInput.BaseStream, token);
-                                await nextProc.StandardInput.BaseStream.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                            finally { nextProc.StandardInput.Close(); }
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, nextProc.StandardInput.BaseStream);
+                            try { nextProc.StandardInput.Close(); } catch { }
+                        }));
                     }
 
                     if (errToOut && stdoutFile == null)
                     {
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try 
-                            { 
-                                await proc.StandardError.BaseStream.CopyToAsync(nextProc.StandardInput.BaseStream, token);
-                                await nextProc.StandardInput.BaseStream.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, nextProc.StandardInput.BaseStream);
+                        }));
                     }
                     else if (stderrFile != null)
                     {
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try 
-                            { 
-                                await proc.StandardError.BaseStream.CopyToAsync(stderrFile, token);
-                                await stderrFile.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, stderrFile);
+                        }));
                     }
                 }
                 else
@@ -541,32 +541,12 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                         var fileLock = new object();
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try
-                            {
-                                byte[] buffer = new byte[8192];
-                                int read;
-                                while ((read = await proc.StandardOutput.BaseStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
-                                {
-                                    lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
-                                }
-                                await stdoutFile.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile, fileLock);
+                        }));
                         drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                         {
-                            try
-                            {
-                                byte[] buffer = new byte[8192];
-                                int read;
-                                while ((read = await proc.StandardError.BaseStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
-                                {
-                                    lock (fileLock) { stdoutFile.Write(buffer, 0, read); }
-                                }
-                                await stdoutFile.FlushAsync(token);
-                            }
-                            catch (Exception) { }
-                        }, token));
+                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, stdoutFile, fileLock);
+                        }));
                     }
                     else
                     {
@@ -575,13 +555,8 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try 
-                                { 
-                                    await proc.StandardOutput.BaseStream.CopyToAsync(stdoutFile, token);
-                                    await stdoutFile.FlushAsync(token);
-                                }
-                                catch (Exception) { }
-                            }, token));
+                                await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile);
+                            }));
                         }
 
                         if (errToOut && stdoutFile == null)
@@ -589,29 +564,26 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try 
-                                { 
-                                    await proc.StandardError.BaseStream.CopyToAsync(Console.OpenStandardOutput(), token);
-                                }
-                                catch (Exception) { }
-                            }, token));
+                                await PumpStreamResilientAsync(proc.StandardError.BaseStream, Console.OpenStandardOutput());
+                            }));
                         }
                         else if (stderrFile != null)
                         {
                             var proc = processes[i]!;
                             drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
                             {
-                                try 
-                                { 
-                                    await proc.StandardError.BaseStream.CopyToAsync(stderrFile, token);
-                                    await stderrFile.FlushAsync(token);
-                                }
-                                catch (Exception) { }
-                            }, token));
+                                await PumpStreamResilientAsync(proc.StandardError.BaseStream, stderrFile);
+                            }));
                         }
                     }
                 }
             }
+
+            try
+            {
+                System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
+            }
+            catch (AggregateException) { }
 
             int lastExit = 0;
             for (int i = 0; i < count; i++)
@@ -622,15 +594,6 @@ private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, str
                     lastExit = processes[i]!.ExitCode;
                 }
             }
-
-            cts.CancelAfter(50);
-
-            try
-            {
-                System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
-            }
-            catch (AggregateException) { }
-            catch (OperationCanceledException) { }
 
             if (pipeline.Background)
             {

@@ -51,11 +51,11 @@ Has:
 
 **Windows**
 
-![Windows](/Assets/Images/Windows2.png)
+![Windows](/Assets/Images/Windows3.png)
 
 **Linux**
 
-![Linux](/Assets/Images/Linux2.png)
+![Linux](/Assets/Images/Linux3.png)
 
 **Android**
 

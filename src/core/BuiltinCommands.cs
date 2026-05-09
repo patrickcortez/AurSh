@@ -9,7 +9,7 @@ namespace AurShell.Core;
 public static class BuiltinCommands
 {
 
-    private readonly static string version = "1.2";
+    private readonly static string version = "1.3";
     private static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
     {
         "cd", "export", "unset", "exit", "history", "clear", "echo",

@@ -1,4 +1,4 @@
-﻿<?xml version="1.2" encoding="utf-8"?>
+﻿<?xml version="1.3" encoding="utf-8"?>
 <DotNetCliTool Version="1">
   <Commands>
     <Command Name="Aursh" EntryPoint="aursh.dll" Runner="dotnet" />

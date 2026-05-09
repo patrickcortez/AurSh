@@ -4,7 +4,7 @@ namespace AurShell.Core;
 
 public static class Banner
 {
-    private const string Version = "0.1.0";
+    private const string Version = "1.0.0";
 
     private static readonly string[] AsciiArt = new[]
     {
@@ -124,6 +124,15 @@ public static class Banner
         sb.Append(Utils.Ansi.Reset);
         sb.Append(dimFg);
         sb.Append(" to quit.");
+        sb.Append(Utils.Ansi.Reset);
+        sb.Append(dimFg);
+        sb.Append("\n   Type ");
+        sb.Append(Utils.Ansi.Reset);
+        sb.Append(accentFg);
+        sb.Append("aursh-about ");
+        sb.Append(Utils.Ansi.Reset);
+        sb.Append(dimFg);
+        sb.Append("to learn about Aurshell");
         sb.Append(Utils.Ansi.Reset);
         sb.AppendLine();
         sb.AppendLine();

@@ -3,7 +3,7 @@
 <h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
 <p align="center">
-<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_0.1-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen">
+<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_1.0-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen">
 </p>
 
 <p align="center">

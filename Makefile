@@ -5,7 +5,7 @@
 PROJECT := src/AurShell.csproj
 BIN_DIR := bin
 APP_NAME := aursh
-VERSION := 0.1.0
+VERSION := 1.0.0
 
 # ──────────────────────────────────────────────
 # OS and Architecture Detection

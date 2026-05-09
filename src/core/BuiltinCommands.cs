@@ -8,6 +8,8 @@ namespace AurShell.Core;
 
 public static class BuiltinCommands
 {
+
+    private readonly static string version = "1.0";
     private static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
     {
         "cd", "export", "unset", "exit", "history", "clear", "echo",
@@ -97,6 +99,15 @@ public static class BuiltinCommands
 
                             {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}
                             {Ansi.FgBrightBlue}Current Architecture: {Ansi.FgBrightMagenta}{GetArch().ToString()}
+                            {Ansi.FgBrightBlue}Current Version: {Ansi.FgBrightMagenta}{version}
+
+                            {Ansi.FgBrightBlue}AurSh has some native commands that you can invoke/use:
+                                - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.
+                                - {Ansi.FgBrightCyan}aursh-about : {Ansi.FgBrightBlue}Shows this message.
+                                - {Ansi.FgBrightCyan}aursh-assoc : {Ansi.FgBrightBlue}Associate file extensions with its compiler/interpreter.
+                                - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin management of AurSh.
+                                - {Ansi.FgBrightCyan}aursh-history : {Ansi.FgBrightBlue}TUI command history.
+                                - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

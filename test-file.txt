@@ -1,0 +1,5 @@
+Hello World!
+This is a test file for aursh-cat.
+Line 3
+Line 4
+Final line

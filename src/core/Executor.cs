@@ -21,17 +21,16 @@ public class Executor
 
     public (int ExitCode, string Output) ExecuteCapture(string input)
     {
-        var sw = new System.IO.StringWriter();
-        var originalOut = Console.Out;
-        Console.SetOut(sw);
+        string tempFile = System.IO.Path.GetTempFileName();
         try
         {
-            int exit = Execute(input);
-            return (exit, sw.ToString().TrimEnd('\n', '\r'));
+            int exit = Execute($"{input} > {tempFile}");
+            string output = System.IO.File.ReadAllText(tempFile).TrimEnd('\n', '\r');
+            return (exit, output);
         }
         finally
         {
-            Console.SetOut(originalOut);
+            try { System.IO.File.Delete(tempFile); } catch { }
         }
     }
 

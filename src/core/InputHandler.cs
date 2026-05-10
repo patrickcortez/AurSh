@@ -1,4 +1,6 @@
+using System.Reflection.PortableExecutable;
 using System.Text;
+using AurShell.Utils;
 
 namespace AurShell.Core;
 
@@ -19,13 +21,16 @@ public class InputHandler
     private int _pendingResizeWidth;
     private long _resizeChangeTick;
 
-    public InputHandler(History history, ShellEnvironment env)
+    private int count;
+
+    public InputHandler(History history, ShellEnvironment env) // Constructor
     {
         _history = history;
         _env = env;
+        count = 0; 
     }
 
-    public string? ReadLine(string prompt)
+    public string? ReadLine(string prompt) // AurSh Input hanndler
     {
         _currentPrompt = prompt;
         Console.Write(prompt);
@@ -56,11 +61,16 @@ public class InputHandler
             ConsoleKeyInfo key;
             try
             {
-                key = Console.ReadKey(true);
+                key = Console.ReadKey(true); // Get input from the user,key by key
             }
             catch
             {
                 return null;
+            }
+
+            if(key.Key == ConsoleKey.Spacebar)
+            {
+                count++;
             }
 
             if (_inReverseSearch)
@@ -71,7 +81,7 @@ public class InputHandler
                 continue;
             }
 
-            if (key.Key == ConsoleKey.Enter)
+            if (key.Key == ConsoleKey.Enter) // User confirms input
             {
                 if (Console.KeyAvailable)
                 {
@@ -175,7 +185,7 @@ public class InputHandler
                 continue;
             }
 
-            if ((key.Modifiers & ConsoleModifiers.Control) != 0)
+            if ((key.Modifiers & ConsoleModifiers.Control) != 0) // ctrl characters e.g: ctrl + c, ctrl + u, ctrl + w and etc...
             {
                 switch (key.Key)
                 {
@@ -214,7 +224,7 @@ public class InputHandler
                 }
             }
 
-            if (!char.IsControl(key.KeyChar))
+            if (!char.IsControl(key.KeyChar)) // Appending reg chars to Buffer
             {
                 HandleCharacter(key.KeyChar);
             }
@@ -231,7 +241,7 @@ public class InputHandler
         _cursorPos = 0;
     }
 
-    private void HandleCharacter(char c)
+    private void HandleCharacter(char c) // Input handler for regular characters
     {
         if (_cursorPos == _buffer.Length)
         {
@@ -475,18 +485,173 @@ public class InputHandler
         RedrawLine();
     }
 
-    private void RedrawLine()
+    private bool isParenthesis(char c)
+    {
+        return c switch{
+            '(' => true,
+            ')' => true,
+            '[' => true,
+            ']' => true,
+            '{' => true,
+            '}' => true,
+            _ => false
+
+        };
+    }
+
+ private string SyntaxHighlight(string data) // Syntax highlightning
+{
+
+    data = Utils.Ansi.Strip(data);
+
+    var sb = new StringBuilder();
+
+    bool inQuotes = false;
+    bool inSingles = false;
+    bool firstToken = true;
+
+    int i = 0;
+
+    while (i < data.Length)
+    {
+        char c = data[i];
+
+
+        if (c == '"') // if were in qoutes, display as meganta
+        {
+            inQuotes = !inQuotes;
+
+            sb.Append(Ansi.FgBrightMagenta);
+            sb.Append(c);
+            sb.Append(Ansi.Reset);
+
+            i++;
+            continue;
+        }
+
+        if(c == '\'')
+        {
+            inSingles = !inSingles;
+
+            sb.Append(Ansi.FgBrightMagenta);
+            sb.Append(c);
+            sb.Append(Ansi.Reset);
+
+            i++;
+            continue;
+        }
+
+        if (inSingles && !inQuotes)
+        {
+            sb.Append(Ansi.FgBrightMagenta);
+
+            while(i < data.Length && !char.IsWhiteSpace(data[i]))
+            {
+                sb.Append(data[i]);
+                i++;
+            }
+
+            continue;
+        }
+
+            if (isParenthesis(c) && !inQuotes && !firstToken)
+            {
+                sb.Append(Ansi.FgBrightRed);
+                sb.Append(c);
+                sb.Append(Ansi.Reset);
+
+                i++;
+                continue;
+            }
+
+        if(c == '$' && !inQuotes && !firstToken)
+        {
+                sb.Append(Ansi.FgBrightGreen);
+
+                while(i < data.Length && !char.IsWhiteSpace(data[i])){
+                    sb.Append(data[i]);
+                    i++;
+                }
+
+                continue;
+        }
+
+       
+        if (firstToken)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                firstToken = false;
+
+                if(i == data.Length - 1)
+                {
+                    sb.Append(c);
+                }
+                else
+                {
+                    sb.Append(Ansi.Reset);
+                    sb.Append(c);
+                }
+            }
+            else
+            {
+                sb.Append(Ansi.FgBrightCyan);
+                sb.Append(c);
+            }
+
+            i++;
+            continue;
+        }
+
+        if (!inQuotes && c == '-')
+        {
+            sb.Append(Ansi.Dim);
+
+            while (i < data.Length &&
+                   !char.IsWhiteSpace(data[i]))
+            {
+                sb.Append(data[i]);
+                i++;
+            }
+
+            sb.Append(Ansi.Reset);
+            continue;
+        }
+
+        if (inQuotes)
+        {
+            sb.Append(Ansi.FgBrightMagenta);
+            sb.Append(c);
+            sb.Append(Ansi.Reset);
+
+            i++;
+            continue;
+        }
+
+        sb.Append(Ansi.FgBrightWhite);
+        sb.Append(c);
+        sb.Append(Ansi.Reset);
+
+        i++;
+    }
+
+    sb.Append(Ansi.Reset);
+
+    return sb.ToString();
+}
+
+    private void RedrawLine() // Displays/render user input to console
     {
         UpdateGhostText();
 
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(); // we use sb since C# strings are immutable
         sb.Append(Utils.Ansi.CursorHide);
         sb.Append('\r');
         sb.Append(Utils.Ansi.SetCursorColumn(_promptVisibleLen + 1));
         sb.Append(Utils.Ansi.ClearLineFromCursor);
-        sb.Append(_buffer.ToString());
+        sb.Append(SyntaxHighlight(_buffer.ToString()));
 
-        if (!string.IsNullOrEmpty(_ghostText))
+        if (!string.IsNullOrEmpty(_ghostText)) // Ghost texts aka suggestions rendering
         {
             sb.Append(Utils.Ansi.FgRgb(80, 80, 100));
             sb.Append(_ghostText);
@@ -498,6 +663,8 @@ public class InputHandler
         int targetCol = _promptVisibleLen + 1 + _cursorPos;
         sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
         sb.Append(Utils.Ansi.CursorShow);
+
+        
 
         Console.Write(sb.ToString());
         _lastDisplayLines = ComputeDisplayLines();

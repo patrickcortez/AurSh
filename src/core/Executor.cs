@@ -1,3 +1,5 @@
+using AurShell.Utils;
+
 namespace AurShell.Core;
 
 public class Executor
@@ -17,10 +19,30 @@ public class Executor
         _workingDirectory = workingDirectory;
     }
 
-    public int Execute(string input)
+    public (int ExitCode, string Output) ExecuteCapture(string input)
+    {
+        var sw = new System.IO.StringWriter();
+        var originalOut = Console.Out;
+        Console.SetOut(sw);
+        try
+        {
+            int exit = Execute(input);
+            return (exit, sw.ToString().TrimEnd('\n', '\r'));
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    public int Execute(string input) // AurSh Command parser
     {
         if (string.IsNullOrWhiteSpace(input))
             return 0;
+
+        if(input.StartsWith(';')){ // So it wont freeze up when hit with ';'
+            return 1;
+        }
 
         if (input.Contains('\n'))
         {
@@ -44,6 +66,15 @@ public class Executor
 
         if (tokens.Count <= 1)
             return 0;
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].Type == TokenType.Word && !tokens[i].WasSingleQuoted)
+            {
+                string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
+                tokens[i] = new Token(TokenType.Word, resolved, tokens[i].WasQuoted, tokens[i].WasSingleQuoted);
+            }
+        }
 
         var parser = new Parser(tokens);
         ListNode ast;

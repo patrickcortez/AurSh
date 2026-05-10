@@ -56,7 +56,7 @@ public static class BuiltinCommands
         };
     }
 
-    public static int ExecuteCat(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int ExecuteCat(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         bool isEditorMode = false;
         string targetFile = "";

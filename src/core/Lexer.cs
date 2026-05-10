@@ -25,12 +25,14 @@ public class Token
     public TokenType Type { get; }
     public string Value { get; }
     public bool WasQuoted { get; }
+    public bool WasSingleQuoted { get; }
 
-    public Token(TokenType type, string value, bool wasQuoted = false)
+    public Token(TokenType type, string value, bool wasQuoted = false, bool wasSingleQuoted = false)
     {
         Type = type;
         Value = value;
         WasQuoted = wasQuoted;
+        WasSingleQuoted = wasSingleQuoted;
     }
 
     public override string ToString() => $"[{Type}: {Value}]";
@@ -172,6 +174,7 @@ public class Lexer
     {
         var sb = new StringBuilder();
         bool wasQuoted = false;
+        bool wasSingleQuoted = false;
 
         while (_pos < _input.Length)
         {
@@ -198,11 +201,14 @@ public class Lexer
                 char escaped = _input[_pos];
                 sb.Append(MapEscapeChar(escaped));
                 _pos++;
+                wasSingleQuoted = false;
                 continue;
             }
 
             if (c == '\'')
             {
+                if (sb.Length == 0)
+                    wasSingleQuoted = true;
                 sb.Append(ReadSingleQuoted());
                 wasQuoted = true;
                 continue;
@@ -210,6 +216,7 @@ public class Lexer
 
             if (c == '"')
             {
+                wasSingleQuoted = false;
                 sb.Append(ReadDoubleQuoted());
                 wasQuoted = true;
                 continue;
@@ -217,7 +224,14 @@ public class Lexer
 
             if (c == '$')
             {
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
+                {
+                    sb.Append(ReadSubCommand());
+                    wasSingleQuoted = false;
+                    continue;
+                }
                 sb.Append(ExpandInline());
+                wasSingleQuoted = false;
                 continue;
             }
 
@@ -227,6 +241,7 @@ public class Lexer
                 {
                     sb.Append(Utils.Platform.HomeDirectory);
                     _pos++;
+                    wasSingleQuoted = false;
                     continue;
                 }
             }
@@ -235,14 +250,45 @@ public class Lexer
             {
                 sb.Append(c);
                 _pos++;
+                wasSingleQuoted = false;
                 continue;
             }
 
             sb.Append(c);
             _pos++;
+            wasSingleQuoted = false;
         }
 
-        return new Token(TokenType.Word, sb.ToString(), wasQuoted);
+        return new Token(TokenType.Word, sb.ToString(), wasQuoted, wasSingleQuoted);
+    }
+
+    private string ReadSubCommand()
+    {
+        _pos++;
+        _pos++;
+        var sb = new StringBuilder();
+        sb.Append("$(");
+
+        int depth = 1;
+        while (_pos < _input.Length && depth > 0)
+        {
+            char c = _input[_pos];
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+
+            if (depth > 0)
+            {
+                sb.Append(c);
+                _pos++;
+            }
+            else
+            {
+                sb.Append(')');
+                _pos++;
+            }
+        }
+
+        return sb.ToString();
     }
 
     private string ReadSingleQuoted()
@@ -284,6 +330,11 @@ public class Lexer
 
             if (c == '$')
             {
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
+                {
+                    sb.Append(ReadSubCommand());
+                    continue;
+                }
                 sb.Append(ExpandInline());
                 continue;
             }

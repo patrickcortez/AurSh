@@ -15,7 +15,7 @@ similar to most shells like bash, zsh and fish.
 
 This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
 
-It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands or create new behaviors for the shell.
+It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua or F# scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands or create new behaviors for the shell.
 
 It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
 
@@ -31,7 +31,7 @@ Has:
 - Environmental variable handling.
 - resolves commands to native OS Commands.
 - Job control.
-- Plug-in system using lua (aursh-plugin <add,list,del,init>)
+- Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
 
 ---

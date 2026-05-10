@@ -1643,11 +1643,11 @@ public static class BuiltinCommands
         if (cmd.Args.Count == 0)
         {
             Console.WriteLine("Usage: aursh-plugin <list|add|del|init|debug> [args]");
-            Console.WriteLine("  list           List installed plugins");
-            Console.WriteLine("  add <path>     Install plugin from directory");
-            Console.WriteLine("  del <name>     Remove a plugin");
-            Console.WriteLine("  init <name>    Create a new plugin template in current directory");
-            Console.WriteLine("  debug <file>   Check lua script for syntax errors");
+            Console.WriteLine("  list                      List installed plugins");
+            Console.WriteLine("  add <path>                Install plugin from directory");
+            Console.WriteLine("  del <name>                Remove a plugin");
+            Console.WriteLine("  init <name> [--type lua|fsharp]  Create a new plugin template");
+            Console.WriteLine("  debug <file>              Check script for syntax errors");
             return 0;
         }
 
@@ -1673,8 +1673,11 @@ public static class BuiltinCommands
                 {
                     string cmds = p.RegisteredCommands.Count > 0
                         ? string.Join(", ", p.RegisteredCommands.Keys)
-                        : "(none)";
+                        : (p.Manifest.Commands.Count > 0
+                            ? string.Join(", ", p.Manifest.Commands)
+                            : "(none)");
                     Console.WriteLine($"  {p.Manifest.Name} v{p.Manifest.Version} by {p.Manifest.Author}");
+                    Console.WriteLine($"    Type: {p.Manifest.Type}");
                     Console.WriteLine($"    {p.Manifest.Description}");
                     Console.WriteLine($"    Commands: {cmds}");
                 }
@@ -1694,8 +1697,17 @@ public static class BuiltinCommands
             case "init":
             case "create":
             case "new":
-                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin init <name>"); return 1; }
-                return pm.InitPlugin(cmd.Args[1], workingDirectory);
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin init <name> [--type lua|fsharp]"); return 1; }
+                string pluginType = "lua";
+                for (int i = 2; i < cmd.Args.Count; i++)
+                {
+                    if (cmd.Args[i] == "--type" && i + 1 < cmd.Args.Count)
+                    {
+                        pluginType = cmd.Args[i + 1];
+                        break;
+                    }
+                }
+                return pm.InitPlugin(cmd.Args[1], workingDirectory, pluginType);
 
             case "debug":
                 if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin debug <file_or_plugin>"); return 1; }

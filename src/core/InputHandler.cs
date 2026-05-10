@@ -32,6 +32,12 @@ public class InputHandler
 
     public string? ReadLine(string prompt) // AurSh Input hanndler
     {
+        if (Console.IsInputRedirected)
+        {
+            Console.Write(prompt);
+            return Console.ReadLine();
+        }
+
         _currentPrompt = prompt;
         Console.Write(prompt);
         _promptVisibleLen = ComputeLastLineVisibleLength(prompt);
@@ -697,9 +703,42 @@ public class InputHandler
 
         string? suggestion = _history.GetSuggestion(current);
         if (suggestion != null && suggestion.Length > current.Length)
+        {
             _ghostText = suggestion.Substring(current.Length);
-        else
-            _ghostText = "";
+            return;
+        }
+
+        bool isCommand = true;
+        for (int i = 0; i < _cursorPos; i++)
+        {
+            if (_buffer[i] == ' ')
+            {
+                isCommand = false;
+                break;
+            }
+        }
+
+        if (!isCommand)
+        {
+            string word = GetCurrentWord();
+            var completions = GetCompletions(word);
+            if (completions.Count > 0)
+            {
+                string first = completions[0];
+                if (first.Length > word.Length && first.StartsWith(word, StringComparison.OrdinalIgnoreCase))
+                {
+                    _ghostText = first.Substring(word.Length);
+                    return;
+                }
+                else if (string.IsNullOrEmpty(word))
+                {
+                    _ghostText = first;
+                    return;
+                }
+            }
+        }
+
+        _ghostText = "";
     }
 
     private void CheckTerminalResize()

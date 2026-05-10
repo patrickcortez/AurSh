@@ -1,0 +1,140 @@
+<Project>
+
+  <PropertyGroup>
+    <ProjectFile>src/AurShell.csproj</ProjectFile>
+    <AppName>aursh</AppName>
+    <Version>1.3.0</Version>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_OS Condition="$([MSBuild]::IsOSPlatform('Windows'))">Windows</_OS>
+    <_OS Condition="$([MSBuild]::IsOSPlatform('OSX'))">macOS</_OS>
+    <_OS Condition="$([MSBuild]::IsOSPlatform('Linux'))">Linux</_OS>
+    <_IsTermux Condition="Exists('/data/data/com.termux')">true</_IsTermux>
+    <_IsTermux Condition="'$(ANDROID_ROOT)' != ''">true</_IsTermux>
+    <_OS Condition="'$(_IsTermux)' == 'true'">Termux</_OS>
+
+    <_Arch Condition="$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture) == Arm64">arm64</_Arch>
+    <_Arch Condition="'$(_Arch)' == ''">x64</_Arch>
+
+    <_RID Condition="'$(_OS)' == 'Windows'">win-$(_Arch)</_RID>
+    <_RID Condition="'$(_OS)' == 'macOS'">osx-$(_Arch)</_RID>
+    <_RID Condition="'$(_OS)' == 'Linux'">linux-$(_Arch)</_RID>
+    <_RID Condition="'$(_OS)' == 'Termux'">linux-$(_Arch)</_RID>
+
+    <_Exe Condition="'$(_OS)' == 'Windows'">$(AppName).exe</_Exe>
+    <_Exe Condition="'$(_Exe)' == ''">$(AppName)</_Exe>
+
+    <_PublishDir>publish/$(_RID)</_PublishDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_OS)' == 'Windows'">
+    <_InstallDir>C:/Program Files/AurShell</_InstallDir>
+    <_UserInstallDir Condition="'$(LOCALAPPDATA)' != ''">$(LOCALAPPDATA)/AurShell</_UserInstallDir>
+    <_UserInstallDir Condition="'$(_UserInstallDir)' == ''">$(USERPROFILE)/AppData/Local/AurShell</_UserInstallDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_OS)' == 'macOS'">
+    <_InstallDir>/usr/local/bin</_InstallDir>
+    <_UserInstallDir>$(HOME)/.local/bin</_UserInstallDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_OS)' == 'Termux'">
+    <_InstallDir>$(PREFIX)/bin</_InstallDir>
+    <_UserInstallDir>$(HOME)/.local/bin</_UserInstallDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_OS)' == 'Linux'">
+    <_InstallDir>/usr/local/bin</_InstallDir>
+    <_UserInstallDir>$(HOME)/.local/bin</_UserInstallDir>
+  </PropertyGroup>
+
+  <Target Name="Build">
+    <Message Text="[build] Compiling $(Configuration) build..." Importance="high" />
+    <Exec Command="dotnet build $(ProjectFile) -c $(Configuration)" />
+    <Message Text="[build] Output: bin/$(_Exe)" Importance="high" />
+  </Target>
+
+  <Target Name="Release">
+    <Message Text="[release] Compiling release build..." Importance="high" />
+    <Exec Command="dotnet build $(ProjectFile) -c Release" />
+    <Message Text="[release] Output: bin/$(_Exe)" Importance="high" />
+  </Target>
+
+  <Target Name="Publish">
+    <Message Text="[publish] Publishing self-contained $(_RID) binary..." Importance="high" />
+    <Exec Command="dotnet publish $(ProjectFile) -c Release -r $(_RID) --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(_PublishDir)" />
+    <Message Text="[publish] Output: $(_PublishDir)/$(_Exe)" Importance="high" />
+  </Target>
+
+  <Target Name="Install" DependsOnTargets="Publish">
+    <Message Text="[install] Installing to $(_InstallDir)/$(_Exe)..." Importance="high" />
+    <MakeDir Directories="$(_InstallDir)" />
+    <Copy SourceFiles="$(_PublishDir)/$(_Exe)" DestinationFolder="$(_InstallDir)" />
+    <Message Text="[install] Installed to $(_InstallDir)/$(_Exe)" Importance="high" />
+    <Message Text="[install] Run 'aursh' to start." Importance="high" />
+  </Target>
+
+  <Target Name="InstallUser" DependsOnTargets="Publish">
+    <Message Text="[install] Installing to $(_UserInstallDir)/$(_Exe)..." Importance="high" />
+    <MakeDir Directories="$(_UserInstallDir)" />
+    <Copy SourceFiles="$(_PublishDir)/$(_Exe)" DestinationFolder="$(_UserInstallDir)" />
+    <Message Text="[install] Installed to $(_UserInstallDir)/$(_Exe)" Importance="high" />
+    <Message Text="[install] Add to PATH: export PATH=&quot;$(_UserInstallDir):$$PATH&quot;" Importance="high" Condition="'$(_OS)' != 'Windows'" />
+    <Message Text="[install] Done. Run 'aursh' to start." Importance="high" />
+  </Target>
+
+  <Target Name="Uninstall">
+    <Message Text="[uninstall] Removing aursh..." Importance="high" />
+    <Delete Files="$(_InstallDir)/$(_Exe)" ContinueOnError="true" />
+    <Delete Files="$(_UserInstallDir)/$(_Exe)" ContinueOnError="true" />
+    <Message Text="[uninstall] Done." Importance="high" />
+  </Target>
+
+  <Target Name="Run" DependsOnTargets="Build">
+    <Message Text="[run] Launching aursh..." Importance="high" />
+    <Exec Command="dotnet run --project $(ProjectFile) --configuration $(Configuration)" />
+  </Target>
+
+  <Target Name="Clean">
+    <Message Text="[clean] Removing build artifacts..." Importance="high" />
+    <Exec Command="dotnet clean $(ProjectFile) -c Debug --nologo -v q" ContinueOnError="true" />
+    <Exec Command="dotnet clean $(ProjectFile) -c Release --nologo -v q" ContinueOnError="true" />
+    <RemoveDir Directories="bin;publish;src/obj;src/bin" ContinueOnError="true" />
+    <Message Text="[clean] Done." Importance="high" />
+  </Target>
+
+  <Target Name="Info">
+    <Message Text="OS:          $(_OS)" Importance="high" />
+    <Message Text="Arch:        $(_Arch)" Importance="high" />
+    <Message Text="RID:         $(_RID)" Importance="high" />
+    <Message Text="Executable:  $(_Exe)" Importance="high" />
+    <Message Text="Install Dir: $(_InstallDir)" Importance="high" />
+    <Message Text="User Dir:    $(_UserInstallDir)" Importance="high" />
+  </Target>
+
+  <Target Name="Help">
+    <Message Text="" Importance="high" />
+    <Message Text="  AurShell v$(Version) - Build System" Importance="high" />
+    <Message Text="  -------------------------------------" Importance="high" />
+    <Message Text="" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Build         Debug build" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Release      Release build" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Publish      Self-contained single-file release" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Install      Publish + install to system dir" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:InstallUser  Publish + install to user dir" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Uninstall    Remove installed binary" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Clean        Remove all build artifacts" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Run          Build and launch interactive shell" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Info         Show detected platform info" Importance="high" />
+    <Message Text="  dotnet msbuild build.proj -t:Help         Show this help" Importance="high" />
+    <Message Text="" Importance="high" />
+    <Message Text="  Detected: $(_OS) $(_Arch) [$(_RID)]" Importance="high" />
+    <Message Text="  Install:  $(_InstallDir)" Importance="high" />
+    <Message Text="" Importance="high" />
+  </Target>
+
+  <Target Name="All" DependsOnTargets="Build" />
+
+</Project>

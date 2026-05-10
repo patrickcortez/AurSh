@@ -222,6 +222,21 @@ public static class Platform
         return prefix + sep + "\u2026" + sep + string.Join(sep, tail);
     }
 
+    public static void ApplyAndroidWorkarounds()
+    {
+        if (CurrentOS != OperatingSystemType.Termux && string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ANDROID_ROOT")))
+            return;
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_EnableWriteXorExecute")))
+            System.Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_GCHeapHardLimit")))
+            System.Environment.SetEnvironmentVariable("DOTNET_GCHeapHardLimit", "1073741824");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_GCRetainVM")))
+            System.Environment.SetEnvironmentVariable("DOTNET_GCRetainVM", "1");
+    }
+
     public static void EnsureDirectoriesExist()
     {
         Directory.CreateDirectory(ConfigDirectory);

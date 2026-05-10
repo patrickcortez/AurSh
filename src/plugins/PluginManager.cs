@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using AurShell.Core;
 using AurShell.Lua;
@@ -88,6 +89,10 @@ public class PluginManager
                 return false;
             }
         }
+        else if (manifest.Type.ToLowerInvariant() == "fsharp")
+        {
+            plugin = new LoadedPlugin(manifest, null);
+        }
 
         _plugins.Add(plugin);
 
@@ -98,7 +103,7 @@ public class PluginManager
                 foreach (var kv in plugin.RegisteredCommands)
                     _commandMap[kv.Key] = plugin;
             }
-            else if (manifest.Type.ToLowerInvariant() == "binary")
+            else if (manifest.Type.ToLowerInvariant() == "binary" || manifest.Type.ToLowerInvariant() == "fsharp")
             {
                 foreach (var cmd in manifest.Commands)
                     _commandMap[cmd] = plugin;
@@ -137,6 +142,10 @@ public class PluginManager
     public int ExecutePluginCommand(string name, List<string> args)
     {
         if (!_commandMap.TryGetValue(name, out var plugin)) return 127;
+
+        if (plugin.Manifest.Type.ToLowerInvariant() == "fsharp")
+            return ExecuteFSharpPlugin(plugin, args);
+
         if (!plugin.RegisteredCommands.TryGetValue(name, out var callback)) return 127;
 
         var luaArgs = new LuaTable();
@@ -154,6 +163,51 @@ public class PluginManager
         {
             Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}': {ex.Message}");
             return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}': {ex.Message}");
+            return 1;
+        }
+    }
+
+    private int ExecuteFSharpPlugin(LoadedPlugin plugin, List<string> args)
+    {
+        string entryPath = Path.Combine(plugin.Manifest.PluginDir, plugin.Manifest.Entry);
+        if (!File.Exists(entryPath))
+        {
+            Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}': entry file '{plugin.Manifest.Entry}' not found");
+            return 127;
+        }
+
+        var argBuilder = new StringBuilder();
+        argBuilder.Append($"fsi \"{entryPath}\"");
+        if (args.Count > 0)
+        {
+            argBuilder.Append(" -- ");
+            foreach (string a in args)
+            {
+                argBuilder.Append('"');
+                argBuilder.Append(a.Replace("\"", "\\\""));
+                argBuilder.Append("\" ");
+            }
+        }
+
+        var psi = new System.Diagnostics.ProcessStartInfo("dotnet", argBuilder.ToString().TrimEnd())
+        {
+            WorkingDirectory = _executor.WorkingDirectory,
+            UseShellExecute = false
+        };
+
+        foreach (var kv in _env.Variables)
+            psi.Environment[kv.Key] = kv.Value;
+
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return 127;
+            proc.WaitForExit();
+            return proc.ExitCode;
         }
         catch (Exception ex)
         {
@@ -243,7 +297,7 @@ public class PluginManager
         }
     }
 
-    public int InitPlugin(string name, string workingDirectory)
+    public int InitPlugin(string name, string workingDirectory, string type = "lua")
     {
         string pluginDir = Path.Combine(workingDirectory, name);
 
@@ -257,14 +311,15 @@ public class PluginManager
         {
             Directory.CreateDirectory(pluginDir);
 
+            string entryFile = type.ToLowerInvariant() == "fsharp" ? "init.fsx" : "init.lua";
             var manifest = new PluginManifest
             {
                 Name = name,
                 Version = "1.3.0",
                 Author = Utils.Platform.UserName,
                 Description = $"A custom AurShell plugin",
-                Entry = "init.lua",
-                Type = "lua",
+                Entry = entryFile,
+                Type = type.ToLowerInvariant() == "fsharp" ? "fsharp" : "lua",
                 Invokable = true,
                 Commands = new List<string> { name }
             };
@@ -272,7 +327,53 @@ public class PluginManager
             string json = PluginManifest.Serialize(manifest);
             File.WriteAllText(Path.Combine(pluginDir, "plugin.json"), json);
 
-            string luaTemplate = $@"aursh.register(""{name}"", function(args)
+            if (type.ToLowerInvariant() == "fsharp")
+            {
+                string fsxTemplate = $@"module {name}
+open System
+open System.Diagnostics
+
+module Aursh =
+    let print (s: string) = Console.WriteLine(s)
+
+    let exec (cmd: string) =
+        let shell = if Environment.OSVersion.Platform = PlatformID.Win32NT then ""cmd"" else ""sh""
+        let flag = if Environment.OSVersion.Platform = PlatformID.Win32NT then ""/c"" else ""-c""
+        let psi = ProcessStartInfo(shell, $""{{flag}} \""{{cmd}}\"""")
+        psi.UseShellExecute <- false
+        use p = Process.Start(psi)
+        if p <> null then
+            p.WaitForExit()
+            p.ExitCode
+        else 1
+
+    let get_env (var: string) =
+        Environment.GetEnvironmentVariable(var)
+
+    let get_cwd () =
+        Environment.CurrentDirectory
+
+let args = Environment.GetCommandLineArgs()
+let pluginArgs =
+    args
+    |> Array.skip 1
+    |> Array.filter (fun a -> a <> ""--"")
+    |> Array.toList
+
+Aursh.print($""Hello from {name} plugin!"")
+if pluginArgs.Length > 0 then
+    Aursh.print($""Argument: {{pluginArgs.[0]}}"")
+
+Environment.ExitCode <- 0
+";
+                File.WriteAllText(Path.Combine(pluginDir, "init.fsx"), fsxTemplate);
+                Console.WriteLine($"Created F# plugin '{name}' at {pluginDir}");
+                Console.WriteLine($"  plugin.json  - manifest");
+                Console.WriteLine($"  init.fsx     - entry point");
+            }
+            else
+            {
+                string luaTemplate = $@"aursh.register(""{name}"", function(args)
     aursh.print(""Hello from {name} plugin!"")
     if args[1] then
         aursh.print(""Argument: "" .. args[1])
@@ -282,11 +383,11 @@ end)
 
 aursh.print(""[plugin] {name} loaded"")
 ";
-            File.WriteAllText(Path.Combine(pluginDir, "init.lua"), luaTemplate);
-
-            Console.WriteLine($"Created plugin '{name}' at {pluginDir}");
-            Console.WriteLine($"  plugin.json  - manifest");
-            Console.WriteLine($"  init.lua     - entry point");
+                File.WriteAllText(Path.Combine(pluginDir, "init.lua"), luaTemplate);
+                Console.WriteLine($"Created Lua plugin '{name}' at {pluginDir}");
+                Console.WriteLine($"  plugin.json  - manifest");
+                Console.WriteLine($"  init.lua     - entry point");
+            }
             return 0;
         }
         catch (Exception ex)
@@ -304,11 +405,16 @@ aursh.print(""[plugin] {name} loaded"")
             string pluginDir = Path.Combine(_pluginsDir, fileOrName);
             if (Directory.Exists(pluginDir))
             {
-                filePath = Path.Combine(pluginDir, "init.lua");
+                // Try both .fsx and .lua entry files
+                filePath = Path.Combine(pluginDir, "init.fsx");
                 if (!File.Exists(filePath))
                 {
-                    Console.Error.WriteLine($"aursh: debug: no init.lua found for plugin '{fileOrName}'");
-                    return 1;
+                    filePath = Path.Combine(pluginDir, "init.lua");
+                    if (!File.Exists(filePath))
+                    {
+                        Console.Error.WriteLine($"aursh: debug: no init.fsx or init.lua found for plugin '{fileOrName}'");
+                        return 1;
+                    }
                 }
             }
             else
@@ -318,16 +424,49 @@ aursh.print(""[plugin] {name} loaded"")
             }
         }
 
+        bool isFSharp = filePath.EndsWith(".fsx", StringComparison.OrdinalIgnoreCase);
+        
         try
         {
-            string source = File.ReadAllText(filePath);
-            var lexer = new LuaLexer(source);
-            var tokens = lexer.Tokenize();
-            var parser = new LuaParser(tokens);
-            parser.ParseBlock();
-            
-            Console.WriteLine($"Syntax OK: {filePath}");
-            return 0;
+            if (isFSharp)
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("dotnet", $"fsi \"{filePath}\" --quiet")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return 1;
+                
+                string output = proc.StandardOutput.ReadToEnd();
+                string error = proc.StandardError.ReadToEnd();
+                proc.WaitForExit();
+
+                if (proc.ExitCode == 0 && string.IsNullOrEmpty(error))
+                {
+                    Console.WriteLine($"Syntax OK: {filePath}");
+                    return 0;
+                }
+                else
+                {
+                    Console.Error.WriteLine($"Syntax Error in {filePath}:\n{error}");
+                    return 1;
+                }
+            }
+            else
+            {
+                string source = File.ReadAllText(filePath);
+                var lexer = new LuaLexer(source);
+                var tokens = lexer.Tokenize();
+                var parser = new LuaParser(tokens);
+                parser.ParseBlock();
+                
+                Console.WriteLine($"Syntax OK: {filePath}");
+                return 0;
+            }
         }
         catch (Exception ex)
         {
@@ -339,7 +478,7 @@ aursh.print(""[plugin] {name} loaded"")
     private void RegisterAurshApi(LoadedPlugin plugin)
     {
         var aursh = new LuaTable();
-        var interp = plugin.Interpreter;
+        var interp = plugin.Interpreter!;
 
         aursh.SetField("register", LuaValue.FromFunc(new LuaCSharpFunc(args =>
         {
@@ -478,10 +617,10 @@ aursh.print(""[plugin] {name} loaded"")
 public class LoadedPlugin
 {
     public PluginManifest Manifest { get; }
-    public LuaInterpreter Interpreter { get; }
+    public LuaInterpreter? Interpreter { get; }
     public Dictionary<string, LuaCallable> RegisteredCommands { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public LoadedPlugin(PluginManifest manifest, LuaInterpreter interpreter)
+    public LoadedPlugin(PluginManifest manifest, LuaInterpreter? interpreter)
     {
         Manifest = manifest;
         Interpreter = interpreter;

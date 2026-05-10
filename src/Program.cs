@@ -4,6 +4,7 @@ public class Program
 {
     public static int Main(string[] args)
     {
+        Utils.Platform.ApplyAndroidWorkarounds();
         Utils.Platform.EnableAnsiOnWindows();
         Utils.Platform.EnsureDirectoriesExist();
 

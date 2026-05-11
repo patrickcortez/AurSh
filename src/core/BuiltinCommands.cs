@@ -52,7 +52,7 @@ public static class BuiltinCommands
             "aursh-about" => ExecuteAbout(cmd),
             "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
             "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
-            "aursh-update" => ExecuteUpdate(),
+            "aursh-update" => ExecuteUpdate(cmd),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -530,6 +530,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-history : {Ansi.FgBrightBlue}TUI command history.
                                 - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
                                 - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.
+                                - {Ansi.FgBrightCyan}aursh-update : {Ansi.FgBrightBlue}Updates the shell from the remote repository.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";
@@ -1841,36 +1842,198 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteUpdate()
+    private static string UpdateRepoConfigPath => Path.Combine(Platform.ConfigDirectory, "update-repo");
+
+    private static string? GetUpdateRepoPath()
     {
-        string? sourceDir = null;
-        string currentDir = AppContext.BaseDirectory;
-        string? dir = currentDir;
-        while (!string.IsNullOrEmpty(dir))
+        if (!File.Exists(UpdateRepoConfigPath)) return null;
+        string content = File.ReadAllText(UpdateRepoConfigPath).Trim();
+        return string.IsNullOrEmpty(content) ? null : content;
+    }
+
+    private static void SetUpdateRepoPath(string path)
+    {
+        Directory.CreateDirectory(Platform.ConfigDirectory);
+        File.WriteAllText(UpdateRepoConfigPath, path);
+    }
+
+    private static bool ValidateRepo(string path)
+    {
+        string gitDir = Path.Combine(path, ".git");
+        if (!Directory.Exists(gitDir))
         {
-            if (Directory.Exists(Path.Combine(dir, ".git")))
+            Console.Error.WriteLine($"aursh: aursh-update: '{path}' is not a git repository.");
+            return false;
+        }
+
+        var psi = new System.Diagnostics.ProcessStartInfo("git", "remote -v")
+        {
+            WorkingDirectory = path,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return false;
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            if (proc.ExitCode != 0) return false;
+
+            string expected = "https://github.com/patrickcortez/AurSh.git";
+            foreach (string line in output.Split('\n'))
             {
-                sourceDir = dir;
-                break;
+                string trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed)) continue;
+                int urlStart = trimmed.IndexOf('\t');
+                if (urlStart < 0) continue;
+                string urlPart = trimmed.Substring(urlStart + 1).Trim();
+                int spaceIdx = urlPart.IndexOf(' ');
+                if (spaceIdx >= 0) urlPart = urlPart.Substring(0, spaceIdx);
+                string normalized = urlPart.EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+                    ? urlPart.Substring(0, urlPart.Length - 4)
+                    : urlPart;
+                if (normalized.Equals(expected, StringComparison.OrdinalIgnoreCase) ||
+                    normalized.Equals("https://github.com/patrickcortez/AurSh", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
-            string? parent = Directory.GetParent(dir)?.FullName;
-            if (parent == dir) break;
-            dir = parent;
+        }
+        catch { }
+
+        Console.Error.WriteLine("aursh: aursh-update: repository does not have the expected remote (https://github.com/patrickcortez/AurSh.git).");
+        return false;
+    }
+
+    private static string RunGitOutput(string workingDir, string args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = workingDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return "";
+            string output = proc.StandardOutput.ReadToEnd().Trim();
+            proc.WaitForExit();
+            if (proc.ExitCode != 0) return "";
+            return output;
+        }
+        catch { return ""; }
+    }
+
+    private static int ExecuteUpdate(CommandNode cmd)
+    {
+        if (cmd.Args.Count == 0)
+            return DoUpdate();
+
+        string sub = cmd.Args[0].ToLowerInvariant();
+
+        if (sub == "set")
+        {
+            if (cmd.Args.Count < 2)
+            {
+                Console.Error.WriteLine("aursh: aursh-update set <path-to-repo>");
+                return 1;
+            }
+            string path = Path.GetFullPath(cmd.Args[1]);
+            if (!Directory.Exists(path))
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: directory '{path}' not found.");
+                return 1;
+            }
+            if (!ValidateRepo(path))
+                return 1;
+            SetUpdateRepoPath(path);
+            Console.WriteLine($"Update repository set to: {path}");
+            return 0;
+        }
+
+        if (sub == "check")
+        {
+            string? repoPath = GetUpdateRepoPath();
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                Console.Error.WriteLine("aursh: aursh-update: no repository set. Use 'aursh-update set <path>'.");
+                return 1;
+            }
+            if (!Directory.Exists(repoPath))
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: repository directory '{repoPath}' not found.");
+                return 1;
+            }
+
+            string fetchErr = RunGitOutput(repoPath, "fetch");
+            if (fetchErr == "")
+            {
+                // fetch may silently succeed; let's just proceed
+            }
+
+            string behind = RunGitOutput(repoPath, "rev-list HEAD..origin/main --count");
+            if (string.IsNullOrEmpty(behind))
+            {
+                behind = RunGitOutput(repoPath, "rev-list HEAD..origin/master --count");
+            }
+
+            if (int.TryParse(behind, out int count))
+            {
+                if (count == 0)
+                    Console.WriteLine("AurShell is up to date.");
+                else
+                    Console.WriteLine($"AurShell is {count} commit(s) behind.");
+            }
+            else
+            {
+                Console.Error.WriteLine("aursh: aursh-update: failed to check remote status.");
+                return 1;
+            }
+            return 0;
+        }
+
+        Console.Error.WriteLine($"aursh: aursh-update: unknown subcommand '{sub}'");
+        return 1;
+    }
+
+    private static int DoUpdate()
+    {
+        string? sourceDir = GetUpdateRepoPath();
+        if (string.IsNullOrEmpty(sourceDir))
+        {
+            string currentDir = AppContext.BaseDirectory;
+            string? dir = currentDir;
+            while (!string.IsNullOrEmpty(dir))
+            {
+                if (Directory.Exists(Path.Combine(dir, ".git")))
+                {
+                    sourceDir = dir;
+                    break;
+                }
+                string? parent = Directory.GetParent(dir)?.FullName;
+                if (parent == dir) break;
+                dir = parent;
+            }
         }
 
         if (string.IsNullOrEmpty(sourceDir))
         {
-            Console.Error.WriteLine("aursh: aursh-update: could not find git repository. Ensure aursh is running from a cloned directory.");
+            Console.Error.WriteLine("aursh: aursh-update: no repository set. Use 'aursh-update set <path>'.");
+            return 1;
+        }
+
+        if (!Directory.Exists(sourceDir))
+        {
+            Console.Error.WriteLine($"aursh: aursh-update: repository directory '{sourceDir}' not found.");
             return 1;
         }
 
         Console.WriteLine($"Updating AurShell from {sourceDir}...");
-
-        string aurshPath = Platform.FindExecutableInPath("aursh") ?? Path.Combine(AppContext.BaseDirectory, Platform.ExecutableExtension == ".exe" ? "aursh.exe" : "aursh");
-        if (!File.Exists(aurshPath))
-        {
-            aurshPath = Path.Combine(AppContext.BaseDirectory, "aursh" + Platform.ExecutableExtension);
-        }
 
         var gitPsi = new System.Diagnostics.ProcessStartInfo("git", "pull origin main")
         {
@@ -1922,11 +2085,11 @@ public static class BuiltinCommands
             return 1;
         }
 
-        Console.WriteLine("Building AurShell...");
+        Console.WriteLine("Installing AurShell...");
         bool useMake = File.Exists(Path.Combine(sourceDir, "Makefile"));
-        var buildPsi = new System.Diagnostics.ProcessStartInfo(
-            useMake ? "make" : "dotnet",
-            useMake ? "build" : $"build \"{Path.Combine(sourceDir, "src", "AurShell.csproj")}\" -c Release")
+        var installPsi = new System.Diagnostics.ProcessStartInfo(
+            useMake ? "make" : "msbuild",
+            useMake ? "install" : $"\"{Path.Combine(sourceDir, "src", "AurShell.csproj")}\" /p:Configuration=Release")
         {
             WorkingDirectory = sourceDir,
             UseShellExecute = false,
@@ -1936,17 +2099,17 @@ public static class BuiltinCommands
 
         try
         {
-            using var buildProc = System.Diagnostics.Process.Start(buildPsi);
-            if (buildProc != null)
+            using var installProc = System.Diagnostics.Process.Start(installPsi);
+            if (installProc != null)
             {
-                string buildOut = buildProc.StandardOutput.ReadToEnd();
-                string buildErr = buildProc.StandardError.ReadToEnd();
-                buildProc.WaitForExit();
-                if (!string.IsNullOrEmpty(buildOut)) Console.WriteLine(buildOut.Trim());
-                if (!string.IsNullOrEmpty(buildErr)) Console.Error.WriteLine(buildErr.Trim());
-                if (buildProc.ExitCode != 0)
+                string installOut = installProc.StandardOutput.ReadToEnd();
+                string installErr = installProc.StandardError.ReadToEnd();
+                installProc.WaitForExit();
+                if (!string.IsNullOrEmpty(installOut)) Console.WriteLine(installOut.Trim());
+                if (!string.IsNullOrEmpty(installErr)) Console.Error.WriteLine(installErr.Trim());
+                if (installProc.ExitCode != 0)
                 {
-                    Console.Error.WriteLine("aursh: aursh-update: build failed.");
+                    Console.Error.WriteLine("aursh: aursh-update: install failed.");
                     return 1;
                 }
             }
@@ -1957,22 +2120,8 @@ public static class BuiltinCommands
             return 1;
         }
 
-        Console.WriteLine("Restarting AurShell...");
-        try
-        {
-            var restartPsi = new System.Diagnostics.ProcessStartInfo(aurshPath)
-            {
-                UseShellExecute = false
-            };
-            System.Diagnostics.Process.Start(restartPsi);
-            System.Environment.Exit(0);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"aursh: aursh-update: failed to restart: {ex.Message}");
-            return 1;
-        }
-
+        Console.WriteLine("Update complete. Exiting shell to apply changes...");
+        System.Environment.Exit(0);
         return 0;
     }
 }

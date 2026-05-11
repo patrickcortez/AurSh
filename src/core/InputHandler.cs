@@ -16,9 +16,11 @@ public class InputHandler
     private string _searchQuery = "";
     private int _searchIndex = -1;
     private int _lastTermWidth;
+    private int _lastTermHeight;
     private string _currentPrompt = "";
     private int _lastDisplayLines;
     private int _pendingResizeWidth;
+    private int _pendingResizeHeight;
     private long _resizeChangeTick;
 
     private int count;
@@ -39,9 +41,11 @@ public class InputHandler
         }
 
         _currentPrompt = prompt;
+        Console.Write(Utils.Ansi.CursorSave);
         Console.Write(prompt);
         _promptVisibleLen = ComputeLastLineVisibleLength(prompt);
         _lastTermWidth = Utils.Platform.TerminalWidth;
+        _lastTermHeight = Utils.Platform.TerminalHeight;
 
         _buffer.Clear();
         _cursorPos = 0;
@@ -744,16 +748,19 @@ public class InputHandler
     private void CheckTerminalResize()
     {
         int currentWidth = Utils.Platform.TerminalWidth;
+        int currentHeight = Utils.Platform.TerminalHeight;
 
-        if (currentWidth == _lastTermWidth)
+        if (currentWidth == _lastTermWidth && currentHeight == _lastTermHeight)
         {
             _pendingResizeWidth = 0;
+            _pendingResizeHeight = 0;
             return;
         }
 
-        if (currentWidth != _pendingResizeWidth)
+        if (currentWidth != _pendingResizeWidth || currentHeight != _pendingResizeHeight)
         {
             _pendingResizeWidth = currentWidth;
+            _pendingResizeHeight = currentHeight;
             _resizeChangeTick = Environment.TickCount64;
             return;
         }
@@ -762,7 +769,9 @@ public class InputHandler
         if (elapsed >= 100)
         {
             _lastTermWidth = currentWidth;
+            _lastTermHeight = currentHeight;
             _pendingResizeWidth = 0;
+            _pendingResizeHeight = 0;
             FullRedraw(clearPrevious: true);
         }
     }
@@ -779,10 +788,7 @@ public class InputHandler
         {
             try
             {
-                int currentLines = ComputeDisplayLines() + 2;
-                int currentRow = Console.CursorTop;
-                int targetRow = Math.Max(0, currentRow - (currentLines - 1));
-                Console.SetCursorPosition(0, targetRow);
+                Console.Write(Utils.Ansi.CursorRestore);
                 Console.Write(Utils.Ansi.ClearScreenFromCursor);
             }
             catch
@@ -793,6 +799,7 @@ public class InputHandler
         }
 
         var sb = new StringBuilder();
+        sb.Append(Utils.Ansi.CursorSave);
         sb.Append(_currentPrompt);
         sb.Append(_buffer.ToString());
 

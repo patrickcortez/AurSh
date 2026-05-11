@@ -197,6 +197,13 @@ public class Lexer
 
             if (c == '\\' && _pos + 1 < _input.Length)
             {
+                if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
+                {
+                    sb.Append(c);
+                    _pos++;
+                    wasSingleQuoted = false;
+                    continue;
+                }
                 _pos++;
                 char escaped = _input[_pos];
                 sb.Append(MapEscapeChar(escaped));

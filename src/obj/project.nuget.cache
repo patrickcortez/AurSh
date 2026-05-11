@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Mqi9fHDIl7w=",
+  "dgSpecHash": "0lL3K+pFKko=",
   "success": true,
-  "projectFilePath": "c:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
+  "projectFilePath": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.24\\microsoft.net.illink.tasks.8.0.24.nupkg.sha512",
     "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.24\\microsoft.netcore.app.ref.8.0.24.nupkg.sha512",

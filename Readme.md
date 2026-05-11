@@ -45,9 +45,7 @@ Has:
 - `aursh-about` : basic info about AurSh
 - `aursh-ls` : A TUI file system explorer.
 - `aursh-cat <options: -e> <file>` : A pipable file reader and a *vim-like* TUI text editor ( with `-e` flag ).
-- `aursh-update` : updates the shell from the remote repository.
-
-
+- `aursh-update` : updates the shell from the remote repository then exits the shell to apply changes.
 
 ---
 

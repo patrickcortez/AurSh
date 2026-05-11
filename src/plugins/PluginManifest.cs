@@ -12,7 +12,7 @@ public class PluginManifest
     public string Name { get; set; } = "";
 
     [JsonPropertyName("version")]
-    public string Version { get; set; } = "1.3.0";
+    public string Version { get; set; } = "1.0.0";
 
     [JsonPropertyName("author")]
     public string Author { get; set; } = "";

@@ -3,3 +3,4 @@ bin/*
 .gitignore
 publish/win-x64
 nupkg
+problems.txt

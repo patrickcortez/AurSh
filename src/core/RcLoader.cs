@@ -217,6 +217,7 @@ public class RcLoader
                 sb.AppendLine("alias ...='cd ../..'");
                 sb.AppendLine("alias home='cd ~'");
                 sb.AppendLine("alias open='explorer'");
+                sb.AppendLine("alias sudo-shell='sudo aursh -c'");
                 break;
 
             case Utils.OperatingSystemType.MacOS:

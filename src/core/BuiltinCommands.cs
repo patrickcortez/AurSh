@@ -525,7 +525,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.
                                 - {Ansi.FgBrightCyan}aursh-about : {Ansi.FgBrightBlue}Shows this message.
                                 - {Ansi.FgBrightCyan}aursh-assoc : {Ansi.FgBrightBlue}Associate file extensions with its compiler/interpreter.
-                                - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin management of AurSh.
+                                - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin manager of AurSh.
                                 - {Ansi.FgBrightCyan}aursh-history : {Ansi.FgBrightBlue}TUI command history.
                                 - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
                                 - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.

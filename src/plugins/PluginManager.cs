@@ -315,7 +315,7 @@ public class PluginManager
             var manifest = new PluginManifest
             {
                 Name = name,
-                Version = "1.3.0",
+                Version = "1.0.0",
                 Author = Utils.Platform.UserName,
                 Description = $"A custom AurShell plugin",
                 Entry = entryFile,
@@ -329,8 +329,7 @@ public class PluginManager
 
             if (type.ToLowerInvariant() == "fsharp")
             {
-                string fsxTemplate = $@"module {name}
-open System
+                string fsxTemplate = $@"open System
 open System.Diagnostics
 
 module Aursh =
@@ -339,7 +338,7 @@ module Aursh =
     let exec (cmd: string) =
         let shell = if Environment.OSVersion.Platform = PlatformID.Win32NT then ""cmd"" else ""sh""
         let flag = if Environment.OSVersion.Platform = PlatformID.Win32NT then ""/c"" else ""-c""
-        let psi = ProcessStartInfo(shell, $""{{flag}} \""{{cmd}}\"""")
+        let psi = ProcessStartInfo(shell, sprintf ""%s \""%s\"""" flag cmd)
         psi.UseShellExecute <- false
         use p = Process.Start(psi)
         if p <> null then
@@ -353,16 +352,22 @@ module Aursh =
     let get_cwd () =
         Environment.CurrentDirectory
 
-let args = Environment.GetCommandLineArgs()
-let pluginArgs =
-    args
-    |> Array.skip 1
-    |> Array.filter (fun a -> a <> ""--"")
-    |> Array.toList
+    let register (name: string) (handler: string list -> int) =
+        ()
 
-Aursh.print($""Hello from {name} plugin!"")
-if pluginArgs.Length > 0 then
-    Aursh.print($""Argument: {{pluginArgs.[0]}}"")
+let args = Environment.GetCommandLineArgs()
+
+let pluginArgs =
+    match args |> Array.tryFindIndex (fun a -> a = ""--"") with
+    | Some index -> 
+        args |> Array.skip (index + 1) |> Array.toList
+    | None -> 
+        []
+
+Aursh.print $""Hello from {name} plugin!""
+
+if not (List.isEmpty pluginArgs) then
+    Aursh.print (sprintf ""Argument: %s"" (List.head pluginArgs))
 
 Environment.ExitCode <- 0
 ";

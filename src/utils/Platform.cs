@@ -242,6 +242,8 @@ public static class Platform
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
+        Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh"));
+        Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh", "plugins"));
     }
 
     private static OperatingSystemType DetectOperatingSystem()

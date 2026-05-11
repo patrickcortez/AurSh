@@ -297,6 +297,27 @@ public class PluginManager
         }
     }
 
+    public int UpdatePlugin(string name)
+    {
+        string pluginDir = Path.Combine(_pluginsDir, name);
+        string manifestPath = Path.Combine(pluginDir, "plugin.json");
+        if (!Directory.Exists(pluginDir) || !File.Exists(manifestPath))
+        {
+            Console.Error.WriteLine($"aursh: plugin '{name}' not found");
+            return 1;
+        }
+
+        UnloadPlugin(name);
+
+        if (LoadPlugin(manifestPath))
+        {
+            Console.WriteLine($"Updated plugin '{name}'");
+            return 0;
+        }
+        Console.Error.WriteLine($"aursh: failed to reload plugin '{name}'");
+        return 1;
+    }
+
     public int InitPlugin(string name, string workingDirectory, string type = "lua")
     {
         string pluginDir = Path.Combine(workingDirectory, name);
@@ -599,8 +620,7 @@ aursh.print(""[plugin] {name} loaded"")
 
     private static string GetPluginsDirectory()
     {
-        string binaryDir = AppContext.BaseDirectory;
-        return Path.Combine(binaryDir, "plugins");
+        return Path.Combine(Utils.Platform.HomeDirectory, ".aursh", "plugins");
     }
 
     private static void CopyDirectory(string source, string dest)

@@ -15,7 +15,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -52,6 +52,7 @@ public static class BuiltinCommands
             "aursh-about" => ExecuteAbout(cmd),
             "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
             "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
+            "aursh-update" => ExecuteUpdate(),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -525,7 +526,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.
                                 - {Ansi.FgBrightCyan}aursh-about : {Ansi.FgBrightBlue}Shows this message.
                                 - {Ansi.FgBrightCyan}aursh-assoc : {Ansi.FgBrightBlue}Associate file extensions with its compiler/interpreter.
-                                - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin manager of AurSh.
+                                - {Ansi.FgBrightCyan}aursh-plugin : {Ansi.FgBrightBlue}Plugin management of AurSh.
                                 - {Ansi.FgBrightCyan}aursh-history : {Ansi.FgBrightBlue}TUI command history.
                                 - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
                                 - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.
@@ -1642,12 +1643,15 @@ public static class BuiltinCommands
     {
         if (cmd.Args.Count == 0)
         {
-            Console.WriteLine("Usage: aursh-plugin <list|add|del|init|debug> [args]");
+            Console.WriteLine("Usage: aursh-plugin <list|add|del|init|debug|update|unload> [args]");
             Console.WriteLine("  list                      List installed plugins");
             Console.WriteLine("  add <path>                Install plugin from directory");
             Console.WriteLine("  del <name>                Remove a plugin");
             Console.WriteLine("  init <name> [--type lua|fsharp]  Create a new plugin template");
             Console.WriteLine("  debug <file>              Check script for syntax errors");
+            Console.WriteLine("  update <name>             Unload and reload a plugin");
+            Console.WriteLine("  unload <name>             Unload a plugin from memory");
+            Console.WriteLine("  unload -d <name>          Unload, delete directory, and reload");
             return 0;
         }
 
@@ -1712,6 +1716,47 @@ public static class BuiltinCommands
             case "debug":
                 if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin debug <file_or_plugin>"); return 1; }
                 return pm.DebugPlugin(cmd.Args[1], workingDirectory);
+
+            case "update":
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin update <name>"); return 1; }
+                return pm.UpdatePlugin(cmd.Args[1]);
+
+            case "unload":
+                if (cmd.Args.Count < 2) { Console.Error.WriteLine("aursh: aursh-plugin unload <name>"); return 1; }
+                if (cmd.Args[1] == "-d" && cmd.Args.Count < 3) { Console.Error.WriteLine("aursh: aursh-plugin unload -d <name>"); return 1; }
+                {
+                    bool deleteDir = cmd.Args[1] == "-d";
+                    string name = deleteDir ? cmd.Args[2] : cmd.Args[1];
+                    if (pm.UnloadPlugin(name))
+                    {
+                        if (deleteDir)
+                        {
+                            string pluginDir = Path.Combine(pm.PluginsDirectory, name);
+                            if (Directory.Exists(pluginDir))
+                            {
+                                try
+                                {
+                                    Directory.Delete(pluginDir, true);
+                                    Console.WriteLine($"Unloaded and deleted plugin '{name}'");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.Error.WriteLine($"aursh: failed to delete plugin '{name}': {ex.Message}");
+                                    return 1;
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Unloaded plugin '{name}'");
+                            }
+                            return pm.UpdatePlugin(name);
+                        }
+                        Console.WriteLine($"Unloaded plugin '{name}'");
+                        return 0;
+                    }
+                    Console.Error.WriteLine($"aursh: plugin '{name}' not loaded");
+                    return 1;
+                }
 
             default:
                 Console.Error.WriteLine($"aursh: aursh-plugin: unknown action '{action}'");
@@ -1793,6 +1838,141 @@ public static class BuiltinCommands
             env.PluginManager.LoadAll();
         }
         Console.WriteLine("Reload complete.");
+        return 0;
+    }
+
+    private static int ExecuteUpdate()
+    {
+        string? sourceDir = null;
+        string currentDir = AppContext.BaseDirectory;
+        string? dir = currentDir;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (Directory.Exists(Path.Combine(dir, ".git")))
+            {
+                sourceDir = dir;
+                break;
+            }
+            string? parent = Directory.GetParent(dir)?.FullName;
+            if (parent == dir) break;
+            dir = parent;
+        }
+
+        if (string.IsNullOrEmpty(sourceDir))
+        {
+            Console.Error.WriteLine("aursh: aursh-update: could not find git repository. Ensure aursh is running from a cloned directory.");
+            return 1;
+        }
+
+        Console.WriteLine($"Updating AurShell from {sourceDir}...");
+
+        string aurshPath = Platform.FindExecutableInPath("aursh") ?? Path.Combine(AppContext.BaseDirectory, Platform.ExecutableExtension == ".exe" ? "aursh.exe" : "aursh");
+        if (!File.Exists(aurshPath))
+        {
+            aurshPath = Path.Combine(AppContext.BaseDirectory, "aursh" + Platform.ExecutableExtension);
+        }
+
+        var gitPsi = new System.Diagnostics.ProcessStartInfo("git", "pull origin main")
+        {
+            WorkingDirectory = sourceDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        try
+        {
+            using var gitProc = System.Diagnostics.Process.Start(gitPsi);
+            if (gitProc != null)
+            {
+                string gitOut = gitProc.StandardOutput.ReadToEnd();
+                string gitErr = gitProc.StandardError.ReadToEnd();
+                gitProc.WaitForExit();
+                if (!string.IsNullOrEmpty(gitOut)) Console.WriteLine(gitOut.Trim());
+                if (!string.IsNullOrEmpty(gitErr)) Console.Error.WriteLine(gitErr.Trim());
+                if (gitProc.ExitCode != 0)
+                {
+                    var gitPsiMaster = new System.Diagnostics.ProcessStartInfo("git", "pull origin master")
+                    {
+                        WorkingDirectory = sourceDir,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    using var gitProcMaster = System.Diagnostics.Process.Start(gitPsiMaster);
+                    if (gitProcMaster != null)
+                    {
+                        string gitOutMaster = gitProcMaster.StandardOutput.ReadToEnd();
+                        string gitErrMaster = gitProcMaster.StandardError.ReadToEnd();
+                        gitProcMaster.WaitForExit();
+                        if (!string.IsNullOrEmpty(gitOutMaster)) Console.WriteLine(gitOutMaster.Trim());
+                        if (!string.IsNullOrEmpty(gitErrMaster)) Console.Error.WriteLine(gitErrMaster.Trim());
+                        if (gitProcMaster.ExitCode != 0)
+                        {
+                            Console.Error.WriteLine("aursh: aursh-update: git pull failed.");
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: aursh-update: {ex.Message}");
+            return 1;
+        }
+
+        Console.WriteLine("Building AurShell...");
+        bool useMake = File.Exists(Path.Combine(sourceDir, "Makefile"));
+        var buildPsi = new System.Diagnostics.ProcessStartInfo(
+            useMake ? "make" : "dotnet",
+            useMake ? "build" : $"build \"{Path.Combine(sourceDir, "src", "AurShell.csproj")}\" -c Release")
+        {
+            WorkingDirectory = sourceDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        try
+        {
+            using var buildProc = System.Diagnostics.Process.Start(buildPsi);
+            if (buildProc != null)
+            {
+                string buildOut = buildProc.StandardOutput.ReadToEnd();
+                string buildErr = buildProc.StandardError.ReadToEnd();
+                buildProc.WaitForExit();
+                if (!string.IsNullOrEmpty(buildOut)) Console.WriteLine(buildOut.Trim());
+                if (!string.IsNullOrEmpty(buildErr)) Console.Error.WriteLine(buildErr.Trim());
+                if (buildProc.ExitCode != 0)
+                {
+                    Console.Error.WriteLine("aursh: aursh-update: build failed.");
+                    return 1;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: aursh-update: {ex.Message}");
+            return 1;
+        }
+
+        Console.WriteLine("Restarting AurShell...");
+        try
+        {
+            var restartPsi = new System.Diagnostics.ProcessStartInfo(aurshPath)
+            {
+                UseShellExecute = false
+            };
+            System.Diagnostics.Process.Start(restartPsi);
+            System.Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: aursh-update: failed to restart: {ex.Message}");
+            return 1;
+        }
+
         return 0;
     }
 }

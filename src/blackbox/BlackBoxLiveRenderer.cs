@@ -27,9 +27,14 @@ public sealed class BlackBoxLiveRenderer
     {
         lock (_lock)
         {
-            if (_started) return;
+            // Reset per-session state so the renderer can be reused for the next
+            // command. Previously _started/_completed stuck at true after the
+            // first command, which made every subsequent Start/Update/Finish a
+            // no-op (boxes never re-painted).
             _started = true;
             _completed = false;
+            _previousHeight = 0;
+            _lastRender = DateTime.MinValue;
 
             HideCursor(writer);
             RenderInternal(session, writer, force: true);

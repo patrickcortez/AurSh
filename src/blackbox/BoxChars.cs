@@ -74,20 +74,33 @@ public static class BoxChars
         if (!string.IsNullOrWhiteSpace(configured))
             return ParseStyle(configured);
 
-        string? lang = System.Environment.GetEnvironmentVariable("LANG")
-                       ?? System.Environment.GetEnvironmentVariable("LC_ALL")
-                       ?? System.Environment.GetEnvironmentVariable("LC_CTYPE");
-        bool utf8 = lang != null && lang.ToUpperInvariant().Contains("UTF-8");
-
         string? term = System.Environment.GetEnvironmentVariable("TERM");
         bool terminalLooksPlain = term != null && (term.Equals("linux", System.StringComparison.OrdinalIgnoreCase)
                                                    || term.Equals("dumb", System.StringComparison.OrdinalIgnoreCase));
-
-        if (!utf8 || terminalLooksPlain)
+        if (terminalLooksPlain)
             return BoxStyle.Ascii;
 
         if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Termux)
             return BoxStyle.Square;
+
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
+        {
+            bool windowsUtf8 = false;
+            try { windowsUtf8 = System.Console.OutputEncoding.CodePage == 65001; }
+            catch { }
+            bool windowsTerminal = !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("WT_SESSION"))
+                                || !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ConEmuPID"));
+            if (windowsUtf8 || windowsTerminal)
+                return BoxStyle.Rounded;
+            return BoxStyle.Ascii;
+        }
+
+        string? lang = System.Environment.GetEnvironmentVariable("LANG")
+                       ?? System.Environment.GetEnvironmentVariable("LC_ALL")
+                       ?? System.Environment.GetEnvironmentVariable("LC_CTYPE");
+        bool utf8 = lang != null && lang.ToUpperInvariant().Contains("UTF-8");
+        if (!utf8)
+            return BoxStyle.Ascii;
 
         return BoxStyle.Rounded;
     }

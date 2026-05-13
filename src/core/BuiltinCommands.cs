@@ -513,7 +513,7 @@ public static class BuiltinCommands
         {Ansi.FgBrightCyan}-------------------------------------------------------------------------------------------------------
         
         {Ansi.FgBrightBlue}                 About:
-                            - This Shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
+                            - This frontend shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
                             As a cross platform shell with a purpose to make the command-line
                             look aesthetically pleasing while working. This Shell is under the license of
                             {Ansi.FgBrightCyan}GNU General Public License.

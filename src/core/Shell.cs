@@ -38,7 +38,13 @@ public class Shell
         _executor = new Executor(_env, startDir);
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
-        _inputHandler = new InputHandler(_history, _env);
+
+        var suggestions = new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
+        suggestions.GenerateDefaults();
+        suggestions.Load();
+        _env.Suggestions = suggestions;
+
+        _inputHandler = new InputHandler(_history, _env, suggestions);
         _pluginManager = new PluginManager(_env, _executor);
         _env.PluginManager = _pluginManager;
         _running = true;
@@ -56,7 +62,16 @@ public class Shell
         _executor = new Executor(_env, workingDirectory);
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
-        _inputHandler = new InputHandler(_history, _env);
+
+        var suggestions = _env.Suggestions ?? new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
+        if (_env.Suggestions == null)
+        {
+            suggestions.GenerateDefaults();
+            suggestions.Load();
+            _env.Suggestions = suggestions;
+        }
+
+        _inputHandler = new InputHandler(_history, _env, suggestions);
         _pluginManager = new PluginManager(_env, _executor);
         _env.PluginManager = _pluginManager;
         _running = true;

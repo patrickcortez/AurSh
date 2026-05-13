@@ -244,6 +244,47 @@ public static class Pipeline
     {
         var commands = pipeline.Commands;
         int count = commands.Count;
+
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && count > 1)
+        {
+            bool allShellDelegated = true;
+            for (int i = 0; i < count; i++)
+            {
+                var cmd = commands[i];
+                if (BuiltinCommands.IsBuiltin(cmd.Name))
+                {
+                    allShellDelegated = false;
+                    break;
+                }
+                if (env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
+                {
+                    allShellDelegated = false;
+                    break;
+                }
+                if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out _))
+                {
+                    allShellDelegated = false;
+                    break;
+                }
+                string? exe = ResolveCommand(cmd.Name, workingDirectory);
+                if (exe != null)
+                {
+                    string exeLower = exe.ToLowerInvariant();
+                    bool isPowerShellExe = exeLower.EndsWith("powershell.exe") || exeLower.EndsWith("pwsh.exe");
+                    if (!isPowerShellExe)
+                    {
+                        allShellDelegated = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allShellDelegated)
+            {
+                return ExecuteCoalescedPipeline(pipeline, env, workingDirectory);
+            }
+        }
+
         var processes = new Process?[count];
         var fileStreams = new List<FileStream>();
         var redirInfos = new (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut)[count];
@@ -627,6 +668,112 @@ public static class Pipeline
         }
     }
 
+    private static int ExecuteCoalescedPipeline(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
+    {
+        var fullSb = new System.Text.StringBuilder();
+
+        for (int i = 0; i < pipeline.Commands.Count; i++)
+        {
+            var cmd = pipeline.Commands[i];
+            if (i > 0)
+                fullSb.Append(" | ");
+
+            fullSb.Append(cmd.Name);
+            foreach (string arg in cmd.Args)
+            {
+                fullSb.Append(' ');
+                if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
+                {
+                    fullSb.Append('"');
+                    fullSb.Append(arg.Replace("\"", "\\\""));
+                    fullSb.Append('"');
+                }
+                else
+                {
+                    fullSb.Append(arg);
+                }
+            }
+
+            foreach (var redir in cmd.Redirections)
+            {
+                switch (redir.Type)
+                {
+                    case RedirectType.Out:
+                        fullSb.Append(" > ");
+                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        break;
+                    case RedirectType.Append:
+                        fullSb.Append(" >> ");
+                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        break;
+                    case RedirectType.In:
+                        fullSb.Append(" < ");
+                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        break;
+                    case RedirectType.Err:
+                        fullSb.Append(" 2> ");
+                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        break;
+                    case RedirectType.ErrAppend:
+                        fullSb.Append(" 2>> ");
+                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        break;
+                    case RedirectType.ErrToOut:
+                        fullSb.Append(" 2>&1");
+                        break;
+                }
+            }
+        }
+
+        string fullCommand = fullSb.ToString();
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = Utils.Platform.DefaultShell,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = false
+        };
+
+        Utils.Platform.AddShellCommandArguments(psi, fullCommand);
+
+        foreach (var kv in env.Variables)
+            psi.Environment[kv.Key] = kv.Value;
+
+        try
+        {
+            using var process = Process.Start(psi);
+            if (process == null)
+            {
+                Console.Error.WriteLine($"aursh: failed to start shell for pipeline");
+                return 126;
+            }
+
+            if (pipeline.Background)
+            {
+                string cmdDesc = string.Join(" | ", pipeline.Commands.Select(c => c.Name));
+                int jobId = env.Jobs.Add(process, cmdDesc);
+                Console.WriteLine($"[{jobId}] {process.Id}");
+                return 0;
+            }
+
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: pipeline execution failed: {ex.Message}");
+            return 126;
+        }
+    }
+
+    private static string QuoteForShell(string value)
+    {
+        if (value.Contains(' ') || value.Contains('"') || value.Contains('\''))
+            return "\"" + value.Replace("\"", "\\\"") + "\"";
+        return value;
+    }
+
     private static ProcessStartInfo CreateProcessStartInfo(
         string executable, CommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
@@ -776,8 +923,7 @@ public static class Pipeline
             CreateNoWindow = false
         };
 
-        psi.ArgumentList.Add(Utils.Platform.ShellFlag);
-        psi.ArgumentList.Add(fullCommand);
+        Utils.Platform.AddShellCommandArguments(psi, fullCommand);
 
         foreach (var kv in env.Variables)
             psi.Environment[kv.Key] = kv.Value;
@@ -924,8 +1070,7 @@ public static class Pipeline
             CreateNoWindow = false
         };
 
-        psi.ArgumentList.Add(Utils.Platform.ShellFlag);
-        psi.ArgumentList.Add(sb.ToString());
+        Utils.Platform.AddShellCommandArguments(psi, sb.ToString());
 
         foreach (var kv in env.Variables)
             psi.Environment[kv.Key] = kv.Value;

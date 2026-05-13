@@ -195,7 +195,7 @@ endif
 publish:
 ifeq ($(WIN_ENV),native)
 	@echo [publish] Publishing self-contained $(RID) binary...
-	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
+	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
 	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE)
 else
 	@echo "[publish] Publishing self-contained $(RID) binary..."
@@ -203,6 +203,9 @@ else
 		-c Release \
 		-r $(RID) \
 		--self-contained true \
+		-p:OutputPath=obj/publish-build/ \
+		-p:AppendTargetFrameworkToOutputPath=true \
+		-p:AppendRuntimeIdentifierToOutputPath=true \
 		-p:PublishSingleFile=true \
 		-p:PublishTrimmed=true \
 		-p:IncludeNativeLibrariesForSelfExtract=true \

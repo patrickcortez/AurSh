@@ -8,6 +8,7 @@ public class InputHandler
 {
     private readonly History _history;
     private readonly ShellEnvironment _env;
+    private readonly SuggestionProvider? _suggestions;
     private readonly StringBuilder _buffer = new();
     private int _cursorPos;
     private int _promptVisibleLen;
@@ -25,11 +26,12 @@ public class InputHandler
 
     private int count;
 
-    public InputHandler(History history, ShellEnvironment env) // Constructor
+    public InputHandler(History history, ShellEnvironment env, SuggestionProvider? suggestions = null)
     {
         _history = history;
         _env = env;
-        count = 0; 
+        _suggestions = suggestions;
+        count = 0;
     }
 
     public string? ReadLine(string prompt) // AurSh Input hanndler
@@ -41,7 +43,6 @@ public class InputHandler
         }
 
         _currentPrompt = prompt;
-        Console.Write(Utils.Ansi.CursorSave);
         Console.Write(prompt);
         _promptVisibleLen = ComputeLastLineVisibleLength(prompt);
         _lastTermWidth = Utils.Platform.TerminalWidth;
@@ -713,12 +714,37 @@ public class InputHandler
         }
 
         bool isCommand = true;
+        int firstSpaceIdx = -1;
         for (int i = 0; i < _cursorPos; i++)
         {
             if (_buffer[i] == ' ')
             {
                 isCommand = false;
+                if (firstSpaceIdx < 0)
+                    firstSpaceIdx = i;
                 break;
+            }
+        }
+
+        if (!isCommand && _suggestions != null && firstSpaceIdx > 0)
+        {
+            string commandName = current.Substring(0, firstSpaceIdx);
+            string word = GetCurrentWord();
+            var sugCompletions = _suggestions.GetCompletionsForArg(commandName, word);
+            if (sugCompletions.Count > 0)
+            {
+                string first = sugCompletions[0];
+                if (!string.IsNullOrEmpty(word) && first.Length > word.Length &&
+                    first.StartsWith(word, StringComparison.OrdinalIgnoreCase))
+                {
+                    _ghostText = first.Substring(word.Length);
+                    return;
+                }
+                else if (string.IsNullOrEmpty(word))
+                {
+                    _ghostText = first;
+                    return;
+                }
             }
         }
 
@@ -768,15 +794,39 @@ public class InputHandler
         long elapsed = Environment.TickCount64 - _resizeChangeTick;
         if (elapsed >= 100)
         {
+            int cursorRowsFromTop = ComputeCursorRowFromPromptStart(currentWidth);
+
             _lastTermWidth = currentWidth;
             _lastTermHeight = currentHeight;
             _pendingResizeWidth = 0;
             _pendingResizeHeight = 0;
-            FullRedraw(clearPrevious: true);
+            FullRedraw(clearPrevious: true, cursorRowsFromTop: cursorRowsFromTop);
         }
     }
 
-    private void FullRedraw(bool clearPrevious = false)
+    private int ComputeCursorRowFromPromptStart(int width)
+    {
+        if (width <= 0) return 0;
+
+        string[] promptLines = _currentPrompt.Split('\n');
+        int rows = 0;
+
+        for (int i = 0; i < promptLines.Length - 1; i++)
+        {
+            int vis = Utils.Ansi.VisibleLength(promptLines[i]);
+            rows += Math.Max(1, (vis + width - 1) / width);
+        }
+
+        int lastPromptVis = promptLines.Length > 0
+            ? Utils.Ansi.VisibleLength(promptLines[^1])
+            : _promptVisibleLen;
+        int cursorCharPos = lastPromptVis + _cursorPos;
+        rows += cursorCharPos / width;
+
+        return rows;
+    }
+
+    private void FullRedraw(bool clearPrevious = false, int cursorRowsFromTop = -1)
     {
         var prompt = new Prompt(_env);
         string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
@@ -786,22 +836,19 @@ public class InputHandler
 
         if (clearPrevious)
         {
-            try
-            {
-                Console.Write(Utils.Ansi.CursorRestore);
-                Console.Write(Utils.Ansi.ClearScreenFromCursor);
-            }
-            catch
-            {
-                Console.Write('\r');
-                Console.Write(Utils.Ansi.ClearLine);
-            }
+            int moveUp = cursorRowsFromTop >= 0 ? cursorRowsFromTop : (_lastDisplayLines > 1 ? _lastDisplayLines - 1 : 0);
+            var clearSb = new StringBuilder();
+            clearSb.Append(Utils.Ansi.CursorHide);
+            clearSb.Append('\r');
+            if (moveUp > 0)
+                clearSb.Append(Utils.Ansi.MoveCursorUp(moveUp));
+            clearSb.Append(Utils.Ansi.ClearScreenFromCursor);
+            Console.Write(clearSb.ToString());
         }
 
         var sb = new StringBuilder();
-        sb.Append(Utils.Ansi.CursorSave);
         sb.Append(_currentPrompt);
-        sb.Append(_buffer.ToString());
+        sb.Append(SyntaxHighlight(_buffer.ToString()));
 
         if (!string.IsNullOrEmpty(_ghostText))
         {
@@ -814,6 +861,7 @@ public class InputHandler
 
         int targetCol = _promptVisibleLen + 1 + _cursorPos;
         sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
+        sb.Append(Utils.Ansi.CursorShow);
 
         Console.Write(sb.ToString());
 
@@ -946,11 +994,14 @@ public class InputHandler
         var completions = new List<string>();
 
         bool isCommand = true;
+        int firstSpaceIdx = -1;
         for (int i = 0; i < _cursorPos; i++)
         {
             if (_buffer[i] == ' ')
             {
                 isCommand = false;
+                if (firstSpaceIdx < 0)
+                    firstSpaceIdx = i;
                 break;
             }
         }
@@ -962,7 +1013,9 @@ public class InputHandler
                 "cd", "export", "unset", "exit", "history", "clear", "echo",
                 "pwd", "type", "alias", "unalias", "source", "set", "env",
                 "true", "false", "read", "test", "return",
-                "jobs", "fg", "kill", "aursh-plugin"
+                "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc",
+                "aursh-reload", "aursh-history", "aursh-about",
+                "aursh-ls", "aursh-cat", "aursh-update"
             })
             {
                 if (builtin.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
@@ -1005,6 +1058,16 @@ public class InputHandler
         }
         else
         {
+            string commandName = firstSpaceIdx > 0
+                ? _buffer.ToString().Substring(0, firstSpaceIdx)
+                : "";
+
+            if (_suggestions != null && !string.IsNullOrEmpty(commandName) && _suggestions.HasCommand(commandName))
+            {
+                var sugResults = _suggestions.GetCompletionsForArg(commandName, partial);
+                completions.AddRange(sugResults);
+            }
+
             string expanded = Utils.Platform.ExpandTilde(partial);
             string? dir = Path.GetDirectoryName(expanded);
             string prefix = Path.GetFileName(expanded);

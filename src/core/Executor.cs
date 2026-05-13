@@ -34,18 +34,38 @@ public class Executor
         }
     }
 
-    public int Execute(string input) // AurSh Command parser
+    public int Execute(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
             return 0;
 
-        if(input.StartsWith(';')){ // So it wont freeze up when hit with ';'
+        if(input.StartsWith(';')){
             return 1;
         }
 
         if (input.Contains('\n'))
         {
             return ExecuteMultilineAsNativeScript(input);
+        }
+
+        string trimmedInput = input.Trim();
+        if (IsAutoCdPath(trimmedInput))
+        {
+            string resolved = Utils.FileSystem.ResolvePath(trimmedInput, _workingDirectory);
+            if (Directory.Exists(resolved))
+            {
+                string oldDir = _workingDirectory;
+                _workingDirectory = Utils.FileSystem.NormalizePath(resolved);
+                try { Directory.SetCurrentDirectory(_workingDirectory); } catch { }
+                _env.Set("OLDPWD", oldDir);
+                _env.Set("PWD", _workingDirectory);
+                return 0;
+            }
+            if (!File.Exists(resolved))
+            {
+                Console.Error.WriteLine($"aursh: cd: {trimmedInput}: No such file or directory");
+                return 1;
+            }
         }
 
         string expanded = ResolveAliases(input);
@@ -176,6 +196,36 @@ public class Executor
                 _workingDirectory = envCwd;
         }
         catch { }
+    }
+
+    private static bool IsAutoCdPath(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return false;
+
+        if (input.Contains('|') || input.Contains(';') || input.Contains('>') ||
+            input.Contains('<') || input.Contains('&'))
+            return false;
+
+        if (input == "." || input == "..")
+            return true;
+
+        if (input.StartsWith("./") || input.StartsWith(".\\") ||
+            input.StartsWith("../") || input.StartsWith("..\\"))
+        {
+            bool hasSpaces = false;
+            for (int i = 0; i < input.Length; i++)
+            {
+                if (input[i] == ' ')
+                {
+                    hasSpaces = true;
+                    break;
+                }
+            }
+            return !hasSpaces;
+        }
+
+        return false;
     }
 
     private int ExecuteMultilineAsNativeScript(string input)

@@ -1,7 +1,11 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
 namespace AurShell;
 
 public class Program
 {
+
     public static int Main(string[] args)
     {
         Utils.Platform.ApplyAndroidWorkarounds();

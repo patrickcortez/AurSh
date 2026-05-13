@@ -366,6 +366,12 @@ public class Lexer
 
         char c = _input[_pos];
 
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && c == '_')
+        {
+            _pos++;
+            return "$_";
+        }
+
         if (c == '?')
         {
             _pos++;
@@ -417,17 +423,32 @@ public class Lexer
                 }
                 return _env.GetObjectField(objName, fieldBuf.ToString()) ?? "";
             }
+
+            if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
+                return "$" + objName;
         }
 
         string name = nameBuf.ToString();
         if (string.IsNullOrEmpty(name))
             return "$";
 
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
+        {
+            if (_pos < _input.Length && _input[_pos] == ':' && IsPowerShellScopeName(name))
+                return "$" + name;
+
+            if (IsPowerShellAutomaticVariable(name) && _env.Get(name) == null)
+                return "$" + name;
+        }
+
         return _env.Get(name) ?? "";
     }
 
     private string ExpandBracedContent(string content)
     {
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && IsPowerShellBracedVariable(content))
+            return "${" + content + "}";
+
         int colonDash = content.IndexOf(":-", StringComparison.Ordinal);
         if (colonDash >= 0)
         {
@@ -483,6 +504,45 @@ public class Lexer
         }
 
         return _env.Get(content) ?? "";
+    }
+
+    private static bool IsPowerShellBracedVariable(string content)
+    {
+        if (content == "_")
+            return true;
+
+        int colonIdx = content.IndexOf(':');
+        if (colonIdx > 0)
+        {
+            string scopeName = content.Substring(0, colonIdx);
+            return IsPowerShellScopeName(scopeName);
+        }
+
+        return IsPowerShellAutomaticVariable(content);
+    }
+
+    private static bool IsPowerShellScopeName(string name)
+    {
+        return name.Equals("env", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("global", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("local", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("private", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("script", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("using", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("variable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPowerShellAutomaticVariable(string name)
+    {
+        return name.Equals("PSItem", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("this", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("input", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("args", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("foreach", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("switch", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("false", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("null", StringComparison.OrdinalIgnoreCase);
     }
 
     private static char MapEscapeChar(char c) => c switch

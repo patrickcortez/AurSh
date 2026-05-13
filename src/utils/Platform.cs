@@ -55,6 +55,7 @@ public static class Platform
 
     public static string HistoryFilePath => Path.Combine(DataDirectory, "history");
     public static string RcFilePath => Path.Combine(HomeDirectory, ".aurc");
+    public static string SuggestionsDirectory => Path.Combine(HomeDirectory, ".aursh", "suggestions");
     public static char PathSeparator => CurrentOS == OperatingSystemType.Windows ? '\\' : '/';
     public static char PathListSeparator => CurrentOS == OperatingSystemType.Windows ? ';' : ':';
     public static string ExecutableExtension => CurrentOS == OperatingSystemType.Windows ? ".exe" : "";
@@ -150,6 +151,35 @@ public static class Platform
 
     public static string ShellFlag => "-c";
 
+    public static void AddShellCommandArguments(System.Diagnostics.ProcessStartInfo psi, string command)
+    {
+        if (CurrentOS == OperatingSystemType.Windows)
+        {
+            string shellName = Path.GetFileName(psi.FileName);
+            if (shellName.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-ExecutionPolicy");
+                psi.ArgumentList.Add("Bypass");
+                psi.ArgumentList.Add("-Command");
+                psi.ArgumentList.Add(command);
+                return;
+            }
+
+            if (shellName.Equals("pwsh.exe", StringComparison.OrdinalIgnoreCase) ||
+                shellName.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
+            {
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-Command");
+                psi.ArgumentList.Add(command);
+                return;
+            }
+        }
+
+        psi.ArgumentList.Add(ShellFlag);
+        psi.ArgumentList.Add(command);
+    }
+
     public static bool SupportsAnsi()
     {
         if (IsUnixLike)
@@ -222,7 +252,7 @@ public static class Platform
         return prefix + sep + "\u2026" + sep + string.Join(sep, tail);
     }
 
-    public static void ApplyAndroidWorkarounds()
+    public static void ApplyAndroidWorkarounds() // We set our termux env var before booting up
     {
         if (CurrentOS != OperatingSystemType.Termux && string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ANDROID_ROOT")))
             return;
@@ -244,6 +274,7 @@ public static class Platform
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
         Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh"));
         Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh", "plugins"));
+        Directory.CreateDirectory(SuggestionsDirectory);
     }
 
     private static OperatingSystemType DetectOperatingSystem()
@@ -318,7 +349,7 @@ public static class Platform
             return pwsh;
 
         string systemRoot = System.Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows";
-        string builtinPwsh = Path.Combine(systemRoot, "System32", "WindowsPowerShell", "v1.4", "powershell.exe");
+        string builtinPwsh = Path.Combine(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
         if (File.Exists(builtinPwsh))
             return builtinPwsh;
 

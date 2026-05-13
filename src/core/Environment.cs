@@ -22,6 +22,8 @@ public class ShellEnvironment
 
     public Plugins.PluginManager? PluginManager { get; set; }
 
+    public SuggestionProvider? Suggestions { get; set; }
+
     public FileAssociator Associator { get; } = new();
 
     public IReadOnlyDictionary<string, string> Variables => _variables;

@@ -15,7 +15,8 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update",
+        "aursh-blackbox-demo"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -53,6 +54,7 @@ public static class BuiltinCommands
             "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
             "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
             "aursh-update" => ExecuteUpdate(cmd),
+            "aursh-blackbox-demo" => ExecuteBlackBoxDemo(cmd),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -2123,5 +2125,11 @@ public static class BuiltinCommands
         Console.WriteLine("Update complete. Exiting shell to apply changes...");
         System.Environment.Exit(0);
         return 0;
+    }
+
+    private static int ExecuteBlackBoxDemo(CommandNode cmd)
+    {
+        string[] args = cmd.Args.ToArray();
+        return AurShell.BlackBoxView.BlackBoxDemo.Run(args);
     }
 }

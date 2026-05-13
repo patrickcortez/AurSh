@@ -33,6 +33,7 @@ Has:
 - Job control.
 - Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
+- BlackBox: TUI execution viewport that wraps every command's stdin/stdout/stderr in a rounded Unicode box drawn beneath the prompt (in progress, see [docs/blackbox.md](docs/blackbox.md)).
 
 ---
 

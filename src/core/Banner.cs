@@ -4,7 +4,7 @@ namespace AurShell.Core;
 
 public static class Banner
 {
-    private const string Version = "1.4.0";
+    private const string Version = "1.5.0";
 
     private static readonly string[] AsciiArt = new[]
     {

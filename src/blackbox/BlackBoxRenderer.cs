@@ -20,10 +20,11 @@ public sealed class BlackBoxRenderer
         int outerWidth = ResolveOuterWidth();
         int innerWidth = System.Math.Max(4, outerWidth - 2);
 
-        int bodyCap = _config.ResolveMaxHeight();
-        int bodyRows = System.Math.Max(_config.MinHeight, System.Math.Min(bodyCap, System.Math.Max(1, session.Buffer.Count)));
-
-        int top = ComputeScrollTop(session.Buffer, bodyRows);
+        // Y-axis autoscale: render every line the buffer has. No height cap, no
+        // scrolling. Older rows naturally scroll into the terminal's scrollback
+        // if the box exceeds the visible viewport.
+        int bodyRows = System.Math.Max(_config.MinHeight, session.Buffer.Count);
+        int top = 0;
 
         var sb = new StringBuilder();
         RenderTop(sb, glyphs, session, outerWidth, innerWidth);
@@ -180,11 +181,11 @@ public sealed class BlackBoxRenderer
 
     private void RenderBottom(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, int top, int bodyRows)
     {
-        string scroll = BuildScrollIndicator(session.Buffer, top, bodyRows);
         string exitLabel = BuildExitLabel(session);
         string elapsed = BuildElapsedLabel(session);
 
-        string left = string.IsNullOrEmpty(scroll) ? "" : $" {_config.MetaColor}{scroll}{Ansi.Reset}{_config.BorderColor} ";
+        // Scroll indicator removed: body always renders entire buffer (y-axis autoscale).
+        string left = "";
         string mid = string.IsNullOrEmpty(exitLabel) ? "" : $" {exitLabel}{_config.BorderColor} ";
         string right = string.IsNullOrEmpty(elapsed) ? "" : $" {_config.MetaColor}{elapsed}{Ansi.Reset}{_config.BorderColor} ";
 
@@ -195,8 +196,6 @@ public sealed class BlackBoxRenderer
         int remaining = innerWidth - leftVis - midVis - rightVis;
         if (remaining < 2)
         {
-            left = "";
-            leftVis = 0;
             remaining = innerWidth - midVis - rightVis;
             if (remaining < 2)
             {

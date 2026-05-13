@@ -1880,11 +1880,13 @@ public static class BuiltinCommands
         return null;
     }
 
-    // Stored in <ConfigDirectory>/update_configs.txt as a comma-separated
-    // list of key=value pairs. Format: `path=<repo-path>,`. The schema is
-    // shared with the standalone aursh-update binary so both readers agree
-    // on the same file. The legacy `update-repo` flat-text file is still
-    // read for backward compatibility.
+    // Stored in <ConfigDirectory>/update_configs.txt as one `key=value,`
+    // pair per line. The schema is shared with the standalone aursh-update
+    // binary so both readers agree on the same file.
+    //
+    // Recognized keys: `path` (repo checkout location), `branch` (which
+    // branch check/update/pull should track). The legacy `update-repo`
+    // flat-text file is still read for backward compatibility.
     private static string UpdateConfigPath => Path.Combine(Platform.ConfigDirectory, "update_configs.txt");
     private static string LegacyUpdateRepoPath => Path.Combine(Platform.ConfigDirectory, "update-repo");
 
@@ -1907,6 +1909,34 @@ public static class BuiltinCommands
     {
         Directory.CreateDirectory(Platform.ConfigDirectory);
         WriteUpdateConfigField("path", path);
+    }
+
+    private static string? GetUpdateBranch()
+    {
+        if (!File.Exists(UpdateConfigPath)) return null;
+        return ReadUpdateConfigField("branch");
+    }
+
+    private static void SetUpdateBranch(string branch)
+    {
+        Directory.CreateDirectory(Platform.ConfigDirectory);
+        WriteUpdateConfigField("branch", branch);
+    }
+
+    /// <summary>
+    /// Resolves the branch to use for git operations in the configured repo.
+    /// Prefers <c>branch=</c> from update_configs.txt; falls back to the
+    /// repo's currently checked-out HEAD; finally to <c>main</c>.
+    /// </summary>
+    private static string ResolveUpdateBranch(string repoPath)
+    {
+        string? stored = GetUpdateBranch();
+        if (!string.IsNullOrEmpty(stored)) return stored!;
+
+        string head = RunGitOutput(repoPath, "rev-parse --abbrev-ref HEAD").Trim();
+        if (!string.IsNullOrEmpty(head) && head != "HEAD") return head;
+
+        return "main";
     }
 
     private static string? ReadUpdateConfigField(string key)
@@ -1953,13 +1983,27 @@ public static class BuiltinCommands
 
         entries[key] = value;
 
-        var sb = new System.Text.StringBuilder();
+        // Write one `key=value,` per line. `path` always appears first,
+        // followed by `branch` directly below it; future keys append in
+        // insertion order so the file stays diffable.
+        var ordered = new List<KeyValuePair<string, string>>();
+        if (entries.TryGetValue("path", out string? p)) ordered.Add(new("path", p));
+        if (entries.TryGetValue("branch", out string? b)) ordered.Add(new("branch", b));
         foreach (var kv in entries)
+        {
+            if (kv.Key.Equals("path", StringComparison.OrdinalIgnoreCase)) continue;
+            if (kv.Key.Equals("branch", StringComparison.OrdinalIgnoreCase)) continue;
+            ordered.Add(new(kv.Key, kv.Value));
+        }
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in ordered)
         {
             sb.Append(kv.Key);
             sb.Append('=');
             sb.Append(kv.Value);
             sb.Append(',');
+            sb.Append('\n');
         }
         File.WriteAllText(UpdateConfigPath, sb.ToString());
     }
@@ -2034,6 +2078,33 @@ public static class BuiltinCommands
             return output;
         }
         catch { return ""; }
+    }
+
+    /// <summary>
+    /// Run git with stdout/stderr inherited from the current process so the
+    /// user sees progress / conflict messages directly. Returns the exit
+    /// code (or 127 if the binary could not be launched).
+    /// </summary>
+    private static int RunGitForeground(string workingDir, string args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = workingDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = false,
+            RedirectStandardError = false
+        };
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return 127;
+            proc.WaitForExit();
+            return proc.ExitCode;
+        }
+        catch
+        {
+            return 127;
+        }
     }
 
     private static int ExecuteUpdate(CommandNode cmd)
@@ -2115,6 +2186,52 @@ public static class BuiltinCommands
             return 0;
         }
 
+        if (sub == "change")
+        {
+            if (cmd.Args.Count < 2)
+            {
+                Console.Error.WriteLine("aursh: aursh-update change <branch-name>");
+                return 1;
+            }
+            string branch = cmd.Args[1].Trim();
+            if (string.IsNullOrEmpty(branch))
+            {
+                Console.Error.WriteLine("aursh: aursh-update: branch name is empty.");
+                return 1;
+            }
+            if (branch.IndexOfAny(new[] { ' ', '\t', ',', '\n', '\r' }) >= 0)
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: branch name '{branch}' contains invalid whitespace or commas.");
+                return 1;
+            }
+
+            string? repoPath = GetUpdateRepoPath();
+            if (string.IsNullOrEmpty(repoPath))
+            {
+                Console.Error.WriteLine("aursh: aursh-update: no repository set. Use 'aursh-update set <path>' first.");
+                return 1;
+            }
+            if (!Directory.Exists(repoPath))
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: repository directory '{repoPath}' not found.");
+                return 1;
+            }
+
+            RunGitOutput(repoPath, "fetch origin");
+
+            Console.WriteLine($"Switching {repoPath} to branch '{branch}'...");
+            int rc = RunGitForeground(repoPath, $"checkout {branch}");
+            if (rc != 0)
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: git checkout {branch} failed.");
+                return rc;
+            }
+
+            SetUpdateBranch(branch);
+            Console.WriteLine($"Now on branch '{branch}'. Stored in update_configs.txt.");
+            return 0;
+        }
+
         if (sub == "check")
         {
             string? repoPath = GetUpdateRepoPath();
@@ -2129,28 +2246,21 @@ public static class BuiltinCommands
                 return 1;
             }
 
-            string fetchErr = RunGitOutput(repoPath, "fetch");
-            if (fetchErr == "")
-            {
-                // fetch may silently succeed; let's just proceed
-            }
+            RunGitOutput(repoPath, "fetch");
 
-            string behind = RunGitOutput(repoPath, "rev-list HEAD..origin/main --count");
-            if (string.IsNullOrEmpty(behind))
-            {
-                behind = RunGitOutput(repoPath, "rev-list HEAD..origin/master --count");
-            }
+            string branch = ResolveUpdateBranch(repoPath);
+            string behind = RunGitOutput(repoPath, $"rev-list HEAD..origin/{branch} --count");
 
             if (int.TryParse(behind, out int count))
             {
                 if (count == 0)
-                    Console.WriteLine("AurShell is up to date.");
+                    Console.WriteLine($"AurShell is up to date (origin/{branch}).");
                 else
-                    Console.WriteLine($"AurShell is {count} commit(s) behind.");
+                    Console.WriteLine($"AurShell is {count} commit(s) behind origin/{branch}.");
             }
             else
             {
-                Console.Error.WriteLine("aursh: aursh-update: failed to check remote status.");
+                Console.Error.WriteLine($"aursh: aursh-update: failed to check remote status against origin/{branch}.");
                 return 1;
             }
             return 0;
@@ -2192,9 +2302,10 @@ public static class BuiltinCommands
             return 1;
         }
 
-        Console.WriteLine($"Updating AurShell from {sourceDir}...");
+        string branch = ResolveUpdateBranch(sourceDir);
+        Console.WriteLine($"Updating AurShell from {sourceDir} (branch '{branch}')...");
 
-        var gitPsi = new System.Diagnostics.ProcessStartInfo("git", "pull origin main")
+        var gitPsi = new System.Diagnostics.ProcessStartInfo("git", $"pull origin {branch}")
         {
             WorkingDirectory = sourceDir,
             UseShellExecute = false,
@@ -2214,27 +2325,8 @@ public static class BuiltinCommands
                 if (!string.IsNullOrEmpty(gitErr)) Console.Error.WriteLine(gitErr.Trim());
                 if (gitProc.ExitCode != 0)
                 {
-                    var gitPsiMaster = new System.Diagnostics.ProcessStartInfo("git", "pull origin master")
-                    {
-                        WorkingDirectory = sourceDir,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-                    using var gitProcMaster = System.Diagnostics.Process.Start(gitPsiMaster);
-                    if (gitProcMaster != null)
-                    {
-                        string gitOutMaster = gitProcMaster.StandardOutput.ReadToEnd();
-                        string gitErrMaster = gitProcMaster.StandardError.ReadToEnd();
-                        gitProcMaster.WaitForExit();
-                        if (!string.IsNullOrEmpty(gitOutMaster)) Console.WriteLine(gitOutMaster.Trim());
-                        if (!string.IsNullOrEmpty(gitErrMaster)) Console.Error.WriteLine(gitErrMaster.Trim());
-                        if (gitProcMaster.ExitCode != 0)
-                        {
-                            Console.Error.WriteLine("aursh: aursh-update: git pull failed.");
-                            return 1;
-                        }
-                    }
+                    Console.Error.WriteLine($"aursh: aursh-update: git pull origin {branch} failed.");
+                    return 1;
                 }
             }
         }

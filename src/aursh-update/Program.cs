@@ -32,6 +32,7 @@ internal static class Program
             return sub switch
             {
                 "set"     => SetRepo(args),
+                "change"  => ChangeBranch(args),
                 "check"   => CheckUpdate(),
                 "where"   => PrintRepoPath(),
                 "-h" or "--help" or "help" => PrintHelp(),
@@ -51,8 +52,9 @@ internal static class Program
         Console.WriteLine("Usage:");
         Console.WriteLine("  aursh-update                       Pull latest and reinstall.");
         Console.WriteLine("  aursh-update set <path-to-repo>    Remember the AurSh git checkout to update from.");
+        Console.WriteLine("  aursh-update change <branch>       Switch the configured repo to <branch> immediately.");
         Console.WriteLine("  aursh-update check                 Report how many commits behind the local clone is.");
-        Console.WriteLine("  aursh-update where                 Print the currently configured repo path.");
+        Console.WriteLine("  aursh-update where                 Print the currently configured repo path + branch.");
         Console.WriteLine("");
         Console.WriteLine("Run under sudo (or as Administrator on Windows) if the install");
         Console.WriteLine("location requires elevated privileges:");
@@ -70,6 +72,9 @@ internal static class Program
             return 1;
         }
         Console.WriteLine(repo);
+        string? branch = GetUpdateBranch();
+        if (!string.IsNullOrEmpty(branch))
+            Console.WriteLine($"branch: {branch}");
         return 0;
     }
 
@@ -100,17 +105,69 @@ internal static class Program
             return Fail($"repository directory '{repoPath}' not found.");
 
         RunGit(repoPath, "fetch");
-        string behind = RunGitOutput(repoPath, "rev-list HEAD..origin/main --count");
-        if (string.IsNullOrEmpty(behind))
-            behind = RunGitOutput(repoPath, "rev-list HEAD..origin/master --count");
+
+        // Prefer the explicit branch from update_configs.txt, then the
+        // currently checked-out branch, then main/master as last resort.
+        string branch = ResolveUpdateBranch(repoPath);
+        string behind = RunGitOutput(repoPath, $"rev-list HEAD..origin/{branch} --count");
 
         if (!int.TryParse(behind, out int count))
-            return Fail("failed to check remote status.");
+            return Fail($"failed to check remote status against origin/{branch}.");
 
         Console.WriteLine(count == 0
-            ? "AurShell is up to date."
-            : $"AurShell is {count} commit(s) behind.");
+            ? $"AurShell is up to date (origin/{branch})."
+            : $"AurShell is {count} commit(s) behind origin/{branch}.");
         return 0;
+    }
+
+    private static int ChangeBranch(string[] args)
+    {
+        if (args.Length < 2)
+            return Fail("aursh-update change <branch-name>");
+
+        string branch = args[1].Trim();
+        if (string.IsNullOrEmpty(branch))
+            return Fail("branch name is empty.");
+        if (branch.IndexOfAny(new[] { ' ', '\t', ',', '\n', '\r' }) >= 0)
+            return Fail($"branch name '{branch}' contains invalid whitespace or commas.");
+
+        string? repoPath = GetUpdateRepoPath();
+        if (string.IsNullOrEmpty(repoPath))
+            return Fail("no repository set. Use 'aursh-update set <path>' first.");
+        if (!Directory.Exists(repoPath))
+            return Fail($"repository directory '{repoPath}' not found.");
+
+        // Make sure the remote has heard of the requested branch before we
+        // switch. `git fetch` is cheap; this also lets `checkout <branch>`
+        // succeed if the branch only exists on the remote.
+        RunGit(repoPath, "fetch origin");
+
+        Console.WriteLine($"Switching {repoPath} to branch '{branch}'...");
+        int rc = RunGit(repoPath, $"checkout {branch}");
+        if (rc != 0)
+            return Fail($"git checkout {branch} failed (exit {rc}).");
+
+        // Persist so subsequent `check` / `update` runs use this branch.
+        SetUpdateBranch(branch);
+        Console.WriteLine($"Now on branch '{branch}'. Stored in update_configs.txt.");
+        return 0;
+    }
+
+    /// <summary>
+    /// Branch to use for git operations. Order of precedence:
+    /// 1. Explicit `branch=` value in update_configs.txt.
+    /// 2. The repo's currently checked-out branch (HEAD).
+    /// 3. "main" as a final fallback.
+    /// </summary>
+    private static string ResolveUpdateBranch(string repoPath)
+    {
+        string? stored = GetUpdateBranch();
+        if (!string.IsNullOrEmpty(stored)) return stored!;
+
+        string head = RunGitOutput(repoPath, "rev-parse --abbrev-ref HEAD").Trim();
+        if (!string.IsNullOrEmpty(head) && head != "HEAD") return head;
+
+        return "main";
     }
 
     private static int DoUpdate()
@@ -122,16 +179,12 @@ internal static class Program
         if (!Directory.Exists(sourceDir))
             return Fail($"repository directory '{sourceDir}' not found.");
 
-        Console.WriteLine($"Updating AurShell from {sourceDir}...");
+        string branch = ResolveUpdateBranch(sourceDir);
+        Console.WriteLine($"Updating AurShell from {sourceDir} (branch '{branch}')...");
 
-        int pullCode = RunGit(sourceDir, "pull origin main");
+        int pullCode = RunGit(sourceDir, $"pull origin {branch}");
         if (pullCode != 0)
-        {
-            // Fall back to master if main isn't the default branch.
-            pullCode = RunGit(sourceDir, "pull origin master");
-            if (pullCode != 0)
-                return Fail("git pull failed.");
-        }
+            return Fail($"git pull origin {branch} failed.");
 
         Console.WriteLine("Installing AurShell...");
         bool useMake = File.Exists(Path.Combine(sourceDir, "Makefile"));
@@ -259,17 +312,21 @@ internal static class Program
 
     // ───────────────────────────── config storage ─────────────────────────
     //
-    // Stored in <ConfigDirectory>/update_configs.txt as a comma-separated
-    // list of key=value pairs. Today only `path` is used; the schema is
-    // intentionally extensible (e.g. `branch=`, `remote=`) so future
-    // versions can add fields without changing the file location.
+    // Stored in <ConfigDirectory>/update_configs.txt as a list of
+    // comma-terminated `key=value,` pairs, one per line. The trailing
+    // comma is part of the wire format. Today recognized keys are:
+    //
+    //   path   — absolute path to the AurSh git checkout
+    //   branch — branch the checkout should track for check/update/pull
     //
     // Example file contents:
     //     path=/home/cortez/Repos/AurSh,
+    //     branch=BlackBox,
     //
-    // The trailing comma is part of the wire format — every key=value
-    // pair is followed by a comma so the parser can tolerate a trailing
-    // line break or whitespace.
+    // The schema is intentionally extensible (`remote=`, `worktree=`, …)
+    // so future versions can add fields without changing the file path.
+    // The parser tolerates extra whitespace around `=` and across line
+    // boundaries; entries are split on commas.
 
     private const string ConfigFileName = "update_configs.txt";
     private const string LegacyConfigFileName = "update-repo";
@@ -302,6 +359,18 @@ internal static class Program
     {
         Directory.CreateDirectory(ConfigDirectory);
         WriteConfigField("path", path);
+    }
+
+    private static string? GetUpdateBranch()
+    {
+        if (!File.Exists(UpdateConfigPath)) return null;
+        return ReadConfigField("branch");
+    }
+
+    private static void SetUpdateBranch(string branch)
+    {
+        Directory.CreateDirectory(ConfigDirectory);
+        WriteConfigField("branch", branch);
     }
 
     /// <summary>
@@ -358,13 +427,29 @@ internal static class Program
 
         entries[key] = value;
 
-        var sb = new System.Text.StringBuilder();
+        // Serialize one `key=value,` pair per line. `path` is always
+        // written first (when present) so it sits at the top of the file
+        // as the most-important field; `branch` follows next when set so
+        // it appears "a line below repo path". Any other future keys are
+        // appended after, in insertion order.
+        var ordered = new List<KeyValuePair<string, string>>();
+        if (entries.TryGetValue("path", out string? p)) ordered.Add(new("path", p));
+        if (entries.TryGetValue("branch", out string? b)) ordered.Add(new("branch", b));
         foreach (var kv in entries)
+        {
+            if (kv.Key.Equals("path", StringComparison.OrdinalIgnoreCase)) continue;
+            if (kv.Key.Equals("branch", StringComparison.OrdinalIgnoreCase)) continue;
+            ordered.Add(new(kv.Key, kv.Value));
+        }
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in ordered)
         {
             sb.Append(kv.Key);
             sb.Append('=');
             sb.Append(kv.Value);
             sb.Append(',');
+            sb.Append('\n');
         }
         File.WriteAllText(UpdateConfigPath, sb.ToString());
     }

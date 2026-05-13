@@ -132,15 +132,13 @@ public static class Platform
         }
     }
 
-    public static int TerminalWidth
-    {
-        get { try { return Console.WindowWidth; } catch { return 80; } }
-    }
+    // Delegate to the TerminalSize cache so we don't call ioctl(TIOCGWINSZ)
+    // on every read. TerminalSize.Start() is invoked from Program.Main and
+    // keeps the value fresh via SIGWINCH + a low-frequency poll, so reads
+    // here are O(1) memory loads. See src/utils/TerminalSize.cs.
+    public static int TerminalWidth => TerminalSize.Width;
 
-    public static int TerminalHeight
-    {
-        get { try { return Console.WindowHeight; } catch { return 24; } }
-    }
+    public static int TerminalHeight => TerminalSize.Height;
 
     public static string DefaultShell => CurrentOS switch
     {

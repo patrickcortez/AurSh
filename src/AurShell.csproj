@@ -24,4 +24,16 @@
     <PackageId>Aursh</PackageId>
   </PropertyGroup>
 
+  <!--
+    aursh-update lives in its own project (src/aursh-update/AurShUpdate.csproj)
+    so that it can be sudo'd independently. Exclude its source files from this
+    project so we don't try to compile two `Main` entrypoints into the same
+    assembly.
+  -->
+  <ItemGroup>
+    <Compile Remove="aursh-update/**/*.cs" />
+    <None Remove="aursh-update/**/*" />
+    <EmbeddedResource Remove="aursh-update/**/*" />
+  </ItemGroup>
+
 </Project>

@@ -1845,6 +1845,41 @@ public static class BuiltinCommands
         return 0;
     }
 
+    // Update logic lives in a separate aursh-update executable so the user
+    // can `sudo aursh-update` without having to elevate the entire shell.
+    // The ExecuteUpdate builtin below just shells out to that binary.
+
+    private static string? FindAurshUpdateExecutable()
+    {
+        string exeName = Platform.CurrentOS == OperatingSystemType.Windows
+            ? "aursh-update.exe"
+            : "aursh-update";
+
+        // 1. Look next to the running aursh binary first (install-time layout).
+        string baseDir = AppContext.BaseDirectory;
+        string adjacent = Path.Combine(baseDir, exeName);
+        if (File.Exists(adjacent))
+            return adjacent;
+
+        // 2. Walk up looking for a bin/ directory (developer layout: repo/bin/).
+        string? dir = baseDir;
+        for (int i = 0; i < 6 && !string.IsNullOrEmpty(dir); i++)
+        {
+            string candidate = Path.Combine(dir, "bin", exeName);
+            if (File.Exists(candidate))
+                return candidate;
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+
+        // 3. Fall back to PATH.
+        string? onPath = Utils.Platform.FindExecutableInPath(
+            Platform.CurrentOS == OperatingSystemType.Windows ? "aursh-update.exe" : "aursh-update");
+        if (!string.IsNullOrEmpty(onPath))
+            return onPath;
+
+        return null;
+    }
+
     private static string UpdateRepoConfigPath => Path.Combine(Platform.ConfigDirectory, "update-repo");
 
     private static string? GetUpdateRepoPath()
@@ -1934,6 +1969,58 @@ public static class BuiltinCommands
 
     private static int ExecuteUpdate(CommandNode cmd)
     {
+        // Try the standalone aursh-update binary first. Living outside the
+        // shell is the whole point — it lets users run `sudo aursh-update`
+        // without elevating the whole interactive aursh process.
+        string? updaterPath = FindAurshUpdateExecutable();
+        if (!string.IsNullOrEmpty(updaterPath))
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(updaterPath)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = false,
+                // Redirect so the bytes flow through Console.Out / Console.Error,
+                // which the BlackBox builtin path has already swapped over to
+                // its BlackBoxWriter. Otherwise the child writes directly to
+                // the real terminal fd and the box renders an empty body.
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            foreach (var arg in cmd.Args)
+                psi.ArgumentList.Add(arg);
+
+            try
+            {
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc == null) return 127;
+
+                var outTask = System.Threading.Tasks.Task.Run(() =>
+                {
+                    string? line;
+                    while ((line = proc.StandardOutput.ReadLine()) != null)
+                        Console.WriteLine(line);
+                });
+                var errTask = System.Threading.Tasks.Task.Run(() =>
+                {
+                    string? line;
+                    while ((line = proc.StandardError.ReadLine()) != null)
+                        Console.Error.WriteLine(line);
+                });
+
+                proc.WaitForExit();
+                try { outTask.Wait(System.TimeSpan.FromSeconds(2)); } catch { }
+                try { errTask.Wait(System.TimeSpan.FromSeconds(2)); } catch { }
+                return proc.ExitCode;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"aursh: aursh-update: {ex.Message}");
+                return 127;
+            }
+        }
+
+        // Fallback: inline updater. Kept around so the shell still works on
+        // dev checkouts where the standalone binary hasn't been built yet.
         if (cmd.Args.Count == 0)
             return DoUpdate();
 

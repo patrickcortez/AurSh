@@ -134,8 +134,39 @@ src/blackbox/
   Native Pty.Net / ConPTY support for Windows + ANSI cursor parser
   remains future work.
 - **M3** — Scrollback navigation after a command finishes; SIGWINCH
-  redraw; theme polish.
+  redraw; theme polish. **DONE** (SIGWINCH + adaptive tiers; scrollback
+  navigation remains future work).
 - **M4** — Plugin hooks (`OnBoxOpen`, `OnBoxClose`) for lua / F#.
+
+## Adaptive layout tiers
+
+BlackBox picks one of three layout densities based on terminal width.
+The tier is recomputed live whenever the terminal resizes (rotation,
+soft-keyboard show/hide, pinch-zoom, window drag) via SIGWINCH on POSIX
+and a 750ms polling fallback on every platform.
+
+| Tier      | Width range  | Look                                                      |
+|-----------|--------------|-----------------------------------------------------------|
+| `Full`    | `>= 60 cols` | Full box: header + side borders + footer.                 |
+| `Compact` | `30..59`     | Header + footer only; body has no `│` side borders.       |
+| `Bar`     | `< 30 cols`  | Single-line `▸` header + raw body + single-line `└` footer. |
+
+Size detection runs a 5-stage cascade and takes the first sane result:
+
+1. `ioctl(TIOCGWINSZ)` via `Console.WindowWidth`/`Height` (~µs).
+2. `COLUMNS` / `LINES` env vars (set by some emulators after resize).
+3. `stty size` (POSIX standard fallback).
+4. `tput cols` / `tput lines` (terminfo).
+5. `termux-tty-size` (Termux only, from `termux-tools`).
+
+Stale-state safety: if all probes fail, the last known good size is
+retained — we never silently fall back to `80×24` mid-session.
+
+Subscribers (currently the live renderer) are notified on a background
+thread after a 60ms debounce that coalesces orientation-flip bursts.
+Rows already past the viewport stay at their old width — we cannot
+retroactively rewrite terminal scrollback. Rows still inside the
+viewport reflow on the next emit.
 
 ## PTY (M2) configuration
 

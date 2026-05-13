@@ -1880,19 +1880,88 @@ public static class BuiltinCommands
         return null;
     }
 
-    private static string UpdateRepoConfigPath => Path.Combine(Platform.ConfigDirectory, "update-repo");
+    // Stored in <ConfigDirectory>/update_configs.txt as a comma-separated
+    // list of key=value pairs. Format: `path=<repo-path>,`. The schema is
+    // shared with the standalone aursh-update binary so both readers agree
+    // on the same file. The legacy `update-repo` flat-text file is still
+    // read for backward compatibility.
+    private static string UpdateConfigPath => Path.Combine(Platform.ConfigDirectory, "update_configs.txt");
+    private static string LegacyUpdateRepoPath => Path.Combine(Platform.ConfigDirectory, "update-repo");
 
     private static string? GetUpdateRepoPath()
     {
-        if (!File.Exists(UpdateRepoConfigPath)) return null;
-        string content = File.ReadAllText(UpdateRepoConfigPath).Trim();
-        return string.IsNullOrEmpty(content) ? null : content;
+        if (File.Exists(UpdateConfigPath))
+        {
+            string? p = ReadUpdateConfigField("path");
+            if (!string.IsNullOrEmpty(p)) return p;
+        }
+        if (File.Exists(LegacyUpdateRepoPath))
+        {
+            string content = File.ReadAllText(LegacyUpdateRepoPath).Trim();
+            if (!string.IsNullOrEmpty(content)) return content;
+        }
+        return null;
     }
 
     private static void SetUpdateRepoPath(string path)
     {
         Directory.CreateDirectory(Platform.ConfigDirectory);
-        File.WriteAllText(UpdateRepoConfigPath, path);
+        WriteUpdateConfigField("path", path);
+    }
+
+    private static string? ReadUpdateConfigField(string key)
+    {
+        if (!File.Exists(UpdateConfigPath)) return null;
+        string content;
+        try { content = File.ReadAllText(UpdateConfigPath); }
+        catch { return null; }
+
+        foreach (string raw in content.Split(','))
+        {
+            string entry = raw.Trim();
+            if (string.IsNullOrEmpty(entry)) continue;
+            int eq = entry.IndexOf('=');
+            if (eq <= 0) continue;
+            string k = entry.Substring(0, eq).Trim();
+            string v = entry.Substring(eq + 1).Trim();
+            if (string.Equals(k, key, StringComparison.OrdinalIgnoreCase))
+                return string.IsNullOrEmpty(v) ? null : v;
+        }
+        return null;
+    }
+
+    private static void WriteUpdateConfigField(string key, string value)
+    {
+        var entries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (File.Exists(UpdateConfigPath))
+        {
+            try
+            {
+                foreach (string raw in File.ReadAllText(UpdateConfigPath).Split(','))
+                {
+                    string e = raw.Trim();
+                    if (string.IsNullOrEmpty(e)) continue;
+                    int eq = e.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = e.Substring(0, eq).Trim();
+                    string v = e.Substring(eq + 1).Trim();
+                    if (!string.IsNullOrEmpty(k)) entries[k] = v;
+                }
+            }
+            catch { /* overwrite unreadable file */ }
+        }
+
+        entries[key] = value;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in entries)
+        {
+            sb.Append(kv.Key);
+            sb.Append('=');
+            sb.Append(kv.Value);
+            sb.Append(',');
+        }
+        File.WriteAllText(UpdateConfigPath, sb.ToString());
     }
 
     private static bool ValidateRepo(string path)

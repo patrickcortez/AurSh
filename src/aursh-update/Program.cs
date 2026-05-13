@@ -258,20 +258,115 @@ internal static class Program
     }
 
     // ───────────────────────────── config storage ─────────────────────────
+    //
+    // Stored in <ConfigDirectory>/update_configs.txt as a comma-separated
+    // list of key=value pairs. Today only `path` is used; the schema is
+    // intentionally extensible (e.g. `branch=`, `remote=`) so future
+    // versions can add fields without changing the file location.
+    //
+    // Example file contents:
+    //     path=/home/cortez/Repos/AurSh,
+    //
+    // The trailing comma is part of the wire format — every key=value
+    // pair is followed by a comma so the parser can tolerate a trailing
+    // line break or whitespace.
 
-    private static string UpdateRepoConfigPath => Path.Combine(ConfigDirectory, "update-repo");
+    private const string ConfigFileName = "update_configs.txt";
+    private const string LegacyConfigFileName = "update-repo";
+
+    private static string UpdateConfigPath => Path.Combine(ConfigDirectory, ConfigFileName);
+    private static string LegacyUpdateRepoPath => Path.Combine(ConfigDirectory, LegacyConfigFileName);
 
     private static string? GetUpdateRepoPath()
     {
-        if (!File.Exists(UpdateRepoConfigPath)) return null;
-        string content = File.ReadAllText(UpdateRepoConfigPath).Trim();
-        return string.IsNullOrEmpty(content) ? null : content;
+        // Preferred: parse the structured update_configs.txt.
+        if (File.Exists(UpdateConfigPath))
+        {
+            string? p = ReadConfigField("path");
+            if (!string.IsNullOrEmpty(p)) return p;
+        }
+
+        // Backward-compat: older versions stored the raw path in a file
+        // called `update-repo`. If that's all the user has, return it so
+        // existing installs keep working until they next run `set`.
+        if (File.Exists(LegacyUpdateRepoPath))
+        {
+            string content = File.ReadAllText(LegacyUpdateRepoPath).Trim();
+            if (!string.IsNullOrEmpty(content)) return content;
+        }
+
+        return null;
     }
 
     private static void SetUpdateRepoPath(string path)
     {
         Directory.CreateDirectory(ConfigDirectory);
-        File.WriteAllText(UpdateRepoConfigPath, path);
+        WriteConfigField("path", path);
+    }
+
+    /// <summary>
+    /// Read a single key from update_configs.txt. Returns null if the file
+    /// doesn't exist or the key is absent. Trailing commas and whitespace
+    /// around either side of `=` are tolerated.
+    /// </summary>
+    private static string? ReadConfigField(string key)
+    {
+        if (!File.Exists(UpdateConfigPath)) return null;
+        string content;
+        try { content = File.ReadAllText(UpdateConfigPath); }
+        catch { return null; }
+
+        foreach (string raw in content.Split(','))
+        {
+            string entry = raw.Trim();
+            if (string.IsNullOrEmpty(entry)) continue;
+            int eq = entry.IndexOf('=');
+            if (eq <= 0) continue;
+            string k = entry.Substring(0, eq).Trim();
+            string v = entry.Substring(eq + 1).Trim();
+            if (string.Equals(k, key, StringComparison.OrdinalIgnoreCase))
+                return string.IsNullOrEmpty(v) ? null : v;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Write/overwrite a key in update_configs.txt while preserving every
+    /// other key/value already in the file. The final serialized form is
+    /// `key1=value1,key2=value2,` (trailing comma intentional).
+    /// </summary>
+    private static void WriteConfigField(string key, string value)
+    {
+        var entries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (File.Exists(UpdateConfigPath))
+        {
+            try
+            {
+                foreach (string raw in File.ReadAllText(UpdateConfigPath).Split(','))
+                {
+                    string e = raw.Trim();
+                    if (string.IsNullOrEmpty(e)) continue;
+                    int eq = e.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = e.Substring(0, eq).Trim();
+                    string v = e.Substring(eq + 1).Trim();
+                    if (!string.IsNullOrEmpty(k)) entries[k] = v;
+                }
+            }
+            catch { /* fall through; we'll just overwrite the unreadable file */ }
+        }
+
+        entries[key] = value;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in entries)
+        {
+            sb.Append(kv.Key);
+            sb.Append('=');
+            sb.Append(kv.Value);
+            sb.Append(',');
+        }
+        File.WriteAllText(UpdateConfigPath, sb.ToString());
     }
 
     /// <summary>

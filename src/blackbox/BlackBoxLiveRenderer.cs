@@ -39,7 +39,20 @@ public sealed class BlackBoxLiveRenderer
     private int _lastRenderedWidth;
     private LayoutTier _lastRenderedTier;
     private bool _passthrough;
+    private bool _altScreen;
     private Action<int, int>? _resizeHandler;
+
+    /// <summary>
+    /// True between an <see cref="EnterAltScreen"/> call and the next
+    /// <see cref="Finish"/>/<see cref="Abort"/>/reset. The output pumps in
+    /// <c>BlackBoxIo</c> check this to decide whether to forward the child's
+    /// bytes raw to the real terminal (alt-screen takeover) or to keep
+    /// streaming them into the box buffer as normal lines.
+    /// </summary>
+    public bool IsAltScreenActive
+    {
+        get { lock (_lock) return _altScreen; }
+    }
 
     public BlackBoxLiveRenderer(BlackBoxRenderer renderer)
     {
@@ -132,9 +145,40 @@ public sealed class BlackBoxLiveRenderer
         lock (_lock)
         {
             if (!_started || _completed) return;
+            // Once the child has taken over the alt screen, the box header
+            // is already drawn and a child app is owning the display. We
+            // must NOT keep painting body rows over its UI.
+            if (_altScreen) return;
             if ((DateTime.UtcNow - _lastUpdate) < _minInterval) return;
             EmitPending(session, writer);
             _lastUpdate = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Called by the byte pump when it detects that the child process has
+    /// entered the terminal's alternate screen buffer (DECSET 1049/1047/47).
+    /// Drains any pending body rows into the box, then suspends further body
+    /// emission so the child's TUI can take over the display unobstructed.
+    /// The footer continues to be re-emitted by <see cref="Finish"/> once the
+    /// child exits, so the user still sees "exit:N <elapsed>" afterwards.
+    /// </summary>
+    public void EnterAltScreen(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        lock (_lock)
+        {
+            if (!_started || _completed) return;
+            if (_altScreen) return;
+
+            // Flush whatever rows we had buffered up to the alt-screen entry.
+            try { EmitPending(session, writer); } catch { }
+
+            _altScreen = true;
+            // Show the cursor again so the child app's cursor positioning
+            // is visible. The child is expected to manage cursor state from
+            // here on (it will re-hide if it wants to).
+            ShowCursor(writer);
+            try { writer.Flush(); } catch { }
         }
     }
 
@@ -231,6 +275,7 @@ public sealed class BlackBoxLiveRenderer
         _footerEmitted = false;
         _lastUpdate = DateTime.MinValue;
         _passthrough = false;
+        _altScreen = false;
         _lastRenderedWidth = 0;
         _lastRenderedTier = LayoutTier.Full;
         DetachResize();

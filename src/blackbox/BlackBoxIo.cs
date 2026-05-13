@@ -101,6 +101,8 @@ public static class BlackBoxIo
     {
         var lineBuf = new MemoryStream();
         byte[] buffer = new byte[8192];
+        var sniffer = new AltScreenSniffer();
+        Stream? rawOut = null;
 
         try
         {
@@ -119,24 +121,85 @@ public static class BlackBoxIo
                     catch { }
                 }
 
+                // Fast path: once a process has activated the alternate
+                // screen, forward the byte stream raw to the terminal. The
+                // child owns the screen until it exits or sends ?1049l;
+                // wrapping its output in the box would corrupt its layout.
+                if (owner.LiveRenderer.IsAltScreenActive)
+                {
+                    if (rawOut == null) rawOut = System.Console.OpenStandardOutput();
+                    try
+                    {
+                        await rawOut.WriteAsync(buffer, 0, read, cancellation).ConfigureAwait(false);
+                        await rawOut.FlushAsync(cancellation).ConfigureAwait(false);
+                    }
+                    catch { }
+                    continue;
+                }
+
                 for (int i = 0; i < read; i++)
                 {
                     byte b = buffer[i];
+
+                    // Sniff for DECSET 1049/1047/47 (enter alternate screen).
+                    int beforeLen = (int)lineBuf.Length;
+                    int sniffEscStart = sniffer.EscStartIdx;
+                    AltScreenResult r = sniffer.Feed(b, beforeLen);
+
                     if (b == (byte)'\n')
                     {
                         string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
                         session.Buffer.Append(line, kind, stageIndex);
                         lineBuf.SetLength(0);
                         owner.LiveRenderer.Update(session, session.TerminalOut);
+                        continue;
                     }
-                    else
+
+                    lineBuf.WriteByte(b);
+
+                    if (r == AltScreenResult.Entered)
                     {
-                        lineBuf.WriteByte(b);
+                        int escStart = sniffEscStart;
+                        int decValue = sniffer.LastValue;
+
+                        // Pre-ESC content stays in the box buffer as the
+                        // last partial line of pre-altscreen output.
+                        if (escStart > 0 && escStart <= lineBuf.Length)
+                        {
+                            string preEsc = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, escStart));
+                            if (!string.IsNullOrEmpty(preEsc))
+                                session.Buffer.Append(preEsc, kind, stageIndex);
+                        }
+                        lineBuf.SetLength(0);
+                        sniffer.Reset();
+
+                        // Tell the live renderer to finalize body emission
+                        // and switch to passthrough mode. The footer will be
+                        // emitted by the normal Finish() at end-of-command,
+                        // so the user still sees "exit:N <elapsed>" once the
+                        // app exits.
+                        owner.LiveRenderer.EnterAltScreen(session, session.TerminalOut);
+
+                        // Forward the alt-screen-enter sequence (so the
+                        // terminal actually switches buffers) plus any
+                        // remaining bytes from this read.
+                        if (rawOut == null) rawOut = System.Console.OpenStandardOutput();
+                        byte[] enterSeq = Encoding.ASCII.GetBytes($"\x1b[?{decValue}h");
+                        try
+                        {
+                            await rawOut.WriteAsync(enterSeq, 0, enterSeq.Length, cancellation).ConfigureAwait(false);
+                            if (i + 1 < read)
+                                await rawOut.WriteAsync(buffer, i + 1, read - (i + 1), cancellation).ConfigureAwait(false);
+                            await rawOut.FlushAsync(cancellation).ConfigureAwait(false);
+                        }
+                        catch { }
+
+                        break;
                     }
                 }
             }
 
-            if (lineBuf.Length > 0)
+            if (lineBuf.Length > 0 && !owner.LiveRenderer.IsAltScreenActive)
             {
                 string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
                 session.Buffer.Append(line, kind, stageIndex);
@@ -156,6 +219,77 @@ public static class BlackBoxIo
         if (s.Length > 0 && s[s.Length - 1] == '\r')
             return s.Substring(0, s.Length - 1);
         return s;
+    }
+
+    /// <summary>
+    /// Possible outcomes after feeding one byte into <see cref="AltScreenSniffer"/>.
+    /// </summary>
+    private enum AltScreenResult
+    {
+        None,
+        Entered,
+    }
+
+    /// <summary>
+    /// Tiny state machine that watches a byte stream for DECSET sequences
+    /// that enter the terminal's alternate screen buffer:
+    ///   ESC [ ? 47 h       (xterm legacy)
+    ///   ESC [ ? 1047 h     (xterm clear-on-switch)
+    ///   ESC [ ? 1049 h     (xterm save-cursor + clear + switch)
+    /// We also remember the byte offset at which the ESC started inside the
+    /// caller's accumulation buffer, so the caller can drop the in-flight
+    /// sequence and re-emit it cleanly to the real terminal.
+    /// </summary>
+    private struct AltScreenSniffer
+    {
+        private int _state;     // 0 idle / 1 ESC / 2 CSI / 3 DECSET-collect
+        private int _value;     // accumulated number after '?'
+        private int _escStart;  // offset in caller's buf where ESC started
+
+        public int EscStartIdx => _escStart;
+        public int LastValue => _value;
+
+        public void Reset()
+        {
+            _state = 0;
+            _value = 0;
+            _escStart = 0;
+        }
+
+        public AltScreenResult Feed(byte b, int callerBufLen)
+        {
+            switch (_state)
+            {
+                case 0:
+                    if (b == 0x1b) { _state = 1; _escStart = callerBufLen; }
+                    break;
+                case 1:
+                    if (b == (byte)'[') _state = 2;
+                    else _state = 0;
+                    break;
+                case 2:
+                    if (b == (byte)'?') { _state = 3; _value = 0; }
+                    else _state = 0;
+                    break;
+                case 3:
+                    if (b >= (byte)'0' && b <= (byte)'9')
+                    {
+                        _value = _value * 10 + (b - (byte)'0');
+                    }
+                    else if (b == (byte)'h')
+                    {
+                        _state = 0;
+                        if (_value == 1049 || _value == 1047 || _value == 47)
+                            return AltScreenResult.Entered;
+                    }
+                    else
+                    {
+                        _state = 0;
+                    }
+                    break;
+            }
+            return AltScreenResult.None;
+        }
     }
 
     private static async Task ForwardConsoleKeystrokesAsync(Process process, CancellationToken cancel)

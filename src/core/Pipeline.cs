@@ -32,6 +32,12 @@ public static class Pipeline
             session.MarkTtyBypassed();
             return false;
         }
+        // Passthrough sessions: the box framing is rendered by Shell.Run, but
+        // the child must inherit the real terminal stdio so interactive REPLs
+        // (python, ssh, mysql, …) work on platforms without a PTY. Do NOT
+        // redirect through BlackBoxIo for these.
+        if (session.Passthrough)
+            return false;
         return true;
     }
 

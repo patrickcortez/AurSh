@@ -22,6 +22,7 @@ public sealed class BlackBoxSession : System.IDisposable
     public int? ExitCode { get; private set; }
     public BlackBoxState State { get; private set; }
     public bool TtyBypassed { get; private set; }
+    public bool Passthrough { get; private set; }
 
     public BlackBoxBuffer Buffer { get; }
 
@@ -65,6 +66,11 @@ public sealed class BlackBoxSession : System.IDisposable
     public void MarkTtyBypassed()
     {
         TtyBypassed = true;
+    }
+
+    public void MarkPassthrough()
+    {
+        Passthrough = true;
     }
 
     public void Dispose()

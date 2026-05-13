@@ -146,8 +146,15 @@ public class Shell
                     continue;
                 }
 
+                bool passthrough = ShouldUsePassthroughBox(trimmed);
                 BlackBoxSession session = _blackBox.Open(trimmed, null, _executor.WorkingDirectory);
-                _blackBox.LiveRenderer.Start(session, session.TerminalOut);
+                if (passthrough) session.MarkPassthrough();
+
+                if (passthrough)
+                    _blackBox.LiveRenderer.StartPassthrough(session, session.TerminalOut);
+                else
+                    _blackBox.LiveRenderer.Start(session, session.TerminalOut);
+
                 try
                 {
                     int exitCode = _executor.Execute(trimmed);
@@ -162,7 +169,10 @@ public class Shell
                 }
                 finally
                 {
-                    _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
+                    if (passthrough)
+                        _blackBox.LiveRenderer.FinishPassthrough(session, session.TerminalOut);
+                    else
+                        _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
                     session.Dispose();
                 }
             }
@@ -222,6 +232,15 @@ public class Shell
             return true;
 
         return BypassList.IsBypassed(head, _blackBox.Config);
+    }
+
+    private bool ShouldUsePassthroughBox(string commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine)) return false;
+        string head = ExtractFirstWord(commandLine);
+        if (string.IsNullOrEmpty(head)) return false;
+
+        return BypassList.NeedsPassthrough(head, _blackBox.Config);
     }
 
     private static string ExtractFirstWord(string commandLine)

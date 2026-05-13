@@ -23,6 +23,51 @@ public sealed class BlackBoxLiveRenderer
         _renderer = renderer;
     }
 
+    /// <summary>
+    /// Open the box in passthrough mode: only the top header is painted; the
+    /// child process is expected to write directly to the terminal between the
+    /// header and the eventual footer (FinishPassthrough). Used for interactive
+    /// REPLs on platforms where we cannot allocate a pseudo-terminal (Windows).
+    /// </summary>
+    public void StartPassthrough(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        lock (_lock)
+        {
+            _started = true;
+            _completed = false;
+            _previousHeight = 0;
+            _lastRender = DateTime.MinValue;
+
+            // Don't hide the cursor in passthrough mode — the child needs it
+            // visible so the user can see what they're typing.
+            _renderer.RenderHeaderOnly(session, writer);
+        }
+    }
+
+    /// <summary>
+    /// Close a passthrough box: emit the footer below wherever the child left
+    /// the cursor. We forcibly bring the cursor to column 0 on a new line first.
+    /// </summary>
+    public void FinishPassthrough(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        lock (_lock)
+        {
+            if (!_started || _completed) return;
+            _completed = true;
+
+            // Ensure footer starts on a fresh line even if the child's last
+            // output ended mid-line (no trailing \n).
+            try
+            {
+                writer.Write("\r\n");
+                writer.Flush();
+            }
+            catch { }
+
+            _renderer.RenderFooterOnly(session, writer);
+        }
+    }
+
     public void Start(BlackBoxSession session, System.IO.TextWriter writer)
     {
         lock (_lock)

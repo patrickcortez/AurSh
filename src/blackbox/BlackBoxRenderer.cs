@@ -13,6 +13,38 @@ public sealed class BlackBoxRenderer
         _config = config;
     }
 
+    /// <summary>
+    /// Render only the box header (top border), for passthrough mode where the
+    /// child writes directly to the terminal between the header and footer.
+    /// </summary>
+    public void RenderHeaderOnly(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        var glyphs = BoxChars.From(_config.Border);
+        int outerWidth = ResolveOuterWidth();
+        int innerWidth = System.Math.Max(4, outerWidth - 2);
+
+        var sb = new StringBuilder();
+        RenderTop(sb, glyphs, session, outerWidth, innerWidth);
+        writer.Write(sb.ToString());
+        writer.Flush();
+    }
+
+    /// <summary>
+    /// Render only the box footer (bottom border), for passthrough mode after
+    /// the child has finished writing directly to the terminal.
+    /// </summary>
+    public void RenderFooterOnly(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        var glyphs = BoxChars.From(_config.Border);
+        int outerWidth = ResolveOuterWidth();
+        int innerWidth = System.Math.Max(4, outerWidth - 2);
+
+        var sb = new StringBuilder();
+        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0);
+        writer.Write(sb.ToString());
+        writer.Flush();
+    }
+
     public void Render(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);

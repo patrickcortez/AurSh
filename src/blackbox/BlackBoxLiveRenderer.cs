@@ -4,18 +4,30 @@ using AurShell.Utils;
 namespace AurShell.BlackBoxView;
 
 /// <summary>
-/// Streaming renderer that paints the box in place by rewinding over the
-/// previous render with cursor-up + erase before re-emitting.
+/// Streaming-append live renderer for BlackBox sessions.
+///
+/// The full-redraw strategy (cursor-up the entire previous frame, clear, repaint)
+/// breaks down the moment the box height exceeds the terminal viewport: the
+/// upper portion of the box scrolls into the terminal's scrollback where ANSI
+/// cursor-up can no longer reach it, so subsequent re-renders only clear/redraw
+/// the visible region and leave duplicated tops stuck in history.
+///
+/// Instead, we emit the header ONCE, append body rows progressively below it
+/// (old rows naturally and *correctly* scroll into history), and only ever
+/// rewind the single footer line for updates. That keeps the per-update
+/// cursor-up at exactly 1 row regardless of how tall the box has grown, which
+/// always works because the footer is always inside the visible viewport.
 /// </summary>
 public sealed class BlackBoxLiveRenderer
 {
     private readonly BlackBoxRenderer _renderer;
     private readonly object _lock = new();
-    private int _previousHeight;
+    private int _emittedBodyRows;
+    private bool _footerEmitted;
     private bool _started;
     private bool _completed;
     private bool _cursorHidden;
-    private DateTime _lastRender = DateTime.MinValue;
+    private DateTime _lastUpdate = DateTime.MinValue;
     private readonly TimeSpan _minInterval = TimeSpan.FromMilliseconds(33);
 
     public BlackBoxLiveRenderer(BlackBoxRenderer renderer)
@@ -33,13 +45,8 @@ public sealed class BlackBoxLiveRenderer
     {
         lock (_lock)
         {
+            ResetState();
             _started = true;
-            _completed = false;
-            _previousHeight = 0;
-            _lastRender = DateTime.MinValue;
-
-            // Don't hide the cursor in passthrough mode — the child needs it
-            // visible so the user can see what they're typing.
             _renderer.RenderHeaderOnly(session, writer);
         }
     }
@@ -55,8 +62,6 @@ public sealed class BlackBoxLiveRenderer
             if (!_started || _completed) return;
             _completed = true;
 
-            // Ensure footer starts on a fresh line even if the child's last
-            // output ended mid-line (no trailing \n).
             try
             {
                 writer.Write("\r\n");
@@ -68,21 +73,29 @@ public sealed class BlackBoxLiveRenderer
         }
     }
 
+    /// <summary>
+    /// Open a normal (boxed-body) session: emit the header, then the initial
+    /// footer right below it. Body rows will be appended between them on Update.
+    /// </summary>
     public void Start(BlackBoxSession session, System.IO.TextWriter writer)
     {
         lock (_lock)
         {
-            // Reset per-session state so the renderer can be reused for the next
-            // command. Previously _started/_completed stuck at true after the
-            // first command, which made every subsequent Start/Update/Finish a
-            // no-op (boxes never re-painted).
+            ResetState();
             _started = true;
-            _completed = false;
-            _previousHeight = 0;
-            _lastRender = DateTime.MinValue;
-
             HideCursor(writer);
-            RenderInternal(session, writer, force: true);
+
+            var sb = new StringBuilder();
+            sb.Append(_renderer.RenderFooterToString(session));
+            // The header is emitted via RenderHeaderOnly which already writes a
+            // trailing newline; the footer string above has no trailing newline
+            // and is appended just below the header.
+            _renderer.RenderHeaderOnly(session, writer);
+            writer.Write(sb.ToString());
+            writer.Write('\n');
+            writer.Flush();
+            _footerEmitted = true;
+            _lastUpdate = DateTime.UtcNow;
         }
     }
 
@@ -91,11 +104,9 @@ public sealed class BlackBoxLiveRenderer
         lock (_lock)
         {
             if (!_started || _completed) return;
-
-            if ((DateTime.UtcNow - _lastRender) < _minInterval)
-                return;
-
-            RenderInternal(session, writer, force: false);
+            if ((DateTime.UtcNow - _lastUpdate) < _minInterval) return;
+            EmitPending(session, writer);
+            _lastUpdate = DateTime.UtcNow;
         }
     }
 
@@ -104,7 +115,8 @@ public sealed class BlackBoxLiveRenderer
         lock (_lock)
         {
             if (!_started || _completed) return;
-            RenderInternal(session, writer, force: true);
+            EmitPending(session, writer);
+            _lastUpdate = DateTime.UtcNow;
         }
     }
 
@@ -115,7 +127,9 @@ public sealed class BlackBoxLiveRenderer
             if (!_started || _completed) return;
             _completed = true;
 
-            RenderInternal(session, writer, force: true);
+            // Drain any remaining body rows and emit the final footer (with
+            // exit code / elapsed time).
+            EmitPending(session, writer);
             ShowCursor(writer);
         }
     }
@@ -127,70 +141,72 @@ public sealed class BlackBoxLiveRenderer
             if (!_started) { ShowCursor(writer); return; }
             if (_completed) return;
             _completed = true;
-
             session.MarkAborted();
-            RenderInternal(session, writer, force: true);
+            EmitPending(session, writer);
             ShowCursor(writer);
         }
     }
 
-    private void RenderInternal(BlackBoxSession session, System.IO.TextWriter writer, bool force)
+    /// <summary>
+    /// Move cursor up to overwrite the previously emitted footer, append any
+    /// new body rows that have arrived since the last render, then re-emit the
+    /// footer (which now reflects current elapsed time / final exit code).
+    /// </summary>
+    private void EmitPending(BlackBoxSession session, System.IO.TextWriter writer)
     {
+        int bufCount = session.Buffer.Count;
+        bool needFooterRefresh = !_footerEmitted || bufCount > _emittedBodyRows || _completed;
+        if (!needFooterRefresh) return;
+
         var sb = new StringBuilder();
-        if (_previousHeight > 0)
+
+        if (_footerEmitted)
         {
-            sb.Append(Ansi.MoveCursorUp(_previousHeight));
+            // Cursor is on the blank line below the previous footer. Move up 1
+            // to land on the footer line itself, then \r to col 0, then clear
+            // from cursor to end of screen. Since the footer is always 1 row,
+            // this MoveCursorUp(1) is always within the viewport.
+            sb.Append(Ansi.MoveCursorUp(1));
             sb.Append('\r');
             sb.Append(Ansi.ClearScreenFromCursor);
         }
 
-        string painted = CaptureRender(session);
-        sb.Append(painted);
+        // Append every body row we haven't emitted yet.
+        for (int i = _emittedBodyRows; i < bufCount; i++)
+        {
+            BufferLine line = session.Buffer[i];
+            sb.Append(_renderer.RenderBodyRowToString(line));
+            sb.Append('\n');
+        }
+        _emittedBodyRows = bufCount;
+
+        // Re-emit the footer in its current state.
+        sb.Append(_renderer.RenderFooterToString(session));
+        sb.Append('\n');
+        _footerEmitted = true;
 
         writer.Write(sb.ToString());
         writer.Flush();
-
-        _previousHeight = CountNewlines(painted);
-        _lastRender = DateTime.UtcNow;
-        _ = force;
     }
 
-    private string CaptureRender(BlackBoxSession session)
+    private void ResetState()
     {
-        var sw = new System.IO.StringWriter();
-        _renderer.Render(session, sw);
-        return sw.ToString();
-    }
-
-    private static int CountNewlines(string s)
-    {
-        int n = 0;
-        for (int i = 0; i < s.Length; i++)
-            if (s[i] == '\n') n++;
-        return n;
+        _completed = false;
+        _started = false;
+        _emittedBodyRows = 0;
+        _footerEmitted = false;
+        _lastUpdate = DateTime.MinValue;
     }
 
     private void HideCursor(System.IO.TextWriter writer)
     {
         if (_cursorHidden) return;
-        try
-        {
-            writer.Write(Ansi.CursorHide);
-            writer.Flush();
-            _cursorHidden = true;
-        }
-        catch { }
+        try { writer.Write(Ansi.CursorHide); writer.Flush(); _cursorHidden = true; } catch { }
     }
 
     private void ShowCursor(System.IO.TextWriter writer)
     {
         if (!_cursorHidden) return;
-        try
-        {
-            writer.Write(Ansi.CursorShow);
-            writer.Flush();
-            _cursorHidden = false;
-        }
-        catch { }
+        try { writer.Write(Ansi.CursorShow); writer.Flush(); _cursorHidden = false; } catch { }
     }
 }

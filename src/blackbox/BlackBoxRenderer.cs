@@ -45,6 +45,56 @@ public sealed class BlackBoxRenderer
         writer.Flush();
     }
 
+    /// <summary>
+    /// Return a single rendered body row as a string (without trailing \n).
+    /// Used by the streaming-append live renderer to emit rows one at a time
+    /// instead of re-painting the entire box on every update.
+    /// </summary>
+    public string RenderBodyRowToString(BufferLine line)
+    {
+        var glyphs = BoxChars.From(_config.Border);
+        int outerWidth = ResolveOuterWidth();
+        int innerWidth = System.Math.Max(4, outerWidth - 2);
+
+        var sb = new StringBuilder();
+        sb.Append(_config.BorderColor);
+        sb.Append(glyphs.Vertical);
+        sb.Append(Ansi.Reset);
+        sb.Append(' ');
+
+        string content = FormatBodyLine(line, innerWidth - 2);
+        sb.Append(content);
+
+        int visible = Ansi.VisibleLength(content);
+        int pad = System.Math.Max(0, innerWidth - 2 - visible);
+        if (pad > 0)
+            sb.Append(' ', pad);
+
+        sb.Append(' ');
+        sb.Append(_config.BorderColor);
+        sb.Append(glyphs.Vertical);
+        sb.Append(Ansi.Reset);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Return the footer (bottom border) as a string (without trailing \n).
+    /// </summary>
+    public string RenderFooterToString(BlackBoxSession session)
+    {
+        var glyphs = BoxChars.From(_config.Border);
+        int outerWidth = ResolveOuterWidth();
+        int innerWidth = System.Math.Max(4, outerWidth - 2);
+
+        var sb = new StringBuilder();
+        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0);
+        // RenderBottom appends a trailing \n; strip it so callers can place
+        // their own line terminator.
+        string s = sb.ToString();
+        if (s.EndsWith('\n')) s = s.Substring(0, s.Length - 1);
+        return s;
+    }
+
     public void Render(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);

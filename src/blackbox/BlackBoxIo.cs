@@ -1,0 +1,212 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using AurShell.Utils;
+
+namespace AurShell.BlackBoxView;
+
+/// <summary>
+/// Bridges spawned-process stdio (and pipeline tees) into a BlackBoxSession's
+/// buffer. Encapsulates line-aware byte pumping and stdin keystroke forwarding.
+/// </summary>
+public static class BlackBoxIo
+{
+    /// <summary>
+    /// Configure a child's <see cref="ProcessStartInfo"/> to redirect its stdio
+    /// so we can intercept it. Any streams the caller already redirected
+    /// (e.g. for explicit user redirections like `cmd > file`) are left alone.
+    /// </summary>
+    public static void PrepareForBox(ProcessStartInfo psi, BoxRedirectFlags userFlags)
+    {
+        if (!userFlags.StdoutRedirected) psi.RedirectStandardOutput = true;
+        if (!userFlags.StderrRedirected) psi.RedirectStandardError = true;
+        if (!userFlags.StdinRedirected) psi.RedirectStandardInput = true;
+        psi.StandardOutputEncoding = Encoding.UTF8;
+        psi.StandardErrorEncoding = Encoding.UTF8;
+    }
+
+    /// <summary>
+    /// Pump a child's stdout/stderr/stdin through the BlackBox session, and
+    /// run a live re-render after each line is appended. Returns when both
+    /// stdout and stderr are drained.
+    /// </summary>
+    public static async Task PumpAsync(
+        Process process,
+        BlackBoxSession session,
+        BoxRedirectFlags userFlags,
+        BlackBox owner,
+        int? stageIndex,
+        Stream? stdoutForward,
+        CancellationToken cancellation)
+    {
+        var tasks = new System.Collections.Generic.List<Task>();
+
+        if (process.StartInfo.RedirectStandardOutput && !userFlags.StdoutRedirected)
+        {
+            tasks.Add(PumpToBufferAsync(
+                process.StandardOutput.BaseStream,
+                session,
+                LineKind.Stdout,
+                stageIndex,
+                stdoutForward,
+                owner,
+                cancellation));
+        }
+
+        if (process.StartInfo.RedirectStandardError && !userFlags.StderrRedirected)
+        {
+            tasks.Add(PumpToBufferAsync(
+                process.StandardError.BaseStream,
+                session,
+                LineKind.Stderr,
+                stageIndex,
+                null,
+                owner,
+                cancellation));
+        }
+
+        CancellationTokenSource? stdinCancel = null;
+        Task? stdinTask = null;
+        if (process.StartInfo.RedirectStandardInput && !userFlags.StdinRedirected)
+        {
+            stdinCancel = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            stdinTask = ForwardConsoleKeystrokesAsync(process, stdinCancel.Token);
+        }
+
+        try
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        finally
+        {
+            stdinCancel?.Cancel();
+            if (stdinTask != null)
+            {
+                try { await stdinTask.ConfigureAwait(false); } catch { }
+            }
+            stdinCancel?.Dispose();
+        }
+    }
+
+    public static async Task PumpToBufferAsync(
+        Stream source,
+        BlackBoxSession session,
+        LineKind kind,
+        int? stageIndex,
+        Stream? forwardTo,
+        BlackBox owner,
+        CancellationToken cancellation)
+    {
+        var lineBuf = new MemoryStream();
+        byte[] buffer = new byte[8192];
+
+        try
+        {
+            while (!cancellation.IsCancellationRequested)
+            {
+                int read = await source.ReadAsync(buffer, 0, buffer.Length, cancellation).ConfigureAwait(false);
+                if (read <= 0) break;
+
+                if (forwardTo != null)
+                {
+                    try
+                    {
+                        await forwardTo.WriteAsync(buffer, 0, read, cancellation).ConfigureAwait(false);
+                        await forwardTo.FlushAsync(cancellation).ConfigureAwait(false);
+                    }
+                    catch { }
+                }
+
+                for (int i = 0; i < read; i++)
+                {
+                    byte b = buffer[i];
+                    if (b == (byte)'\n')
+                    {
+                        string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                        session.Buffer.Append(line, kind, stageIndex);
+                        lineBuf.SetLength(0);
+                        owner.LiveRenderer.Update(session, session.TerminalOut);
+                    }
+                    else
+                    {
+                        lineBuf.WriteByte(b);
+                    }
+                }
+            }
+
+            if (lineBuf.Length > 0)
+            {
+                string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                session.Buffer.Append(line, kind, stageIndex);
+                owner.LiveRenderer.Update(session, session.TerminalOut);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (IOException) { }
+        catch (System.Exception)
+        {
+            // Defensive: never let a pump task break the shell.
+        }
+    }
+
+    private static string StripTrailingCr(string s)
+    {
+        if (s.Length > 0 && s[s.Length - 1] == '\r')
+            return s.Substring(0, s.Length - 1);
+        return s;
+    }
+
+    private static async Task ForwardConsoleKeystrokesAsync(Process process, CancellationToken cancel)
+    {
+        try
+        {
+            using var stdin = process.StandardInput;
+            stdin.AutoFlush = true;
+
+            while (!cancel.IsCancellationRequested && !process.HasExited)
+            {
+                if (!System.Console.IsInputRedirected)
+                {
+                    if (!System.Console.KeyAvailable)
+                    {
+                        try { await Task.Delay(30, cancel).ConfigureAwait(false); } catch { return; }
+                        continue;
+                    }
+
+                    System.ConsoleKeyInfo key;
+                    try { key = System.Console.ReadKey(intercept: true); }
+                    catch { return; }
+
+                    if (key.Key == System.ConsoleKey.Enter)
+                    {
+                        try { await stdin.WriteLineAsync().ConfigureAwait(false); } catch { return; }
+                    }
+                    else if (key.KeyChar != '\0')
+                    {
+                        try { await stdin.WriteAsync(key.KeyChar.ToString()).ConfigureAwait(false); } catch { return; }
+                    }
+                }
+                else
+                {
+                    int next;
+                    try { next = System.Console.In.Read(); }
+                    catch { return; }
+                    if (next < 0) return;
+                    try { await stdin.WriteAsync(((char)next).ToString()).ConfigureAwait(false); } catch { return; }
+                }
+            }
+        }
+        catch { }
+    }
+}
+
+public readonly struct BoxRedirectFlags
+{
+    public bool StdoutRedirected { get; init; }
+    public bool StderrRedirected { get; init; }
+    public bool StdinRedirected { get; init; }
+
+    public static BoxRedirectFlags None => default;
+}

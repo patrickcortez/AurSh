@@ -27,6 +27,13 @@ public class Program
             return shell.ExecuteCommand(command);
         }
 
+        if (args[0] == "--box" && args.Length >= 2)
+        {
+            string command = string.Join(" ", args.Skip(1));
+            var shell = new Core.Shell();
+            return shell.ExecuteCommandInBox(command);
+        }
+
         if (args[0] == "--version" || args[0] == "-v")
         {
             Console.WriteLine("aursh 1.5.0");

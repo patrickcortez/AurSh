@@ -25,6 +25,9 @@ public sealed class BlackBoxSession : System.IDisposable
 
     public BlackBoxBuffer Buffer { get; }
 
+    /// <summary>The real terminal stdout, captured at Open() before any redirection.</summary>
+    public System.IO.TextWriter TerminalOut { get; }
+
     public BlackBoxSession(
         int id,
         string commandLine,
@@ -40,6 +43,7 @@ public sealed class BlackBoxSession : System.IDisposable
         Buffer = buffer;
         StartedAt = System.DateTime.UtcNow;
         State = BlackBoxState.Running;
+        TerminalOut = System.Console.Out;
         _onDispose = onDispose;
     }
 

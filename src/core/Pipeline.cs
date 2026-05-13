@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AurShell.BlackBoxView;
 
 namespace AurShell.Core;
 
@@ -13,6 +14,25 @@ public static class Pipeline
             return ExecuteSingle(pipeline.Commands[0], env, workingDirectory, pipeline.Background);
 
         return ExecutePiped(pipeline, env, workingDirectory);
+    }
+
+    private static bool ShouldRouteToBlackBox(CommandNode cmd, out BlackBox box, out BlackBoxSession session)
+    {
+        var current = BlackBox.Current;
+        if (current == null || current.ActiveSession == null)
+        {
+            box = null!;
+            session = null!;
+            return false;
+        }
+        box = current;
+        session = current.ActiveSession;
+        if (BypassList.IsBypassed(cmd.Name, box.Config))
+        {
+            session.MarkTtyBypassed();
+            return false;
+        }
+        return true;
     }
 
     private static int ExecuteSingle(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
@@ -70,7 +90,39 @@ public static class Pipeline
                     }
                 }
 
-                return BuiltinCommands.Execute(cmd, env, ref workingDirectory);
+                BlackBoxWriter? boxOut = null;
+                BlackBoxWriter? boxErr = null;
+                TextWriter? boxOutOrigOut = null;
+                TextWriter? boxOutOrigErr = null;
+                if (ShouldRouteToBlackBox(cmd, out var box, out var sess))
+                {
+                    if (originalOut == null)
+                    {
+                        boxOutOrigOut = Console.Out;
+                        boxOut = new BlackBoxWriter(sess, LineKind.Stdout,
+                            () => box.LiveRenderer.Update(sess, sess.TerminalOut));
+                        Console.SetOut(boxOut);
+                    }
+                    if (originalErr == null)
+                    {
+                        boxOutOrigErr = Console.Error;
+                        boxErr = new BlackBoxWriter(sess, LineKind.Stderr,
+                            () => box.LiveRenderer.Update(sess, sess.TerminalOut));
+                        Console.SetError(boxErr);
+                    }
+                }
+
+                try
+                {
+                    return BuiltinCommands.Execute(cmd, env, ref workingDirectory);
+                }
+                finally
+                {
+                    boxOut?.Flush();
+                    boxErr?.Flush();
+                    if (boxOutOrigOut != null) Console.SetOut(boxOutOrigOut);
+                    if (boxOutOrigErr != null) Console.SetError(boxOutOrigErr);
+                }
             }
             finally
             {
@@ -176,6 +228,18 @@ public static class Pipeline
             }
         }
 
+        bool routeToBox = ShouldRouteToBlackBox(cmd, out var boxOwner, out var boxSession);
+        var boxFlags = new BoxRedirectFlags
+        {
+            StdoutRedirected = redirectStdout,
+            StderrRedirected = redirectStderr || errToOut,
+            StdinRedirected = redirectStdin
+        };
+        if (routeToBox)
+        {
+            BlackBoxIo.PrepareForBox(psi, boxFlags);
+        }
+
         try
         {
             using var process = Process.Start(psi);
@@ -223,8 +287,32 @@ public static class Pipeline
                 }
             }
 
+            System.Threading.CancellationTokenSource? boxPumpCancel = null;
+            System.Threading.Tasks.Task? boxPumpTask = null;
+            if (routeToBox)
+            {
+                boxPumpCancel = new System.Threading.CancellationTokenSource();
+                boxPumpTask = BlackBoxIo.PumpAsync(
+                    process,
+                    boxSession,
+                    boxFlags,
+                    boxOwner,
+                    stageIndex: null,
+                    stdoutForward: null,
+                    cancellation: boxPumpCancel.Token);
+            }
+
             System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
             process.WaitForExit();
+
+            if (boxPumpTask != null)
+            {
+                try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
+                boxPumpCancel?.Cancel();
+                try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(200)); } catch { }
+                boxPumpCancel?.Dispose();
+            }
+
             return process.ExitCode;
         }
         catch (Exception ex)
@@ -244,6 +332,30 @@ public static class Pipeline
     {
         var commands = pipeline.Commands;
         int count = commands.Count;
+
+        BlackBox? pipelineBox = null;
+        BlackBoxSession? pipelineSession = null;
+        if (BlackBox.Current?.ActiveSession is BlackBoxSession activePipeSession && !pipeline.Background)
+        {
+            pipelineBox = BlackBox.Current;
+            pipelineSession = activePipeSession;
+            bool anyBypassed = false;
+            for (int idx = 0; idx < count; idx++)
+            {
+                if (BypassList.IsBypassed(commands[idx].Name, pipelineBox.Config))
+                {
+                    anyBypassed = true;
+                    break;
+                }
+            }
+            if (anyBypassed)
+            {
+                pipelineSession.MarkTtyBypassed();
+                pipelineBox = null;
+                pipelineSession = null;
+            }
+        }
+        bool routePipelineToBox = pipelineBox != null && pipelineSession != null;
 
         if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && count > 1)
         {
@@ -477,7 +589,8 @@ public static class Pipeline
                     var assocPsi = CreateShellDelegatedStartInfo(tempCmd, env, workingDirectory);
 
                     if (!isFirst) assocPsi.RedirectStandardInput = true;
-                    if (!isLast) assocPsi.RedirectStandardOutput = true;
+                    if (!isLast || routePipelineToBox) assocPsi.RedirectStandardOutput = true;
+                    if (routePipelineToBox) assocPsi.RedirectStandardError = true;
 
                     redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
 
@@ -502,7 +615,8 @@ public static class Pipeline
                     var shellPsi = CreateShellDelegatedStartInfo(cmd, env, workingDirectory);
 
                     if (!isFirst) shellPsi.RedirectStandardInput = true;
-                    if (!isLast) shellPsi.RedirectStandardOutput = true;
+                    if (!isLast || routePipelineToBox) shellPsi.RedirectStandardOutput = true;
+                    if (routePipelineToBox) shellPsi.RedirectStandardError = true;
 
                     redirInfos[i] = ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams);
 
@@ -518,7 +632,8 @@ public static class Pipeline
                 var psi = CreateProcessStartInfo(executable, cmd, env, workingDirectory);
 
                 if (!isFirst) psi.RedirectStandardInput = true;
-                if (!isLast) psi.RedirectStandardOutput = true;
+                if (!isLast || routePipelineToBox) psi.RedirectStandardOutput = true;
+                if (routePipelineToBox) psi.RedirectStandardError = true;
 
                 redirInfos[i] = ApplyRedirections(cmd, psi, workingDirectory, fileStreams);
 
@@ -630,11 +745,53 @@ public static class Pipeline
                 }
             }
 
+            System.Threading.CancellationTokenSource? boxCancel = null;
+            if (routePipelineToBox && pipelineBox != null && pipelineSession != null)
+            {
+                boxCancel = new System.Threading.CancellationTokenSource();
+                for (int i = 0; i < count; i++)
+                {
+                    if (processes[i] == null) continue;
+                    var (stdoutFile, stderrFile, _, errToOut) = redirInfos[i];
+                    bool isLast = i == count - 1;
+                    var proc = processes[i]!;
+                    int stageIndex = i;
+
+                    if (isLast && stdoutFile == null && proc.StartInfo.RedirectStandardOutput)
+                    {
+                        drainTasks.Add(BlackBoxIo.PumpToBufferAsync(
+                            proc.StandardOutput.BaseStream,
+                            pipelineSession,
+                            LineKind.Stdout,
+                            count > 1 ? (int?)stageIndex : null,
+                            null,
+                            pipelineBox,
+                            boxCancel.Token));
+                    }
+
+                    if (stderrFile == null && !errToOut && proc.StartInfo.RedirectStandardError)
+                    {
+                        drainTasks.Add(BlackBoxIo.PumpToBufferAsync(
+                            proc.StandardError.BaseStream,
+                            pipelineSession,
+                            LineKind.Stderr,
+                            count > 1 ? (int?)stageIndex : null,
+                            null,
+                            pipelineBox,
+                            boxCancel.Token));
+                    }
+                }
+            }
+
             try
             {
                 System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
             }
             catch (AggregateException) { }
+            finally
+            {
+                boxCancel?.Dispose();
+            }
 
             int lastExit = 0;
             for (int i = 0; i < count; i++)

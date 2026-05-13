@@ -8,6 +8,10 @@ public sealed class BlackBox
 
     public BlackBoxConfig Config { get; }
     public BlackBoxRenderer Renderer { get; }
+    public BlackBoxLiveRenderer LiveRenderer { get; }
+
+    public static BlackBox? Current { get; private set; }
+    public static BlackBoxSession? CurrentSession => Current?.ActiveSession;
 
     public BlackBox() : this(BlackBoxConfig.FromEnvironment()) { }
 
@@ -15,6 +19,7 @@ public sealed class BlackBox
     {
         Config = config;
         Renderer = new BlackBoxRenderer(config);
+        LiveRenderer = new BlackBoxLiveRenderer(Renderer);
     }
 
     public bool IsActive
@@ -46,6 +51,7 @@ public sealed class BlackBox
                 OnSessionDisposed);
 
             _active = session;
+            Current = this;
             return session;
         }
     }
@@ -61,6 +67,8 @@ public sealed class BlackBox
         {
             if (ReferenceEquals(_active, session))
                 _active = null;
+            if (ReferenceEquals(Current, this) && _active == null)
+                Current = null;
         }
     }
 

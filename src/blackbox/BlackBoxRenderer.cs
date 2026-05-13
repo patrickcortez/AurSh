@@ -355,8 +355,17 @@ public sealed class BlackBoxRenderer
         string body = line.Text ?? "";
         string combined = prefix + body;
 
+        // Expand tabs *after* the prefix so the tab stops in the rendered
+        // body line up like they did in the original output. Without this,
+        // a single 0x09 byte counts as one visible char but the terminal
+        // renders it as a jump to the next tab stop — pushing the right
+        // wall out of place on every recipe line that uses tabs (Make
+        // recipes, indented diff output, etc.). The body content sits two
+        // columns in from the left wall ("│ "), so that's our startCol.
+        combined = Ansi.ExpandTabs(combined, tabStop: 8, startCol: 0);
+
         if (Ansi.VisibleLength(combined) > maxVisible)
-            combined = Truncate(combined, maxVisible);
+            combined = Ansi.TruncateVisible(combined, maxVisible);
 
         if (string.IsNullOrEmpty(color))
             return combined;
@@ -475,12 +484,14 @@ public sealed class BlackBoxRenderer
         return text.Substring(0, max - 1) + "\u2026";
     }
 
+    /// <summary>
+    /// Legacy entrypoint kept for callers that don't need colour-preserving
+    /// truncation. New code should call <see cref="Ansi.TruncateVisible"/>
+    /// directly.
+    /// </summary>
     private static string Truncate(string text, int max)
     {
         if (max <= 0) return "";
-        string stripped = Ansi.Strip(text);
-        if (stripped.Length <= max) return text;
-        if (max <= 1) return stripped.Substring(0, max);
-        return stripped.Substring(0, max - 1) + "\u2026";
+        return Ansi.TruncateVisible(text, max);
     }
 }

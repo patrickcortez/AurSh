@@ -523,6 +523,7 @@ public static class BuiltinCommands
                             {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}
                             {Ansi.FgBrightBlue}Current Architecture: {Ansi.FgBrightMagenta}{GetArch().ToString()}
                             {Ansi.FgBrightBlue}Current Version: {Ansi.FgBrightMagenta}{version}
+                            {Ansi.FgBrightBlue}Flavor: {Ansi.FgBrightMagenta} BlackBox
 
                             {Ansi.FgBrightBlue}AurSh has some native commands that you can invoke/use:
                                 - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.

@@ -72,7 +72,7 @@ public static class BlackBoxIo
         if (process.StartInfo.RedirectStandardInput && !userFlags.StdinRedirected)
         {
             stdinCancel = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            stdinTask = ForwardConsoleKeystrokesAsync(process, stdinCancel.Token);
+            stdinTask = ForwardStdinAsync(process, owner.LiveRenderer, stdinCancel.Token);
         }
 
         try
@@ -292,8 +292,27 @@ public static class BlackBoxIo
         }
     }
 
-    private static async Task ForwardConsoleKeystrokesAsync(Process process, CancellationToken cancel)
+    /// <summary>
+    /// Forwards terminal stdin to a child process. Operates in two modes:
+    ///
+    /// 1. NORMAL MODE (before alt-screen): Uses Console.ReadKey to intercept
+    ///    individual keystrokes and forward them. Adequate for simple interactive
+    ///    commands that only need basic text input.
+    ///
+    /// 2. RAW MODE (after alt-screen entry): Puts the terminal into raw mode
+    ///    and pumps raw bytes from Console.OpenStandardInput() directly to the
+    ///    child's stdin. This preserves all escape sequences (arrow keys,
+    ///    function keys, mouse events, etc.) that TUI programs need.
+    ///
+    /// The mode switch is driven by the LiveRenderer's IsAltScreenActive flag,
+    /// which is set by the output pump when it detects DECSET 1049/1047/47.
+    /// </summary>
+    private static async Task ForwardStdinAsync(
+        Process process,
+        BlackBoxLiveRenderer liveRenderer,
+        CancellationToken cancel)
     {
+        TerminalRawMode? rawMode = null;
         try
         {
             using var stdin = process.StandardInput;
@@ -301,6 +320,19 @@ public static class BlackBoxIo
 
             while (!cancel.IsCancellationRequested && !process.HasExited)
             {
+                if (liveRenderer.IsAltScreenActive)
+                {
+                    // Switch to raw byte pumping for full TUI support.
+                    if (rawMode == null)
+                    {
+                        rawMode = new TerminalRawMode();
+                        rawMode.Enter();
+                    }
+
+                    await PumpRawStdinAsync(process, rawMode, liveRenderer, cancel).ConfigureAwait(false);
+                    return;
+                }
+
                 if (!System.Console.IsInputRedirected)
                 {
                     if (!System.Console.KeyAvailable)
@@ -332,6 +364,69 @@ public static class BlackBoxIo
                 }
             }
         }
+        catch { }
+        finally
+        {
+            rawMode?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Pumps raw bytes from the terminal's standard input directly to the
+    /// child process's stdin stream. Runs until the process exits, the
+    /// cancellation token fires, or the alt-screen session ends.
+    ///
+    /// This bypasses .NET's Console.ReadKey entirely and reads the underlying
+    /// input stream byte-by-byte, preserving all escape sequences, arrow
+    /// keys, function keys, mouse reports, and any other terminal-level
+    /// input that TUI programs require.
+    /// </summary>
+    private static async Task PumpRawStdinAsync(
+        Process process,
+        TerminalRawMode rawMode,
+        BlackBoxLiveRenderer liveRenderer,
+        CancellationToken cancel)
+    {
+        Stream? rawStdin = null;
+        try
+        {
+            rawStdin = System.Console.OpenStandardInput();
+            byte[] buffer = new byte[1024];
+
+            while (!cancel.IsCancellationRequested && !process.HasExited)
+            {
+                int bytesRead;
+                try
+                {
+                    var readTask = rawStdin.ReadAsync(buffer, 0, buffer.Length, cancel);
+
+                    // Use a short timeout so we can periodically check process
+                    // state without blocking forever on stdin.
+                    var completed = await Task.WhenAny(
+                        readTask,
+                        Task.Delay(100, cancel)
+                    ).ConfigureAwait(false);
+
+                    if (completed != readTask)
+                        continue;
+
+                    bytesRead = await readTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { return; }
+                catch { return; }
+
+                if (bytesRead <= 0) return;
+
+                try
+                {
+                    await process.StandardInput.BaseStream.WriteAsync(
+                        buffer, 0, bytesRead, cancel).ConfigureAwait(false);
+                    await process.StandardInput.BaseStream.FlushAsync(cancel).ConfigureAwait(false);
+                }
+                catch { return; }
+            }
+        }
+        catch (OperationCanceledException) { }
         catch { }
     }
 }

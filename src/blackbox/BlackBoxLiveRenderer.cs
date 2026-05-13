@@ -199,6 +199,21 @@ public sealed class BlackBoxLiveRenderer
             if (!_started || _completed) return;
             _completed = true;
 
+            if (_altScreen)
+            {
+                // The child used the alternate screen buffer. Emit the
+                // standard DECRST sequence to leave it so the terminal
+                // switches back to the main buffer where our box header
+                // and body rows live, then emit the footer below them.
+                try
+                {
+                    writer.Write("\x1b[?1049l");
+                    writer.Flush();
+                }
+                catch { }
+                _altScreen = false;
+            }
+
             // Drain any remaining body rows and emit the final footer (with
             // exit code / elapsed time).
             EmitPending(session, writer);
@@ -216,6 +231,18 @@ public sealed class BlackBoxLiveRenderer
             if (!_started) { ShowCursor(writer); return; }
             if (_completed) return;
             _completed = true;
+
+            if (_altScreen)
+            {
+                try
+                {
+                    writer.Write("\x1b[?1049l");
+                    writer.Flush();
+                }
+                catch { }
+                _altScreen = false;
+            }
+
             session.MarkAborted();
             EmitPending(session, writer);
             ShowCursor(writer);

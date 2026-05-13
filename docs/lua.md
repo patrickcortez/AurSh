@@ -1,9 +1,11 @@
 # Lua Plugin System
 
-AurShell ships a built-in Lua subset interpreter for writing plugins.
+**AurShell** ships a built-in Lua subset interpreter for writing plugins.
 No external Lua installation is required — the interpreter is compiled
 directly into the `aursh` binary and evaluated in-process, so plugins
 load in microseconds and have zero runtime dependencies.
+
+---
 
 ## Quick start
 

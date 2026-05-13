@@ -21,31 +21,19 @@ The box auto-fits the terminal width and scrolls vertically when output
 exceeds its visible height. After a command finishes, its box stays in
 the scroll history as inert text and the next prompt is printed below.
 
+---
+
 ## Status
 
-M0 (visual prototype), M1 (wired into every command), M2 (PTY for
-interactive children on POSIX) and M3 (alt-screen takeover + adaptive
-layout) are shipped.
+**BlackBox** is still a work in progress, It's still having issues rendering processes 
+that takes over the terminal with their own screen buffer. As of now the only fix it has
+is its `bypass.txt` which excludes any processes written in that file from running inside blackbox
 
-Every command run in the interactive shell — and every command run via
-`aursh --box <cmd>` for one-shot testing — executes inside a BlackBox
-viewport: stdout/stderr appear in the box body, exit code in the
-footer, the box is live-repainted as output streams in (~30fps), and
-fullscreen TUI programs (`vim`, `top`, `less`, `htop`, `tmux`, `ssh`,
-etc.) bypass the box entirely.
-
-For a no-side-effect aesthetic preview, the hidden
-`aursh-blackbox-demo` builtin still paints six sample scenes:
-
-```bash
-aursh-blackbox-demo
-aursh-blackbox-demo square
-aursh-blackbox-demo ascii
-```
+---
 
 ## Configuration
 
-Configured via environment variables (read once on shell start):
+**BlackBox** is also Configurable via environment variables (read once on shell start):
 
 | Variable                       | Default                                   | Meaning |
 |--------------------------------|-------------------------------------------|---------| 
@@ -63,6 +51,8 @@ Auto-detected fallbacks:
 - `TERM=linux` or `TERM=dumb`: `ascii` border.
 - Termux: `square` border (the rounded glyphs don't render reliably in
   every Termux font).
+
+---
 
 ## Style gallery
 
@@ -82,6 +72,8 @@ ascii:
 | hi                              |
 +----------- exit: 0 ------------ +
 ```
+
+---
 
 ## Architecture
 
@@ -126,6 +118,8 @@ src/blackbox/
 5. On exit, the footer flips from `running` to `exit: N` and the
    cursor is left below the box.
 
+---
+
 ## Alt-screen takeover
 
 Some programs use the terminal's alternate screen buffer to draw their
@@ -139,6 +133,8 @@ sequences:
 | `ESC[?1047h`     | Enter alternate screen (clear on switch) |
 | `ESC[?47h`       | Enter alternate screen (legacy) |
 | `ESC[?1049l`     | Leave alternate screen (restore cursor + switch back) |
+
+---
 
 BlackBox handles alternate screen programs in three tiers:
 

@@ -3,7 +3,7 @@
 <h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
 <p align="center">
-<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_1.5-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen" <img src="https://shields.io/badge/BlackBox-black">>
+<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_1.5-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen"> <img src="https://shields.io/badge/BlackBox-black">
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@ When using the shell, make sure you put any process/app that you have installed 
 Has:
 - Shell Scripting: .aur scripts
 - A rc script: .aurc
-- Piping and redirection
+- Text and object Piping and redirection
 - ghost text and auto suggestions
 - Persistent History
 - Environmental variable handling.
@@ -36,7 +36,8 @@ Has:
 - Job control.
 - Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
-- BlackBox: TUI execution viewport that wraps every command's stdin/stdout/stderr in a rounded Unicode box drawn beneath the prompt (in progress, see [docs/blackbox.md](docs/blackbox.md)).
+- BlackBox: TUI execution viewport that displays processes invoked from the command line in a unicode box with
+round edges.
 - Updater: A tool to update the shell from the remote repository.
 
 ---

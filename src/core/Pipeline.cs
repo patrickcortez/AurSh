@@ -164,19 +164,43 @@ public static class Pipeline
         if (executable == null)
             return ExecuteViaShell(cmd, env, workingDirectory, background);
 
+        string actualExecutable = executable;
+        IList<string> actualArgs = cmd.Args;
+
+        bool useBoxPty = BlackBox.Current?.ActiveSession != null
+                      && !BypassList.IsBypassed(cmd.Name, BlackBox.Current.Config)
+                      && PtyHost.IsAvailable()
+                      && PtyHost.NeedsPty(cmd.Name);
+        if (useBoxPty)
+        {
+            var wrapped = PtyHost.WrapForPty(executable, cmd.Args);
+            actualExecutable = wrapped.executable;
+            actualArgs = wrapped.args;
+        }
+
         var psi = new ProcessStartInfo
         {
-            FileName = executable,
+            FileName = actualExecutable,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             CreateNoWindow = false
         };
 
-        foreach (string arg in cmd.Args)
+        foreach (string arg in actualArgs)
             psi.ArgumentList.Add(arg);
 
         foreach (var kv in env.Variables)
             psi.Environment[kv.Key] = kv.Value;
+
+        if (useBoxPty)
+        {
+            // `script -c <cmd>` execs via $SHELL; aursh sets SHELL=aursh so override
+            // it to a real POSIX shell for the wrapped child only.
+            string realShell = System.IO.File.Exists("/bin/bash") ? "/bin/bash"
+                             : System.IO.File.Exists("/bin/sh") ? "/bin/sh"
+                             : "/bin/sh";
+            psi.Environment["SHELL"] = realShell;
+        }
 
         FileStream? stdoutFile = null;
         FileStream? stderrFile = null;
@@ -1135,6 +1159,18 @@ public static class Pipeline
             }
         }
 
+        bool shellRouteToBox = ShouldRouteToBlackBox(cmd, out var shellBoxOwner, out var shellBoxSession);
+        var shellBoxFlags = new BoxRedirectFlags
+        {
+            StdoutRedirected = redirectStdout,
+            StderrRedirected = redirectStderr || errToOut,
+            StdinRedirected = redirectStdin
+        };
+        if (shellRouteToBox)
+        {
+            BlackBoxIo.PrepareForBox(psi, shellBoxFlags);
+        }
+
         try
         {
             using var process = Process.Start(psi);
@@ -1182,8 +1218,32 @@ public static class Pipeline
                 }
             }
 
+            System.Threading.CancellationTokenSource? shellBoxCancel = null;
+            System.Threading.Tasks.Task? shellBoxTask = null;
+            if (shellRouteToBox)
+            {
+                shellBoxCancel = new System.Threading.CancellationTokenSource();
+                shellBoxTask = BlackBoxIo.PumpAsync(
+                    process,
+                    shellBoxSession,
+                    shellBoxFlags,
+                    shellBoxOwner,
+                    stageIndex: null,
+                    stdoutForward: null,
+                    cancellation: shellBoxCancel.Token);
+            }
+
             System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
             process.WaitForExit();
+
+            if (shellBoxTask != null)
+            {
+                try { shellBoxTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
+                shellBoxCancel?.Cancel();
+                try { shellBoxTask.Wait(System.TimeSpan.FromMilliseconds(200)); } catch { }
+                shellBoxCancel?.Dispose();
+            }
+
             return process.ExitCode;
         }
         catch (Exception ex)

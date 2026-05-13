@@ -23,21 +23,24 @@ the scroll history as inert text and the next prompt is printed below.
 
 ## Status
 
-This is the M0 visual prototype. The renderer, buffer, and config
-surface are in place; runtime integration with `Executor` and
-`Pipeline` (so every command actually runs inside a box) lands in M1.
+M0 (visual prototype), M1 (wired into every command) and M2 (PTY for
+interactive children on POSIX) are shipped.
 
-You can preview the rendering today by running the hidden
-`aursh-blackbox-demo` builtin:
+Every command run in the interactive shell — and every command run via
+`aursh --box <cmd>` for one-shot testing — executes inside a BlackBox
+viewport: stdout/stderr appear in the box body, exit code in the
+footer, the box is live-repainted as output streams in (~30fps), and
+fullscreen TUI programs (`vim`, `top`, `less`, `htop`, `tmux`, `ssh`,
+etc.) bypass the box entirely.
+
+For a no-side-effect aesthetic preview, the hidden
+`aursh-blackbox-demo` builtin still paints six sample scenes:
 
 ```bash
 aursh-blackbox-demo
 aursh-blackbox-demo square
 aursh-blackbox-demo ascii
 ```
-
-It paints six sample scenes (empty box, python REPL, pipeline, stderr
-interleaved, overflow with scroll indicator, style fallbacks).
 
 ## Configuration
 
@@ -79,33 +82,78 @@ ascii:
 +----------- exit: 0 ------------ +
 ```
 
-## Architecture (M0)
+## Architecture
 
 ```
 src/blackbox/
   BlackBox.cs             Facade; Open()/Repaint(); owns active session
   BlackBoxConfig.cs       Env-var-driven settings; capability detection
   BlackBoxSession.cs      Per-command IDisposable state (id, command,
-                          start/finish, exit code, buffer)
+                          start/finish, exit code, buffer, TerminalOut)
   BlackBoxBuffer.cs       Ring of typed body lines (stdout, stderr,
                           stdin echo, meta); scroll window
   BlackBoxRenderer.cs     Paints header / body / footer to a TextWriter
+  BlackBoxLiveRenderer.cs Throttled in-place repaint (cursor-up + erase)
+  BlackBoxWriter.cs       TextWriter that appends to the session buffer
+  BlackBoxIo.cs           PrepareForBox + PumpAsync (line-aware byte pump)
+  BypassList.cs           Detect fullscreen-TUI commands to bypass
+  PtyHost.cs              `script -qfec` wrapper for interactive children
   BoxChars.cs             Rounded / square / ascii glyph sets + detect
   BlackBoxDemo.cs         Renders sample scenes for the demo builtin
 ```
 
-The M0 renderer paints a static block of text to `Console.Out` (or any
-`TextWriter`). It does **not** anchor to a row or repaint in place yet;
-that arrives in M1 along with the actual I/O capture pipeline.
+### Execution flow
+
+1. `Shell.Run` reads a line. If the head word is in `BLACKBOX_BYPASS`
+   the command runs raw without a box.
+2. Otherwise `BlackBox.Open(commandLine)` creates a `BlackBoxSession`
+   and `BlackBoxLiveRenderer.Start` paints the initial "running" frame.
+3. `Pipeline.Execute` runs:
+   - **Builtins** retarget `Console.Out`/`Error` to a `BlackBoxWriter`
+     so `Console.WriteLine` appends straight into the session buffer.
+   - **Single externals** redirect stdio via `BlackBoxIo.PrepareForBox`
+     and pump it through `BlackBoxIo.PumpAsync`. Interactive commands
+     (python, ssh, mysql, ...) on POSIX get re-wrapped through
+     `script -qfec` for proper TTY semantics.
+   - **Pipelines** keep their natural stdin/stdout chain, but the last
+     stage's stdout and every stage's stderr are additionally pumped
+     into the session buffer. Per-stage lines are prefixed `[N]`.
+4. As bytes arrive, `BlackBoxLiveRenderer.Update` rewinds the cursor
+   over the previous render, clears, and repaints. Throttled to 33ms.
+5. On exit, the footer flips from `running` to `exit: N` and the
+   cursor is left below the box.
 
 ## Roadmap
 
-- **M0** — Visual prototype, hidden demo builtin (this milestone).
+- **M0** — Visual prototype, hidden demo builtin. **DONE**.
 - **M1** — Wire `BlackBox.Open` into `Shell.Run`; tee builtin
   Console.Out and external process stdio into the active session;
-  pipeline tee semantics; bypass list for TUI programs.
-- **M2** — Pty-backed mode for interactive programs (python REPL,
-  `apt install`, `read -s`, etc.); ANSI parser for in-place updates.
+  pipeline tee semantics; bypass list for TUI programs. **DONE**.
+- **M2** — PTY-backed mode for interactive children (python REPL,
+  `apt install`, `read -s`, etc.). **DONE** on POSIX via `/usr/bin/script`.
+  Native Pty.Net / ConPTY support for Windows + ANSI cursor parser
+  remains future work.
 - **M3** — Scrollback navigation after a command finishes; SIGWINCH
   redraw; theme polish.
 - **M4** — Plugin hooks (`OnBoxOpen`, `OnBoxClose`) for lua / F#.
+
+## PTY (M2) configuration
+
+On POSIX, BlackBox wraps known-interactive commands with
+`/usr/bin/script -qfec` so they see a real TTY and render prompts /
+colors / progress bars correctly.
+
+Default interactive list includes: `python*`, `ipython*`, `node`,
+`deno`, `ruby`, `irb`, `perl`, `lua`, `luajit`, `ghci`, `scala`,
+`ssh`, `telnet`, `ftp`, `sftp`, `mysql`, `mariadb`, `psql`, `sqlite3`,
+`redis-cli`, `mongo`, `mongosh`, `gdb`, `lldb`, `pdb`, `racket`,
+`clojure`, `guile`, `swipl`.
+
+Override with environment variables:
+
+| Variable        | Effect |
+|-----------------|--------|
+| `AURSH_PTY`     | Comma/space-separated extra command names to PTY-wrap |
+| `AURSH_NO_PTY`  | Set to `1` to disable PTY wrapping entirely |
+
+Windows currently falls back to plain pipes (no ConPTY yet).

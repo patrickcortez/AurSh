@@ -4,6 +4,26 @@ using AurShell.Utils;
 
 namespace AurShell.BlackBoxView;
 
+/// <summary>
+/// Visual layout density. Selected automatically from the current terminal
+/// width by <see cref="BlackBoxRenderer.ResolveTier"/>.
+///
+/// Full     (>= 60 cols)  : header + side borders + footer (default desktop look).
+/// Compact  (30..59 cols)  : header + footer only; body has no left/right '│'
+///                           borders so narrow phone screens get back two cols
+///                           of horizontal space per line.
+/// Bar      (&lt; 30 cols)   : single-line header ("▸ ls — running") and
+///                           single-line footer ("└ exit:0 12ms"). Body is
+///                           rendered raw, no decoration. Survives ≈20-col
+///                           terminals (split-screen Android, tiny WSL panes).
+/// </summary>
+public enum LayoutTier
+{
+    Full,
+    Compact,
+    Bar,
+}
+
 public sealed class BlackBoxRenderer
 {
     private readonly BlackBoxConfig _config;
@@ -13,6 +33,9 @@ public sealed class BlackBoxRenderer
         _config = config;
     }
 
+    /// <summary>Current adaptive layout tier (derived from terminal width).</summary>
+    public LayoutTier Tier => ResolveTier();
+
     /// <summary>
     /// Render only the box header (top border), for passthrough mode where the
     /// child writes directly to the terminal between the header and footer.
@@ -20,11 +43,12 @@ public sealed class BlackBoxRenderer
     public void RenderHeaderOnly(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);
+        var tier = ResolveTier();
         int outerWidth = ResolveOuterWidth();
-        int innerWidth = System.Math.Max(4, outerWidth - 2);
+        int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
-        RenderTop(sb, glyphs, session, outerWidth, innerWidth);
+        RenderTop(sb, glyphs, session, outerWidth, innerWidth, tier);
         writer.Write(sb.ToString());
         writer.Flush();
     }
@@ -36,11 +60,12 @@ public sealed class BlackBoxRenderer
     public void RenderFooterOnly(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);
+        var tier = ResolveTier();
         int outerWidth = ResolveOuterWidth();
-        int innerWidth = System.Math.Max(4, outerWidth - 2);
+        int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
-        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0);
+        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0, tier);
         writer.Write(sb.ToString());
         writer.Flush();
     }
@@ -49,13 +74,34 @@ public sealed class BlackBoxRenderer
     /// Return a single rendered body row as a string (without trailing \n).
     /// Used by the streaming-append live renderer to emit rows one at a time
     /// instead of re-painting the entire box on every update.
+    ///
+    /// In Full tier this draws '│ content │'. In Compact tier the side
+    /// borders are dropped (body text fills the entire width). In Bar tier
+    /// the line is rendered raw with no decoration.
     /// </summary>
     public string RenderBodyRowToString(BufferLine line)
     {
         var glyphs = BoxChars.From(_config.Border);
+        var tier = ResolveTier();
         int outerWidth = ResolveOuterWidth();
-        int innerWidth = System.Math.Max(4, outerWidth - 2);
 
+        if (tier == LayoutTier.Bar)
+        {
+            // No decoration. Just truncate to width.
+            return FormatBodyLine(line, System.Math.Max(1, outerWidth));
+        }
+
+        if (tier == LayoutTier.Compact)
+        {
+            int contentWidth = System.Math.Max(1, outerWidth);
+            string c = FormatBodyLine(line, contentWidth);
+            // Pad to keep the right edge clean when the renderer redraws.
+            int vis = Ansi.VisibleLength(c);
+            int padC = System.Math.Max(0, contentWidth - vis);
+            return padC > 0 ? c + new string(' ', padC) : c;
+        }
+
+        int innerWidth = System.Math.Max(4, outerWidth - 2);
         var sb = new StringBuilder();
         sb.Append(_config.BorderColor);
         sb.Append(glyphs.Vertical);
@@ -83,11 +129,12 @@ public sealed class BlackBoxRenderer
     public string RenderFooterToString(BlackBoxSession session)
     {
         var glyphs = BoxChars.From(_config.Border);
+        var tier = ResolveTier();
         int outerWidth = ResolveOuterWidth();
-        int innerWidth = System.Math.Max(4, outerWidth - 2);
+        int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
-        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0);
+        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, 0, 0, tier);
         // RenderBottom appends a trailing \n; strip it so callers can place
         // their own line terminator.
         string s = sb.ToString();
@@ -98,9 +145,10 @@ public sealed class BlackBoxRenderer
     public void Render(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);
+        var tier = ResolveTier();
 
         int outerWidth = ResolveOuterWidth();
-        int innerWidth = System.Math.Max(4, outerWidth - 2);
+        int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         // Y-axis autoscale: render every line the buffer has. No height cap, no
         // scrolling. Older rows naturally scroll into the terminal's scrollback
@@ -109,9 +157,9 @@ public sealed class BlackBoxRenderer
         int top = 0;
 
         var sb = new StringBuilder();
-        RenderTop(sb, glyphs, session, outerWidth, innerWidth);
-        RenderBody(sb, glyphs, session.Buffer, top, bodyRows, innerWidth);
-        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, top, bodyRows);
+        RenderTop(sb, glyphs, session, outerWidth, innerWidth, tier);
+        RenderBody(sb, glyphs, session.Buffer, top, bodyRows, innerWidth, tier);
+        RenderBottom(sb, glyphs, session, outerWidth, innerWidth, top, bodyRows, tier);
 
         writer.Write(sb.ToString());
         writer.Flush();
@@ -119,9 +167,20 @@ public sealed class BlackBoxRenderer
 
     private int ResolveOuterWidth()
     {
-        int w = Platform.TerminalWidth;
-        if (w < 20) w = 80;
+        int w = TerminalSize.Width;
+        // Min usable width: 20. Below that, callers still render but content
+        // gets aggressively truncated. We *don't* silently fall back to 80
+        // here because that hides real failures from the user.
+        if (w < 20) w = 20;
         return w;
+    }
+
+    private LayoutTier ResolveTier()
+    {
+        int w = TerminalSize.Width;
+        if (w < 30) return LayoutTier.Bar;
+        if (w < 60) return LayoutTier.Compact;
+        return LayoutTier.Full;
     }
 
     private int ComputeScrollTop(BlackBoxBuffer buffer, int visibleRows)
@@ -134,8 +193,21 @@ public sealed class BlackBoxRenderer
         return buffer.Count - visibleRows;
     }
 
-    private void RenderTop(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth)
+    private void RenderTop(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, LayoutTier tier)
     {
+        if (tier == LayoutTier.Bar)
+        {
+            // Single-line header, no corners: "▸ BlackBox :: ls".
+            int budget = System.Math.Max(1, outerWidth);
+            string left = $"{_config.BorderColor}▸ {_config.TitleColor}BlackBox{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}";
+            string titleText = TruncateForHeader(session.CommandTitle, System.Math.Max(1, budget - 12));
+            string line = left + titleText + Ansi.Reset;
+            sb.Append(line);
+            sb.Append('\n');
+            return;
+        }
+
+
         string title = $" {_config.TitleColor}BlackBox{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}{TruncateForHeader(session.CommandTitle, innerWidth / 2)}{Ansi.Reset}{_config.BorderColor} ";
 
         string right = BuildHeaderRightLabel(session);
@@ -178,11 +250,35 @@ public sealed class BlackBoxRenderer
         return $"{cwd}  {time}";
     }
 
-    private void RenderBody(StringBuilder sb, BoxGlyphs g, BlackBoxBuffer buffer, int top, int rows, int innerWidth)
+    private void RenderBody(StringBuilder sb, BoxGlyphs g, BlackBoxBuffer buffer, int top, int rows, int innerWidth, LayoutTier tier)
     {
         int rendered = 0;
         foreach (var line in buffer.Window(top, rows))
         {
+            if (tier == LayoutTier.Bar)
+            {
+                // Raw content, no decoration.
+                sb.Append(FormatBodyLine(line, System.Math.Max(1, innerWidth)));
+                sb.Append('\n');
+                rendered++;
+                continue;
+            }
+
+            if (tier == LayoutTier.Compact)
+            {
+                // No side borders, but pad the row to a stable width so the
+                // streaming-append renderer's redraw clears the full row.
+                int contentWidth = System.Math.Max(1, innerWidth);
+                string c = FormatBodyLine(line, contentWidth);
+                sb.Append(c);
+                int vis = Ansi.VisibleLength(c);
+                int padC = System.Math.Max(0, contentWidth - vis);
+                if (padC > 0) sb.Append(' ', padC);
+                sb.Append('\n');
+                rendered++;
+                continue;
+            }
+
             sb.Append(_config.BorderColor);
             sb.Append(g.Vertical);
             sb.Append(Ansi.Reset);
@@ -207,13 +303,20 @@ public sealed class BlackBoxRenderer
 
         while (rendered < rows)
         {
-            sb.Append(_config.BorderColor);
-            sb.Append(g.Vertical);
-            sb.Append(Ansi.Reset);
-            sb.Append(' ', innerWidth);
-            sb.Append(_config.BorderColor);
-            sb.Append(g.Vertical);
-            sb.Append(Ansi.Reset);
+            if (tier == LayoutTier.Full)
+            {
+                sb.Append(_config.BorderColor);
+                sb.Append(g.Vertical);
+                sb.Append(Ansi.Reset);
+                sb.Append(' ', innerWidth);
+                sb.Append(_config.BorderColor);
+                sb.Append(g.Vertical);
+                sb.Append(Ansi.Reset);
+            }
+            else if (tier == LayoutTier.Compact)
+            {
+                sb.Append(' ', System.Math.Max(0, innerWidth));
+            }
             sb.Append('\n');
             rendered++;
         }
@@ -261,10 +364,24 @@ public sealed class BlackBoxRenderer
         return $"{color}{combined}{Ansi.Reset}";
     }
 
-    private void RenderBottom(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, int top, int bodyRows)
+    private void RenderBottom(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, int top, int bodyRows, LayoutTier tier)
     {
         string exitLabel = BuildExitLabel(session);
         string elapsed = BuildElapsedLabel(session);
+
+        if (tier == LayoutTier.Bar)
+        {
+            // Single-line footer: "└ exit:0 12ms" (or "└ running 12ms").
+            string leftBar = $"{_config.BorderColor}└ ";
+            string midBar = string.IsNullOrEmpty(exitLabel) ? "" : exitLabel + " ";
+            string rightBar = string.IsNullOrEmpty(elapsed) ? "" : $"{_config.MetaColor}{elapsed}{Ansi.Reset}";
+            sb.Append(leftBar);
+            sb.Append(midBar);
+            sb.Append(rightBar);
+            sb.Append('\n');
+            return;
+        }
+
 
         // Scroll indicator removed: body always renders entire buffer (y-axis autoscale).
         string left = "";

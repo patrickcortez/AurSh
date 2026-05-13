@@ -30,6 +30,17 @@ public sealed class BlackBoxLiveRenderer
     private DateTime _lastUpdate = DateTime.MinValue;
     private readonly TimeSpan _minInterval = TimeSpan.FromMilliseconds(33);
 
+    // Active session + writer for the resize callback. Only valid between
+    // Start() and Finish()/Abort(). The resize handler is fired on a
+    // background thread (TerminalSize timer/SIGWINCH), so all access is
+    // guarded by _lock.
+    private BlackBoxSession? _activeSession;
+    private System.IO.TextWriter? _activeWriter;
+    private int _lastRenderedWidth;
+    private LayoutTier _lastRenderedTier;
+    private bool _passthrough;
+    private Action<int, int>? _resizeHandler;
+
     public BlackBoxLiveRenderer(BlackBoxRenderer renderer)
     {
         _renderer = renderer;
@@ -47,6 +58,14 @@ public sealed class BlackBoxLiveRenderer
         {
             ResetState();
             _started = true;
+            _passthrough = true;
+            _activeSession = session;
+            _activeWriter = writer;
+            _lastRenderedWidth = TerminalSize.Width;
+            _lastRenderedTier = _renderer.Tier;
+            // Don't subscribe to resize in passthrough mode: the child
+            // process owns the screen between header and footer, so we'd
+            // have nothing to redraw without corrupting its output.
             _renderer.RenderHeaderOnly(session, writer);
         }
     }
@@ -70,6 +89,9 @@ public sealed class BlackBoxLiveRenderer
             catch { }
 
             _renderer.RenderFooterOnly(session, writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -83,6 +105,10 @@ public sealed class BlackBoxLiveRenderer
         {
             ResetState();
             _started = true;
+            _activeSession = session;
+            _activeWriter = writer;
+            _lastRenderedWidth = TerminalSize.Width;
+            _lastRenderedTier = _renderer.Tier;
             HideCursor(writer);
 
             var sb = new StringBuilder();
@@ -96,6 +122,8 @@ public sealed class BlackBoxLiveRenderer
             writer.Flush();
             _footerEmitted = true;
             _lastUpdate = DateTime.UtcNow;
+
+            AttachResize();
         }
     }
 
@@ -131,6 +159,9 @@ public sealed class BlackBoxLiveRenderer
             // exit code / elapsed time).
             EmitPending(session, writer);
             ShowCursor(writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -144,6 +175,9 @@ public sealed class BlackBoxLiveRenderer
             session.MarkAborted();
             EmitPending(session, writer);
             ShowCursor(writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -196,6 +230,60 @@ public sealed class BlackBoxLiveRenderer
         _emittedBodyRows = 0;
         _footerEmitted = false;
         _lastUpdate = DateTime.MinValue;
+        _passthrough = false;
+        _lastRenderedWidth = 0;
+        _lastRenderedTier = LayoutTier.Full;
+        DetachResize();
+    }
+
+    private void AttachResize()
+    {
+        if (_resizeHandler != null) return;
+        _resizeHandler = (_, _) => OnTerminalResized();
+        TerminalSize.Changed += _resizeHandler;
+    }
+
+    private void DetachResize()
+    {
+        if (_resizeHandler == null) return;
+        TerminalSize.Changed -= _resizeHandler;
+        _resizeHandler = null;
+    }
+
+    /// <summary>
+    /// Called on a background thread when the terminal is resized. Triggers
+    /// a redraw of the *body and footer* of the current box at the new
+    /// width. The header and any rows already past the viewport stay at
+    /// their old width — we cannot retroactively edit terminal scrollback,
+    /// so trying to reflow them would produce visible corruption.
+    /// </summary>
+    private void OnTerminalResized()
+    {
+        lock (_lock)
+        {
+            if (!_started || _completed) return;
+            if (_passthrough) return; // child owns the screen
+            BlackBoxSession? session = _activeSession;
+            System.IO.TextWriter? writer = _activeWriter;
+            if (session == null || writer == null) return;
+
+            int newWidth = TerminalSize.Width;
+            LayoutTier newTier = _renderer.Tier;
+            if (newWidth == _lastRenderedWidth && newTier == _lastRenderedTier) return;
+
+            // Force a redraw of every body row already emitted PLUS the
+            // footer, all at the new width. We can't retroactively rewrite
+            // rows already in terminal scrollback, but for rows still
+            // inside the viewport this gives a clean reflow.
+            try
+            {
+                _emittedBodyRows = 0;
+                EmitPending(session, writer);
+                _lastRenderedWidth = newWidth;
+                _lastRenderedTier = newTier;
+            }
+            catch { /* writer may have been disposed mid-resize */ }
+        }
     }
 
     private void HideCursor(System.IO.TextWriter writer)

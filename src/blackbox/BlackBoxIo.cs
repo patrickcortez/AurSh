@@ -208,6 +208,11 @@ public static class BlackBoxIo
                         break;
                     }
                 }
+
+                if (!owner.LiveRenderer.IsAltScreenActive)
+                {
+                    owner.LiveRenderer.ForceUpdate(session, session.TerminalOut);
+                }
             }
 
             if (lineBuf.Length > 0 && !owner.LiveRenderer.IsAltScreenActive)

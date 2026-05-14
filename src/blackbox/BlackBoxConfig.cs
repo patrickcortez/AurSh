@@ -1,5 +1,6 @@
 using AurShell.Utils;
-
+using System.Text.Json;
+using System.Text.Json.Serialization;
 namespace AurShell.BlackBoxView;
 
 public sealed class BlackBoxConfig
@@ -11,6 +12,11 @@ public sealed class BlackBoxConfig
     public string StderrColor { get; set; } = Ansi.FgBrightRed;
     public string ExitOkColor { get; set; } = Ansi.FgBrightGreen;
     public string ExitErrColor { get; set; } = Ansi.FgBrightRed;
+
+    public string Title { get; set; } = "BlackBox";
+    public string? BackgroundColor { get; set; }
+    public bool ShowTitle { get; set; } = true;
+    public bool Enabled { get; set; } = true;
 
     public int? MaxHeight { get; set; }
     public int MinHeight { get; set; } = 1;
@@ -50,6 +56,8 @@ public sealed class BlackBoxConfig
                 System.StringSplitOptions.RemoveEmptyEntries));
         }
 
+        LoadFromJson(c);
+
         return c;
     }
 
@@ -76,6 +84,110 @@ public sealed class BlackBoxConfig
         {
             "1" or "true" or "yes" or "on" => true,
             _ => false
+        };
+    }
+
+    private class BlackBoxConfigFile
+    {
+        [JsonPropertyName("Blackbox Title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("Border-Color")]
+        public string? BorderColor { get; set; }
+
+        [JsonPropertyName("Background-Color")]
+        public string? BackgroundColor { get; set; }
+
+        [JsonPropertyName("Show-Title")]
+        public bool? ShowTitle { get; set; }
+
+        [JsonPropertyName("Enabled")]
+        public bool? Enabled { get; set; }
+
+        [JsonPropertyName("Border-Style")]
+        public string? BorderStyle { get; set; }
+    }
+
+    private static void LoadFromJson(BlackBoxConfig config)
+    {
+        try
+        {
+            string aurshDir = Path.Combine(Platform.HomeDirectory, ".aursh");
+            if (!Directory.Exists(aurshDir)) Directory.CreateDirectory(aurshDir);
+
+            string configPath = Path.Combine(aurshDir, "blackconfig.json");
+            
+            if (!File.Exists(configPath))
+            {
+                var defaultData = new BlackBoxConfigFile
+                {
+                    Title = "BlackBox",
+                    BorderColor = "White",
+                    BackgroundColor = "Black",
+                    ShowTitle = true,
+                    Enabled = true,
+                    BorderStyle = "Rounded"
+                };
+                string defaultJson = JsonSerializer.Serialize(defaultData, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(configPath, defaultJson);
+            }
+
+            string json = File.ReadAllText(configPath);
+
+            // Pre-process to handle capitalized True/False which is common but invalid JSON
+            json = System.Text.RegularExpressions.Regex.Replace(json, @":\s*True\b", ": true", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            json = System.Text.RegularExpressions.Regex.Replace(json, @":\s*False\b", ": false", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
+            };
+            var fileConfig = JsonSerializer.Deserialize<BlackBoxConfigFile>(json, options);
+
+            if (fileConfig == null) return;
+
+            if (fileConfig.Title != null) config.Title = fileConfig.Title;
+            if (fileConfig.ShowTitle.HasValue) config.ShowTitle = fileConfig.ShowTitle.Value;
+            if (fileConfig.Enabled.HasValue) config.Enabled = fileConfig.Enabled.Value;
+
+            if (!string.IsNullOrWhiteSpace(fileConfig.BorderColor))
+                config.BorderColor = ParseColorName(fileConfig.BorderColor, isBackground: false);
+
+            if (!string.IsNullOrWhiteSpace(fileConfig.BackgroundColor))
+                config.BackgroundColor = ParseColorName(fileConfig.BackgroundColor, isBackground: true);
+
+            if (!string.IsNullOrWhiteSpace(fileConfig.BorderStyle))
+            {
+                config.Border = fileConfig.BorderStyle.ToLowerInvariant() switch
+                {
+                    "rounded" => BoxStyle.Rounded,
+                    "ascii" => BoxStyle.Ascii,
+                    "square" => BoxStyle.Square,
+                    _ => config.Border
+                };
+            }
+        }
+        catch
+        {
+            // Ignore errors reading config
+        }
+    }
+
+    private static string ParseColorName(string name, bool isBackground)
+    {
+        return name.Trim().ToLowerInvariant() switch
+        {
+            "black" => isBackground ? Ansi.BgBlack : Ansi.FgBlack,
+            "red" => isBackground ? Ansi.BgRed : Ansi.FgRed,
+            "green" => isBackground ? Ansi.BgGreen : Ansi.FgGreen,
+            "yellow" => isBackground ? Ansi.BgYellow : Ansi.FgYellow,
+            "blue" => isBackground ? Ansi.BgBlue : Ansi.FgBlue,
+            "magenta" => isBackground ? Ansi.BgMagenta : Ansi.FgMagenta,
+            "cyan" => isBackground ? Ansi.BgCyan : Ansi.FgCyan,
+            "white" => isBackground ? Ansi.BgWhite : Ansi.FgWhite,
+            _ => isBackground ? Ansi.BgDefault : Ansi.FgDefault
         };
     }
 }

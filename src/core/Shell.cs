@@ -224,6 +224,7 @@ public class Shell
 
     private bool ShouldBypassBox(string commandLine)
     {
+        if (!_blackBox.Config.Enabled) return true;
         if (string.IsNullOrWhiteSpace(commandLine)) return true;
         string head = ExtractFirstWord(commandLine);
         if (string.IsNullOrEmpty(head)) return true;

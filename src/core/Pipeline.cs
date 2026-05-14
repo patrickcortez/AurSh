@@ -19,7 +19,7 @@ public static class Pipeline
     private static bool ShouldRouteToBlackBox(CommandNode cmd, out BlackBox box, out BlackBoxSession session)
     {
         var current = BlackBox.Current;
-        if (current == null || current.ActiveSession == null)
+        if (current == null || current.ActiveSession == null || !current.Config.Enabled)
         {
             box = null!;
             session = null!;

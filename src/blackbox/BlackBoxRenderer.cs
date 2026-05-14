@@ -106,6 +106,10 @@ public sealed class BlackBoxRenderer
         sb.Append(_config.BorderColor);
         sb.Append(glyphs.Vertical);
         sb.Append(Ansi.Reset);
+
+        if (!string.IsNullOrEmpty(_config.BackgroundColor))
+            sb.Append(_config.BackgroundColor);
+
         sb.Append(' ');
 
         string content = FormatBodyLine(line, innerWidth - 2);
@@ -117,6 +121,9 @@ public sealed class BlackBoxRenderer
             sb.Append(' ', pad);
 
         sb.Append(' ');
+
+        if (!string.IsNullOrEmpty(_config.BackgroundColor))
+            sb.Append(Ansi.Reset);
         sb.Append(_config.BorderColor);
         sb.Append(glyphs.Vertical);
         sb.Append(Ansi.Reset);
@@ -195,11 +202,13 @@ public sealed class BlackBoxRenderer
 
     private void RenderTop(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, LayoutTier tier)
     {
+        string displayTitle = _config.Title ?? "BlackBox";
+
         if (tier == LayoutTier.Bar)
         {
             // Single-line header, no corners: "▸ BlackBox :: ls".
             int budget = System.Math.Max(1, outerWidth);
-            string left = $"{_config.BorderColor}▸ {_config.TitleColor}BlackBox{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}";
+            string left = $"{_config.BorderColor}▸ {_config.TitleColor}{displayTitle}{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}";
             string titleText = TruncateForHeader(session.CommandTitle, System.Math.Max(1, budget - 12));
             string line = left + titleText + Ansi.Reset;
             sb.Append(line);
@@ -207,8 +216,9 @@ public sealed class BlackBoxRenderer
             return;
         }
 
-
-        string title = $" {_config.TitleColor}BlackBox{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}{TruncateForHeader(session.CommandTitle, innerWidth / 2)}{Ansi.Reset}{_config.BorderColor} ";
+        string title = _config.ShowTitle 
+            ? $" {_config.TitleColor}{displayTitle}{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}{TruncateForHeader(session.CommandTitle, innerWidth / 2)}{Ansi.Reset}{_config.BorderColor} "
+            : "";
 
         string right = BuildHeaderRightLabel(session);
         string rightPadded = string.IsNullOrEmpty(right) ? "" : $" {_config.MetaColor}{right}{Ansi.Reset}{_config.BorderColor} ";
@@ -308,7 +318,15 @@ public sealed class BlackBoxRenderer
                 sb.Append(_config.BorderColor);
                 sb.Append(g.Vertical);
                 sb.Append(Ansi.Reset);
+
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(_config.BackgroundColor);
+
                 sb.Append(' ', innerWidth);
+
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(Ansi.Reset);
+
                 sb.Append(_config.BorderColor);
                 sb.Append(g.Vertical);
                 sb.Append(Ansi.Reset);

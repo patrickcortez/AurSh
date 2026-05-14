@@ -102,6 +102,7 @@ public static class BlackBoxIo
         var lineBuf = new MemoryStream();
         byte[] buffer = new byte[8192];
         var sniffer = new AltScreenSniffer();
+        var ansiTracker = new AnsiStateTracker();
         Stream? rawOut = null;
 
         try
@@ -148,7 +149,10 @@ public static class BlackBoxIo
 
                     if (b == (byte)'\n')
                     {
-                        string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                        string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                        string statePrefix = ansiTracker.GetStatePrefix();
+                        string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
+                        ansiTracker.ProcessLine(rawLine);
                         session.Buffer.Append(line, kind, stageIndex);
                         lineBuf.SetLength(0);
                         owner.LiveRenderer.Update(session, session.TerminalOut);
@@ -201,7 +205,9 @@ public static class BlackBoxIo
 
             if (lineBuf.Length > 0 && !owner.LiveRenderer.IsAltScreenActive)
             {
-                string line = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                string statePrefix = ansiTracker.GetStatePrefix();
+                string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
                 session.Buffer.Append(line, kind, stageIndex);
                 owner.LiveRenderer.Update(session, session.TerminalOut);
             }

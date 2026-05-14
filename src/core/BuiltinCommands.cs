@@ -476,8 +476,7 @@ public static class BuiltinCommands
 
         return exitCode;
     }
-
-
+    
     private static string GetPlatform()
     {
         string os = string.Empty;

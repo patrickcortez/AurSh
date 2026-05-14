@@ -368,7 +368,11 @@ public sealed class BlackBoxRenderer
             combined = Ansi.TruncateVisible(combined, maxVisible);
 
         if (string.IsNullOrEmpty(color))
+        {
+            if (combined.Contains('\x1b'))
+                return combined + Ansi.Reset;
             return combined;
+        }
 
         return $"{color}{combined}{Ansi.Reset}";
     }

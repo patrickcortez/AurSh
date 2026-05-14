@@ -19,12 +19,17 @@ public class InputHandler
     private int _lastTermWidth;
     private int _lastTermHeight;
     private string _currentPrompt = "";
-    private int _lastDisplayLines;
+    private int _cursorRowOffset;
     private int _pendingResizeWidth;
     private int _pendingResizeHeight;
     private long _resizeChangeTick;
+    private bool _multilineActive;
+    private int _continuationPromptLen = 5;
 
     private int count;
+
+    private const string ContinuationBoxChar = "\u2570\u2500";
+    private const string ContinuationChevron = "\u276F";
 
     public InputHandler(History history, ShellEnvironment env, SuggestionProvider? suggestions = null)
     {
@@ -57,7 +62,7 @@ public class InputHandler
         _history.ResetNavigation();
 
         UpdateGhostText();
-        _lastDisplayLines = ComputeDisplayLines();
+        _cursorRowOffset = ComputeCursorPosition(_lastTermWidth).Row;
 
         while (true)
         {
@@ -92,7 +97,7 @@ public class InputHandler
                 continue;
             }
 
-            if (key.Key == ConsoleKey.Enter) // User confirms input
+            if (key.Key == ConsoleKey.Enter)
             {
                 if (Console.KeyAvailable)
                 {
@@ -113,21 +118,34 @@ public class InputHandler
                             _cursorPos++;
                         }
                     }
-                    ClearGhostText();
-                    Console.WriteLine();
+                    _multilineActive = _buffer.ToString().Contains('\n');
+                    RedrawLine();
                     
                     string pasted = _buffer.ToString();
-                    int firstNewline = pasted.IndexOf('\n');
-                    if (firstNewline >= 0 && firstNewline < pasted.Length - 1)
+                    if (!IsInputIncomplete(pasted))
                     {
-                        Console.WriteLine(pasted.Substring(firstNewline + 1));
+                        Console.WriteLine();
+                        _multilineActive = false;
+                        return pasted;
                     }
-                    return pasted;
+                    continue;
                 }
 
-                ClearGhostText();
+                string currentInput = _buffer.ToString();
+                if (IsInputIncomplete(currentInput))
+                {
+                    _buffer.Append('\n');
+                    _cursorPos = _buffer.Length;
+                    _multilineActive = true;
+                    RedrawLine();
+                    continue;
+                }
+
+                _ghostText = "";
+                RedrawLine(); // Ensure ghost text is cleared visually before confirming
                 Console.WriteLine();
-                return _buffer.ToString();
+                _multilineActive = false;
+                return currentInput;
             }
 
             if (key.Key == ConsoleKey.Backspace)
@@ -488,11 +506,81 @@ public class InputHandler
         RedrawLine();
     }
 
+    private static bool IsInputIncomplete(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return false;
+
+        int doubleQuotes = 0;
+        int singleQuotes = 0;
+        bool inDouble = false;
+        bool inSingle = false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+
+            if (c == '\\' && i + 1 < input.Length && !inSingle)
+            {
+                i++;
+                continue;
+            }
+
+            if (c == '\'' && !inDouble)
+            {
+                inSingle = !inSingle;
+                singleQuotes++;
+            }
+            else if (c == '"' && !inSingle)
+            {
+                inDouble = !inDouble;
+                doubleQuotes++;
+            }
+        }
+
+        if (doubleQuotes % 2 != 0)
+            return true;
+        if (singleQuotes % 2 != 0)
+            return true;
+
+        string trimmed = input.TrimEnd();
+        if (trimmed.Length == 0)
+            return false;
+
+        if (trimmed.EndsWith("|") && !trimmed.EndsWith("||"))
+            return true;
+
+        if (trimmed.EndsWith("||"))
+            return true;
+
+        if (trimmed.EndsWith("&&"))
+            return true;
+
+        if (Utils.Platform.IsUnixLike)
+        {
+            if (trimmed.EndsWith("\\") && !trimmed.EndsWith("\\\\"))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPathLikeInput(string word)
+    {
+        if (string.IsNullOrEmpty(word))
+            return false;
+
+        return word.StartsWith("./") || word.StartsWith(".\\") ||
+               word.StartsWith("../") || word.StartsWith("..\\") ||
+               word.StartsWith("/") || word.StartsWith("~/") || word.StartsWith("~\\");
+    }
+
     private void ReplaceLine(string newContent)
     {
         _buffer.Clear();
         _buffer.Append(newContent);
         _cursorPos = _buffer.Length;
+        _multilineActive = newContent.Contains('\n');
         RedrawLine();
     }
 
@@ -651,34 +739,58 @@ public class InputHandler
     return sb.ToString();
 }
 
-    private void RedrawLine() // Displays/render user input to console
+    private void RedrawLine()
     {
         UpdateGhostText();
 
-        var sb = new StringBuilder(); // we use sb since C# strings are immutable
+        int width = Utils.Platform.TerminalWidth;
+        if (width <= 0) width = 80;
+
+        var sb = new StringBuilder();
         sb.Append(Utils.Ansi.CursorHide);
         sb.Append('\r');
-        sb.Append(Utils.Ansi.SetCursorColumn(_promptVisibleLen + 1));
-        sb.Append(Utils.Ansi.ClearLineFromCursor);
-        sb.Append(SyntaxHighlight(_buffer.ToString()));
 
-        if (!string.IsNullOrEmpty(_ghostText)) // Ghost texts aka suggestions rendering
+        if (_cursorRowOffset > 0)
         {
-            sb.Append(Utils.Ansi.FgRgb(80, 80, 100));
-            sb.Append(_ghostText);
-            sb.Append(Utils.Ansi.Reset);
+            sb.Append(Utils.Ansi.MoveCursorUp(_cursorRowOffset));
         }
 
-        sb.Append(Utils.Ansi.ClearLineFromCursor);
+        sb.Append(Utils.Ansi.ClearScreenFromCursor);
+        sb.Append(_currentPrompt);
 
-        int targetCol = _promptVisibleLen + 1 + _cursorPos;
-        sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
+        string fullText = _buffer.ToString();
+        string highlightedFull = SyntaxHighlight(fullText);
+
+        string contPrompt = Utils.Ansi.FgBrightBlack + ContinuationBoxChar + Utils.Ansi.Reset + " " + Utils.Ansi.FgRgb(100, 230, 150) + ContinuationChevron + Utils.Ansi.Reset + " ";
+        string displayText = highlightedFull.Replace("\n", "\n" + contPrompt);
+        sb.Append(displayText);
+
+        if (!string.IsNullOrEmpty(_ghostText))
+        {
+            string ghostColor = Utils.Ansi.FgRgb(80, 80, 100);
+            string ghostReset = Utils.Ansi.Reset;
+            string ghostWithPrompts = _ghostText.Replace("\n", ghostReset + "\n" + contPrompt + ghostColor);
+            sb.Append(ghostColor);
+            sb.Append(ghostWithPrompts);
+            sb.Append(ghostReset);
+        }
+
+        int totalRows = ComputeDisplayLinesAtWidth(width);
+
+        var cursorPos = ComputeCursorPosition(width);
+
+        int rowsToMoveUp = (totalRows - 1) - cursorPos.Row;
+        if (rowsToMoveUp > 0)
+        {
+            sb.Append(Utils.Ansi.MoveCursorUp(rowsToMoveUp));
+        }
+
+        sb.Append(Utils.Ansi.SetCursorColumn(cursorPos.Col + 1));
         sb.Append(Utils.Ansi.CursorShow);
 
-        
+        _cursorRowOffset = cursorPos.Row;
 
         Console.Write(sb.ToString());
-        _lastDisplayLines = ComputeDisplayLines();
     }
 
     private void ClearGhostText()
@@ -686,14 +798,7 @@ public class InputHandler
         if (!string.IsNullOrEmpty(_ghostText))
         {
             _ghostText = "";
-            var sb = new StringBuilder();
-            sb.Append(Utils.Ansi.CursorHide);
-            sb.Append(Utils.Ansi.SetCursorColumn(_promptVisibleLen + 1 + _buffer.Length));
-            sb.Append(Utils.Ansi.ClearLineFromCursor);
-            int targetCol = _promptVisibleLen + 1 + _cursorPos;
-            sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
-            sb.Append(Utils.Ansi.CursorShow);
-            Console.Write(sb.ToString());
+            RedrawLine();
         }
     }
 
@@ -768,6 +873,20 @@ public class InputHandler
             }
         }
 
+        if (isCommand && IsPathLikeInput(current))
+        {
+            var pathCompletions = GetPathCompletions(current);
+            if (pathCompletions.Count > 0)
+            {
+                string first = pathCompletions[0];
+                if (first.Length > current.Length && first.StartsWith(current, StringComparison.OrdinalIgnoreCase))
+                {
+                    _ghostText = first.Substring(current.Length);
+                    return;
+                }
+            }
+        }
+
         _ghostText = "";
     }
 
@@ -794,7 +913,7 @@ public class InputHandler
         long elapsed = Environment.TickCount64 - _resizeChangeTick;
         if (elapsed >= 100)
         {
-            int cursorRowsFromTop = ComputeCursorRowFromPromptStart(currentWidth);
+            int cursorRowsFromTop = ComputeCursorPosition(currentWidth).Row;
 
             _lastTermWidth = currentWidth;
             _lastTermHeight = currentHeight;
@@ -804,9 +923,9 @@ public class InputHandler
         }
     }
 
-    private int ComputeCursorRowFromPromptStart(int width)
+    private (int Row, int Col) ComputeCursorPosition(int width)
     {
-        if (width <= 0) return 0;
+        if (width <= 0) return (0, 0);
 
         string[] promptLines = _currentPrompt.Split('\n');
         int rows = 0;
@@ -817,13 +936,27 @@ public class InputHandler
             rows += Math.Max(1, (vis + width - 1) / width);
         }
 
-        int lastPromptVis = promptLines.Length > 0
-            ? Utils.Ansi.VisibleLength(promptLines[^1])
-            : _promptVisibleLen;
-        int cursorCharPos = lastPromptVis + _cursorPos;
-        rows += cursorCharPos / width;
+        int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
 
-        return rows;
+        string bufferText = _buffer.ToString();
+        string textBeforeCursor = bufferText.Substring(0, _cursorPos);
+        string[] linesBeforeCursor = textBeforeCursor.Split('\n');
+        
+        for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
+        {
+            int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
+            int textVis = Utils.Ansi.VisibleLength(linesBeforeCursor[i]);
+            rows += Math.Max(1, (prefixVis + textVis + width - 1) / width);
+        }
+        
+        int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? lastPromptVis : _continuationPromptLen;
+        int lastLineTextVis = Utils.Ansi.VisibleLength(linesBeforeCursor[^1]);
+        int totalVisOnLastLine = lastLinePrefixVis + lastLineTextVis;
+        
+        rows += totalVisOnLastLine / width;
+        int col = totalVisOnLastLine % width;
+        
+        return (rows, col);
     }
 
     private void FullRedraw(bool clearPrevious = false, int cursorRowsFromTop = -1)
@@ -836,36 +969,16 @@ public class InputHandler
 
         if (clearPrevious)
         {
-            int moveUp = cursorRowsFromTop >= 0 ? cursorRowsFromTop : (_lastDisplayLines > 1 ? _lastDisplayLines - 1 : 0);
-            var clearSb = new StringBuilder();
-            clearSb.Append(Utils.Ansi.CursorHide);
-            clearSb.Append('\r');
+            int moveUp = cursorRowsFromTop >= 0 ? cursorRowsFromTop : _cursorRowOffset;
             if (moveUp > 0)
-                clearSb.Append(Utils.Ansi.MoveCursorUp(moveUp));
-            clearSb.Append(Utils.Ansi.ClearScreenFromCursor);
-            Console.Write(clearSb.ToString());
+                Console.Write("\r" + Utils.Ansi.MoveCursorUp(moveUp) + Utils.Ansi.ClearScreenFromCursor);
+            else
+                Console.Write("\r" + Utils.Ansi.ClearScreenFromCursor);
+            
+            _cursorRowOffset = 0;
         }
 
-        var sb = new StringBuilder();
-        sb.Append(_currentPrompt);
-        sb.Append(SyntaxHighlight(_buffer.ToString()));
-
-        if (!string.IsNullOrEmpty(_ghostText))
-        {
-            sb.Append(Utils.Ansi.FgRgb(80, 80, 100));
-            sb.Append(_ghostText);
-            sb.Append(Utils.Ansi.Reset);
-        }
-
-        sb.Append(Utils.Ansi.ClearLineFromCursor);
-
-        int targetCol = _promptVisibleLen + 1 + _cursorPos;
-        sb.Append(Utils.Ansi.SetCursorColumn(targetCol));
-        sb.Append(Utils.Ansi.CursorShow);
-
-        Console.Write(sb.ToString());
-
-        _lastDisplayLines = ComputeDisplayLines();
+        RedrawLine();
     }
 
     private void EnterReverseSearch()
@@ -1008,6 +1121,11 @@ public class InputHandler
 
         if (isCommand)
         {
+            if (IsPathLikeInput(partial))
+            {
+                return GetPathCompletions(partial);
+            }
+
             foreach (string builtin in new[]
             {
                 "cd", "export", "unset", "exit", "history", "clear", "echo",
@@ -1108,6 +1226,53 @@ public class InputHandler
         return completions;
     }
 
+    private List<string> GetPathCompletions(string partial)
+    {
+        var completions = new List<string>();
+        string expanded = Utils.Platform.ExpandTilde(partial);
+        string? dir = Path.GetDirectoryName(expanded);
+        string prefix = Path.GetFileName(expanded);
+
+        if (string.IsNullOrEmpty(dir))
+            dir = ".";
+
+        try
+        {
+            if (Directory.Exists(dir))
+            {
+                foreach (string entry in Directory.GetFileSystemEntries(dir))
+                {
+                    string name = Path.GetFileName(entry);
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string completion = dir == "." ? name : Path.Combine(dir, name);
+
+                        if (Directory.Exists(entry))
+                            completion += Path.DirectorySeparatorChar;
+
+                        if (partial.StartsWith("~/") || partial.StartsWith("~\\"))
+                        {
+                            string home = Utils.Platform.HomeDirectory;
+                            if (completion.StartsWith(home, StringComparison.OrdinalIgnoreCase))
+                                completion = "~" + completion.Substring(home.Length);
+                        }
+
+                        string originalPrefix = partial.Substring(0, partial.Length - prefix.Length);
+                        completion = originalPrefix + name;
+                        if (Directory.Exists(entry))
+                            completion += Path.DirectorySeparatorChar;
+
+                        completions.Add(completion);
+                    }
+                }
+            }
+        }
+        catch { }
+
+        completions.Sort(StringComparer.OrdinalIgnoreCase);
+        return completions;
+    }
+
     private string FindCommonPrefix(List<string> strings)
     {
         if (strings.Count == 0)
@@ -1162,8 +1327,16 @@ public class InputHandler
         }
 
         int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
-        int lastLineVis = lastPromptVis + _buffer.Length + _ghostText.Length;
-        totalLines += Math.Max(1, (lastLineVis + width - 1) / width);
+        
+        string fullContent = _buffer.ToString() + _ghostText;
+        string[] contentLines = fullContent.Split('\n');
+        
+        for (int i = 0; i < contentLines.Length; i++)
+        {
+            int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
+            int lineVis = prefixVis + Utils.Ansi.VisibleLength(contentLines[i]);
+            totalLines += Math.Max(1, (lineVis + width - 1) / width);
+        }
 
         return totalLines;
     }

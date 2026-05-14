@@ -59,11 +59,11 @@ round edges.
 
 **Windows**
 
-![Windows](/Assets/Images/Windows3.png)
+![Windows](/Assets/Images/Windows4.png)
 
 **Linux**
 
-![Linux](/Assets/Images/Linux3.png)
+![Linux](/Assets/Images/Linux4.png)
 
 **Android**
 

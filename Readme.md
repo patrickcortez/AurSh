@@ -89,13 +89,9 @@ This repositories structure is relatively simple:
 
 ## Installation
 
-Make sure you have *.NET SDK* installed, *make* is optional since there is a MSBuild alternative.
+Clone this repository first then make sure you have *.NET SDK* installed and *make* is optional since there is a *MSBuild* alternative.
 
 Once you have them installed simply run `make install-user` for current user installation and `make install` for system wide installation or you can use .Net's *MSBuild* to install the shell: `dotnet msbuild build.proj -t:Install` for system wide installation or `dotnet msbuild build.proj -t:InstallUser` for current user installation.
-
-```bash
-dotnet msbuild build.proj -t:Install
-```
 
 ---
 

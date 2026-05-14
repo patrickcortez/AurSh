@@ -38,8 +38,26 @@ public static class Ansi
     public const string ClearLineFromCursor = "\x1b[0K";
     public const string ClearLineToStart = "\x1b[1K";
 
+    // Recognized control sequences (stripped when measuring visible width):
+    //   - CSI .. final byte   `ESC [ <params> <intermediates> <final>` where
+    //                          params  in [0x30-0x3F] (digits, ; : < = > ?),
+    //                          interm  in [0x20-0x2F] (space, ! " # $ % &
+    //                                                  ' ( ) * + , - . /),
+    //                          final   in [0x40-0x7E] (@ .. ~).
+    //     This includes "private" forms like ESC[?1049h that the previous
+    //     `[0-9;]*` pattern missed (the `?` byte is in the params set).
+    //   - OSC ..  string terminator. OSC starts with `ESC ]` and ends at
+    //     either BEL (0x07) or ST (ESC \). Covers titlebar/hyperlink/colour
+    //     queries.
+    //   - 2-byte ESC sequences   `ESC [@-_]`   (e.g. ESC D, ESC M, ESC E)
+    //   - Charset designation     `ESC [\(\)\*\+\-\.\/] [A-Za-z0-9]`
+    //     (e.g. ESC ( B switches G0 to ASCII)
     private static readonly Regex AnsiPattern = new Regex(
-        @"\x1b\[[0-9;]*[A-Za-z]|\x1b\]8;[^;]*;[^\x1b]*\x1b\\",
+        @"\x1b\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]"           // CSI
+        + @"|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"                   // OSC <ST>
+        + @"|\x1b[\(\)\*\+\-\.\/][A-Za-z0-9]"                     // charset designator
+        + @"|\x1b[\x40-\x5F]"                                    // 2-byte ESC
+        ,
         RegexOptions.Compiled
     );
 
@@ -103,6 +121,118 @@ public static class Ansi
     public static string Strip(string text) => AnsiPattern.Replace(text, "");
 
     public static int VisibleLength(string text) => Strip(text).Length;
+
+    /// <summary>
+    /// Length in display columns assuming a tab stop every <paramref name="tabStop"/>
+    /// columns starting at <paramref name="startCol"/>. ANSI escapes are zero-width.
+    /// </summary>
+    public static int VisibleColumns(string text, int tabStop = 8, int startCol = 0)
+    {
+        string visible = Strip(text);
+        int col = startCol;
+        foreach (char c in visible)
+        {
+            if (c == '\t')
+            {
+                int next = (col / tabStop + 1) * tabStop;
+                col = next;
+            }
+            else
+            {
+                col++;
+            }
+        }
+        return col - startCol;
+    }
+
+    /// <summary>
+    /// Replace tab characters with the equivalent number of spaces, aligning
+    /// to a tab stop every <paramref name="tabStop"/> columns starting at
+    /// <paramref name="startCol"/>. ANSI escapes pass through unchanged.
+    /// </summary>
+    public static string ExpandTabs(string text, int tabStop = 8, int startCol = 0)
+    {
+        if (string.IsNullOrEmpty(text) || text.IndexOf('\t') < 0) return text;
+
+        var sb = new StringBuilder(text.Length + 8);
+        int col = startCol;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+
+            // Pass ANSI sequences through verbatim (and don't count them).
+            if (c == '\x1b')
+            {
+                int matchStart = i;
+                var m = AnsiPattern.Match(text, i);
+                if (m.Success && m.Index == matchStart)
+                {
+                    sb.Append(text, m.Index, m.Length);
+                    i = m.Index + m.Length - 1;
+                    continue;
+                }
+            }
+
+            if (c == '\t')
+            {
+                int next = (col / tabStop + 1) * tabStop;
+                int spaces = next - col;
+                if (spaces <= 0) spaces = tabStop;
+                sb.Append(' ', spaces);
+                col = next;
+            }
+            else
+            {
+                sb.Append(c);
+                col++;
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Truncate a string to at most <paramref name="maxVisible"/> visible
+    /// columns while preserving any ANSI escape sequences inside the text.
+    /// Appends an ellipsis when truncation occurs. Returns the original
+    /// string unchanged if it already fits.
+    /// </summary>
+    public static string TruncateVisible(string text, int maxVisible, string ellipsis = "\u2026")
+    {
+        if (string.IsNullOrEmpty(text) || maxVisible <= 0)
+            return maxVisible <= 0 ? "" : text ?? "";
+
+        int visible = VisibleLength(text);
+        if (visible <= maxVisible) return text;
+
+        int budget = System.Math.Max(0, maxVisible - ellipsis.Length);
+        var sb = new StringBuilder(text.Length);
+        int taken = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+
+            if (c == '\x1b')
+            {
+                var m = AnsiPattern.Match(text, i);
+                if (m.Success && m.Index == i)
+                {
+                    sb.Append(text, m.Index, m.Length);
+                    i = m.Index + m.Length - 1;
+                    continue;
+                }
+            }
+
+            if (taken >= budget) break;
+            sb.Append(c);
+            taken++;
+        }
+
+        sb.Append(ellipsis);
+        // Defensive reset so the truncated suffix doesn't bleed colour into
+        // the rest of the rendered line.
+        sb.Append(Reset);
+        return sb.ToString();
+    }
 
     public static string Colorize(string text, string fg) => $"{fg}{text}{Reset}";
 

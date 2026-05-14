@@ -3,8 +3,12 @@
 # Works on: Linux, macOS, Windows (native + MSYS2/Git-Bash), Termux
 
 PROJECT := src/AurShell.csproj
+UPDATE_PROJECT := src/aursh-update/AurShUpdate.csproj
 BIN_DIR := bin
 APP_NAME := aursh
+UPDATE_APP_NAME := aursh-update
+FONTS_DIR := Assets/fonts
+FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 1.5.0
 
 # ──────────────────────────────────────────────
@@ -69,6 +73,7 @@ PS := powershell -NoProfile -NoLogo -Command
 ifeq ($(DETECTED_OS),Windows)
     RID := win-$(ARCH)
     EXE := $(APP_NAME).exe
+    UPDATE_EXE := $(UPDATE_APP_NAME).exe
     INSTALL_DIR := C:/Program Files/AurShell
     USER_INSTALL_DIR := $(subst \,/,$(LOCALAPPDATA))/AurShell
     ifeq ($(USER_INSTALL_DIR),/AurShell)
@@ -79,6 +84,7 @@ ifeq ($(DETECTED_OS),Windows)
 else ifeq ($(DETECTED_OS),macOS)
     RID := osx-$(ARCH)
     EXE := $(APP_NAME)
+    UPDATE_EXE := $(UPDATE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -86,6 +92,7 @@ else ifeq ($(DETECTED_OS),macOS)
 else ifeq ($(DETECTED_OS),Termux)
     RID := linux-$(ARCH)
     EXE := $(APP_NAME)
+    UPDATE_EXE := $(UPDATE_APP_NAME)
     INSTALL_DIR := $(PREFIX)/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -93,6 +100,7 @@ else ifeq ($(DETECTED_OS),Termux)
 else
     RID := linux-$(ARCH)
     EXE := $(APP_NAME)
+    UPDATE_EXE := $(UPDATE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -103,7 +111,7 @@ endif
 # Targets
 # ──────────────────────────────────────────────
 
-.PHONY: all build release publish install install-user uninstall clean run info help
+.PHONY: all build release publish install install-user uninstall clean run info help setfont
 
 all: build
 
@@ -121,6 +129,7 @@ ifeq ($(WIN_ENV),native)
 	@echo   make uninstall      Remove installed binary
 	@echo   make clean          Remove all build artifacts
 	@echo   make run            Build and launch interactive shell
+	@echo   make setfont        Install JetBrains Mono NL Nerd Font on this OS
 	@echo   make info           Show detected platform info
 	@echo   make help           Show this help
 	@cmd /c "echo."
@@ -140,6 +149,7 @@ else
 	@echo "  make uninstall      Remove from system directory"
 	@echo "  make clean          Remove all build artifacts"
 	@echo "  make run            Build and launch interactive shell"
+	@echo "  make setfont        Install JetBrains Mono NL Nerd Font on this OS"
 	@echo "  make info           Show detected platform info"
 	@echo "  make help           Show this help"
 	@echo ""
@@ -196,9 +206,10 @@ publish:
 ifeq ($(WIN_ENV),native)
 	@echo [publish] Publishing self-contained $(RID) binary...
 	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
-	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE)
+	dotnet publish $(UPDATE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-update/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
+	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE)
 else
-	@echo "[publish] Publishing self-contained $(RID) binary..."
+	@echo "[publish] Publishing self-contained $(RID) binaries..."
 	dotnet publish $(PROJECT) \
 		-c Release \
 		-r $(RID) \
@@ -210,7 +221,18 @@ else
 		-p:PublishTrimmed=true \
 		-p:IncludeNativeLibrariesForSelfExtract=true \
 		-o $(PUBLISH_DIR)
-	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE)"
+	dotnet publish $(UPDATE_PROJECT) \
+		-c Release \
+		-r $(RID) \
+		--self-contained true \
+		-p:OutputPath=obj/publish-build-update/ \
+		-p:AppendTargetFrameworkToOutputPath=true \
+		-p:AppendRuntimeIdentifierToOutputPath=true \
+		-p:PublishSingleFile=true \
+		-p:PublishTrimmed=true \
+		-p:IncludeNativeLibrariesForSelfExtract=true \
+		-o $(PUBLISH_DIR)
+	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE)"
 endif
 
 # ──────────────────────────────────────────────
@@ -222,7 +244,8 @@ ifeq ($(WIN_ENV),native)
 	@echo [install] Installing to $(INSTALL_DIR)...
 	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
-	@echo [install] Installed to $(INSTALL_DIR)/$(EXE)
+	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force"
+	@echo [install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@cmd /c "echo."
@@ -230,7 +253,8 @@ else ifeq ($(DETECTED_OS),Windows)
 	@echo "[install] Installing to $(INSTALL_DIR)..."
 	mkdir -p "$(INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
-	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE)"
+	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
+	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@echo ""
@@ -238,6 +262,7 @@ else
 	@echo "[install] Installing to $(INSTALL_DIR)/$(EXE)..."
 	install -d "$(INSTALL_DIR)"
 	install -m 755 "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
+	install -m 755 "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
 	@if [ -w "$(PREFIX)/etc/shells" ] && ! grep -Fxq "$(INSTALL_DIR)/$(EXE)" "$(PREFIX)/etc/shells"; then \
 		echo "$(INSTALL_DIR)/$(EXE)" >> "$(PREFIX)/etc/shells"; \
 		echo "[install] Added $(INSTALL_DIR)/$(EXE) to $(PREFIX)/etc/shells"; \
@@ -245,8 +270,8 @@ else
 		echo "$(INSTALL_DIR)/$(EXE)" >> /etc/shells; \
 		echo "[install] Added $(INSTALL_DIR)/$(EXE) to /etc/shells"; \
 	fi
-	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE)"
-	@echo "[install] Run 'aursh' to start."
+	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)"
+	@echo "[install] Run 'aursh' to start, or 'sudo aursh-update' to update."
 endif
 
 install-user: publish
@@ -254,7 +279,8 @@ ifeq ($(WIN_ENV),native)
 	@echo [install] Installing to $(USER_INSTALL_DIR)/$(EXE)...
 	@$(PS) "New-Item -Path '$(USER_INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE)' -Force"
-	@echo [install] Installed to $(USER_INSTALL_DIR)/$(EXE)
+	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force"
+	@echo [install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated. Restart your terminal to use aursh.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
 	@cmd /c "echo."
@@ -263,7 +289,8 @@ else ifeq ($(DETECTED_OS),Windows)
 	@echo "[install] Installing to $(USER_INSTALL_DIR)/$(EXE)..."
 	mkdir -p "$(USER_INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
-	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE)"
+	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated (User). Restart your terminal.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
 	@echo ""
@@ -272,7 +299,9 @@ else
 	@echo "[install] Installing to $(USER_INSTALL_DIR)/$(EXE)..."
 	mkdir -p "$(USER_INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
+	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	chmod +x "$(USER_INSTALL_DIR)/$(EXE)"
+	chmod +x "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	@echo ""
 	@if echo "$$PATH" | grep -q "$(USER_INSTALL_DIR)"; then \
 		echo "[install] $(USER_INSTALL_DIR) is already in PATH."; \
@@ -289,17 +318,23 @@ uninstall:
 ifeq ($(WIN_ENV),native)
 	@echo [uninstall] Removing aursh...
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE)') { Remove-Item '$(INSTALL_DIR)/$(EXE)' -Force }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE)') { Remove-Item '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force }"
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE)') { Remove-Item '$(USER_INSTALL_DIR)/$(EXE)' -Force }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)') { Remove-Item '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force }"
 	@echo [uninstall] Done.
 else ifeq ($(DETECTED_OS),Windows)
 	@echo "[uninstall] Removing aursh..."
 	rm -f "$(INSTALL_DIR)/$(EXE)"
+	rm -f "$(INSTALL_DIR)/$(UPDATE_EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(EXE)"
+	rm -f "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	@echo "[uninstall] Done."
 else
 	@echo "[uninstall] Removing aursh..."
 	rm -f "$(INSTALL_DIR)/$(EXE)"
+	rm -f "$(INSTALL_DIR)/$(UPDATE_EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(EXE)"
+	rm -f "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	@echo "[uninstall] Done."
 endif
 
@@ -321,18 +356,88 @@ ifeq ($(WIN_ENV),native)
 	@echo [clean] Removing build artifacts...
 	-@dotnet clean $(PROJECT) -c Debug --nologo -v q 2>nul
 	-@dotnet clean $(PROJECT) -c Release --nologo -v q 2>nul
+	-@dotnet clean $(UPDATE_PROJECT) -c Debug --nologo -v q 2>nul
+	-@dotnet clean $(UPDATE_PROJECT) -c Release --nologo -v q 2>nul
 	@$(PS) "if (Test-Path '$(BIN_DIR)') { Remove-Item '$(BIN_DIR)/*' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'publish') { Remove-Item 'publish' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/obj') { Remove-Item 'src/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/bin') { Remove-Item 'src/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path 'src/aursh-update/obj') { Remove-Item 'src/aursh-update/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path 'src/aursh-update/bin') { Remove-Item 'src/aursh-update/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@echo [clean] Done.
 else
 	@echo "[clean] Removing build artifacts..."
 	dotnet clean $(PROJECT) -c Debug --nologo -v q 2>/dev/null || true
 	dotnet clean $(PROJECT) -c Release --nologo -v q 2>/dev/null || true
+	dotnet clean $(UPDATE_PROJECT) -c Debug --nologo -v q 2>/dev/null || true
+	dotnet clean $(UPDATE_PROJECT) -c Release --nologo -v q 2>/dev/null || true
 	rm -rf $(BIN_DIR)/* 2>/dev/null || true
 	rm -rf publish 2>/dev/null || true
 	rm -rf src/obj 2>/dev/null || true
 	rm -rf src/bin 2>/dev/null || true
+	rm -rf src/aursh-update/obj 2>/dev/null || true
+	rm -rf src/aursh-update/bin 2>/dev/null || true
 	@echo "[clean] Done."
+endif
+
+# ──────────────────────────────────────────────
+# Font Installation
+# ──────────────────────────────────────────────
+# Installs JetBrains Mono NL Nerd Font (bundled in Assets/fonts) into the
+# current user's font directory and refreshes the font cache. Tells the user
+# how to apply it to their terminal — we intentionally do NOT mutate global
+# OS settings, that's too invasive.
+
+setfont:
+ifeq ($(WIN_ENV),native)
+	@echo [setfont] Installing $(FONT_FILE)...
+	@$(PS) "$$src = '$(FONTS_DIR)/$(FONT_FILE)'; if (-not (Test-Path $$src)) { Write-Error \"Font file not found: $$src\"; exit 1 }; $$dst = \"$$env:LOCALAPPDATA\Microsoft\Windows\Fonts\"; New-Item -Path $$dst -ItemType Directory -Force | Out-Null; Copy-Item -Path $$src -Destination $$dst -Force; $$dstFile = Join-Path $$dst (Split-Path $$src -Leaf); $$regPath = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'; New-ItemProperty -Path $$regPath -Name 'JetBrainsMono NL Nerd Font Light (TrueType)' -Value $$dstFile -PropertyType String -Force | Out-Null; Write-Host \"  Installed: $$dstFile\"; Write-Host ''; Write-Host '  To use in Windows Terminal, edit settings.json and set:'; Write-Host '      \"fontFace\": \"JetBrainsMono NL Nerd Font\"'; Write-Host '  Or right-click Windows Terminal title bar > Settings > Defaults > Appearance > Font face.'"
+else ifeq ($(DETECTED_OS),Windows)
+	@echo "[setfont] Installing $(FONT_FILE)..."
+	@if [ ! -f "$(FONTS_DIR)/$(FONT_FILE)" ]; then echo "[setfont] Font file not found: $(FONTS_DIR)/$(FONT_FILE)"; exit 1; fi
+	@powershell.exe -NoProfile -Command "$$src = '$(FONTS_DIR)/$(FONT_FILE)'; $$dst = \"$$env:LOCALAPPDATA\Microsoft\Windows\Fonts\"; New-Item -Path $$dst -ItemType Directory -Force | Out-Null; Copy-Item -Path $$src -Destination $$dst -Force; $$dstFile = Join-Path $$dst (Split-Path $$src -Leaf); $$regPath = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'; New-ItemProperty -Path $$regPath -Name 'JetBrainsMono NL Nerd Font Light (TrueType)' -Value $$dstFile -PropertyType String -Force | Out-Null; Write-Host \"  Installed: $$dstFile\""
+	@echo ""
+	@echo "  To use in Windows Terminal, edit settings.json and set:"
+	@echo '      "fontFace": "JetBrainsMono NL Nerd Font"'
+	@echo ""
+else ifeq ($(DETECTED_OS),macOS)
+	@echo "[setfont] Installing $(FONT_FILE)..."
+	@if [ ! -f "$(FONTS_DIR)/$(FONT_FILE)" ]; then echo "[setfont] Font file not found: $(FONTS_DIR)/$(FONT_FILE)"; exit 1; fi
+	@mkdir -p "$(HOME)/Library/Fonts"
+	@cp -f "$(FONTS_DIR)/$(FONT_FILE)" "$(HOME)/Library/Fonts/$(FONT_FILE)"
+	@echo "[setfont] Installed: $(HOME)/Library/Fonts/$(FONT_FILE)"
+	@echo ""
+	@echo "  To use in Terminal.app:    Preferences > Profiles > Text > Change font"
+	@echo "  To use in iTerm2:          Preferences > Profiles > Text > Font"
+	@echo "  Pick 'JetBrainsMono NL Nerd Font'."
+	@echo ""
+else ifeq ($(DETECTED_OS),Termux)
+	@echo "[setfont] Installing $(FONT_FILE) as Termux font..."
+	@if [ ! -f "$(FONTS_DIR)/$(FONT_FILE)" ]; then echo "[setfont] Font file not found: $(FONTS_DIR)/$(FONT_FILE)"; exit 1; fi
+	@mkdir -p "$(HOME)/.termux"
+	@cp -f "$(FONTS_DIR)/$(FONT_FILE)" "$(HOME)/.termux/font.ttf"
+	@echo "[setfont] Installed: $(HOME)/.termux/font.ttf"
+	@echo ""
+	@echo "  Run 'termux-reload-settings' to apply."
+	@echo ""
+else
+	@echo "[setfont] Installing $(FONT_FILE)..."
+	@if [ ! -f "$(FONTS_DIR)/$(FONT_FILE)" ]; then echo "[setfont] Font file not found: $(FONTS_DIR)/$(FONT_FILE)"; exit 1; fi
+	@mkdir -p "$(HOME)/.local/share/fonts"
+	@cp -f "$(FONTS_DIR)/$(FONT_FILE)" "$(HOME)/.local/share/fonts/$(FONT_FILE)"
+	@echo "[setfont] Installed: $(HOME)/.local/share/fonts/$(FONT_FILE)"
+	@if command -v fc-cache >/dev/null 2>&1; then \
+		echo "[setfont] Rebuilding font cache (fc-cache -f)..."; \
+		fc-cache -f "$(HOME)/.local/share/fonts" || true; \
+	else \
+		echo "[setfont] fc-cache not found; install 'fontconfig' for automatic cache refresh."; \
+	fi
+	@echo ""
+	@echo "  To use it, set your terminal's font to 'JetBrainsMono NL Nerd Font':"
+	@echo "    GNOME Terminal:  Preferences > Profile > Text > Custom font"
+	@echo "    Konsole:         Settings > Edit Profile > Appearance > Font"
+	@echo "    Alacritty:       set font.normal.family in ~/.config/alacritty/alacritty.toml"
+	@echo "    Kitty:           set font_family in ~/.config/kitty/kitty.conf"
+	@echo "    WezTerm:         set font in ~/.wezterm.lua"
+	@echo ""
 endif

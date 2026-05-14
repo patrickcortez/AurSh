@@ -83,11 +83,11 @@
   "project": {
     "version": "1.5.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
+      "projectUniqueName": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj",
       "projectName": "Aursh",
-      "projectPath": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\AurShell.csproj",
+      "projectPath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj",
       "packagesPath": "C:\\Users\\Cortez\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Cortez\\Documents\\Projects\\Aurshell\\src\\obj\\",
+      "outputPath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

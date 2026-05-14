@@ -30,6 +30,30 @@ public sealed class BlackBoxLiveRenderer
     private DateTime _lastUpdate = DateTime.MinValue;
     private readonly TimeSpan _minInterval = TimeSpan.FromMilliseconds(33);
 
+    // Active session + writer for the resize callback. Only valid between
+    // Start() and Finish()/Abort(). The resize handler is fired on a
+    // background thread (TerminalSize timer/SIGWINCH), so all access is
+    // guarded by _lock.
+    private BlackBoxSession? _activeSession;
+    private System.IO.TextWriter? _activeWriter;
+    private int _lastRenderedWidth;
+    private LayoutTier _lastRenderedTier;
+    private bool _passthrough;
+    private bool _altScreen;
+    private Action<int, int>? _resizeHandler;
+
+    /// <summary>
+    /// True between an <see cref="EnterAltScreen"/> call and the next
+    /// <see cref="Finish"/>/<see cref="Abort"/>/reset. The output pumps in
+    /// <c>BlackBoxIo</c> check this to decide whether to forward the child's
+    /// bytes raw to the real terminal (alt-screen takeover) or to keep
+    /// streaming them into the box buffer as normal lines.
+    /// </summary>
+    public bool IsAltScreenActive
+    {
+        get { lock (_lock) return _altScreen; }
+    }
+
     public BlackBoxLiveRenderer(BlackBoxRenderer renderer)
     {
         _renderer = renderer;
@@ -47,6 +71,14 @@ public sealed class BlackBoxLiveRenderer
         {
             ResetState();
             _started = true;
+            _passthrough = true;
+            _activeSession = session;
+            _activeWriter = writer;
+            _lastRenderedWidth = TerminalSize.Width;
+            _lastRenderedTier = _renderer.Tier;
+            // Don't subscribe to resize in passthrough mode: the child
+            // process owns the screen between header and footer, so we'd
+            // have nothing to redraw without corrupting its output.
             _renderer.RenderHeaderOnly(session, writer);
         }
     }
@@ -70,6 +102,9 @@ public sealed class BlackBoxLiveRenderer
             catch { }
 
             _renderer.RenderFooterOnly(session, writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -83,6 +118,10 @@ public sealed class BlackBoxLiveRenderer
         {
             ResetState();
             _started = true;
+            _activeSession = session;
+            _activeWriter = writer;
+            _lastRenderedWidth = TerminalSize.Width;
+            _lastRenderedTier = _renderer.Tier;
             HideCursor(writer);
 
             var sb = new StringBuilder();
@@ -96,6 +135,8 @@ public sealed class BlackBoxLiveRenderer
             writer.Flush();
             _footerEmitted = true;
             _lastUpdate = DateTime.UtcNow;
+
+            AttachResize();
         }
     }
 
@@ -104,9 +145,40 @@ public sealed class BlackBoxLiveRenderer
         lock (_lock)
         {
             if (!_started || _completed) return;
+            // Once the child has taken over the alt screen, the box header
+            // is already drawn and a child app is owning the display. We
+            // must NOT keep painting body rows over its UI.
+            if (_altScreen) return;
             if ((DateTime.UtcNow - _lastUpdate) < _minInterval) return;
             EmitPending(session, writer);
             _lastUpdate = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Called by the byte pump when it detects that the child process has
+    /// entered the terminal's alternate screen buffer (DECSET 1049/1047/47).
+    /// Drains any pending body rows into the box, then suspends further body
+    /// emission so the child's TUI can take over the display unobstructed.
+    /// The footer continues to be re-emitted by <see cref="Finish"/> once the
+    /// child exits, so the user still sees "exit:N <elapsed>" afterwards.
+    /// </summary>
+    public void EnterAltScreen(BlackBoxSession session, System.IO.TextWriter writer)
+    {
+        lock (_lock)
+        {
+            if (!_started || _completed) return;
+            if (_altScreen) return;
+
+            // Flush whatever rows we had buffered up to the alt-screen entry.
+            try { EmitPending(session, writer); } catch { }
+
+            _altScreen = true;
+            // Show the cursor again so the child app's cursor positioning
+            // is visible. The child is expected to manage cursor state from
+            // here on (it will re-hide if it wants to).
+            ShowCursor(writer);
+            try { writer.Flush(); } catch { }
         }
     }
 
@@ -127,10 +199,28 @@ public sealed class BlackBoxLiveRenderer
             if (!_started || _completed) return;
             _completed = true;
 
+            if (_altScreen)
+            {
+                // The child used the alternate screen buffer. Emit the
+                // standard DECRST sequence to leave it so the terminal
+                // switches back to the main buffer where our box header
+                // and body rows live, then emit the footer below them.
+                try
+                {
+                    writer.Write("\x1b[?1049l");
+                    writer.Flush();
+                }
+                catch { }
+                _altScreen = false;
+            }
+
             // Drain any remaining body rows and emit the final footer (with
             // exit code / elapsed time).
             EmitPending(session, writer);
             ShowCursor(writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -141,9 +231,24 @@ public sealed class BlackBoxLiveRenderer
             if (!_started) { ShowCursor(writer); return; }
             if (_completed) return;
             _completed = true;
+
+            if (_altScreen)
+            {
+                try
+                {
+                    writer.Write("\x1b[?1049l");
+                    writer.Flush();
+                }
+                catch { }
+                _altScreen = false;
+            }
+
             session.MarkAborted();
             EmitPending(session, writer);
             ShowCursor(writer);
+            DetachResize();
+            _activeSession = null;
+            _activeWriter = null;
         }
     }
 
@@ -196,6 +301,61 @@ public sealed class BlackBoxLiveRenderer
         _emittedBodyRows = 0;
         _footerEmitted = false;
         _lastUpdate = DateTime.MinValue;
+        _passthrough = false;
+        _altScreen = false;
+        _lastRenderedWidth = 0;
+        _lastRenderedTier = LayoutTier.Full;
+        DetachResize();
+    }
+
+    private void AttachResize()
+    {
+        if (_resizeHandler != null) return;
+        _resizeHandler = (_, _) => OnTerminalResized();
+        TerminalSize.Changed += _resizeHandler;
+    }
+
+    private void DetachResize()
+    {
+        if (_resizeHandler == null) return;
+        TerminalSize.Changed -= _resizeHandler;
+        _resizeHandler = null;
+    }
+
+    /// <summary>
+    /// Called on a background thread when the terminal is resized. Triggers
+    /// a redraw of the *body and footer* of the current box at the new
+    /// width. The header and any rows already past the viewport stay at
+    /// their old width — we cannot retroactively edit terminal scrollback,
+    /// so trying to reflow them would produce visible corruption.
+    /// </summary>
+    private void OnTerminalResized()
+    {
+        lock (_lock)
+        {
+            if (!_started || _completed) return;
+            if (_passthrough) return; // child owns the screen
+            BlackBoxSession? session = _activeSession;
+            System.IO.TextWriter? writer = _activeWriter;
+            if (session == null || writer == null) return;
+
+            int newWidth = TerminalSize.Width;
+            LayoutTier newTier = _renderer.Tier;
+            if (newWidth == _lastRenderedWidth && newTier == _lastRenderedTier) return;
+
+            // Force a redraw of every body row already emitted PLUS the
+            // footer, all at the new width. We can't retroactively rewrite
+            // rows already in terminal scrollback, but for rows still
+            // inside the viewport this gives a clean reflow.
+            try
+            {
+                _emittedBodyRows = 0;
+                EmitPending(session, writer);
+                _lastRenderedWidth = newWidth;
+                _lastRenderedTier = newTier;
+            }
+            catch { /* writer may have been disposed mid-resize */ }
+        }
     }
 
     private void HideCursor(System.IO.TextWriter writer)

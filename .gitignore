@@ -5,3 +5,5 @@ publish/win-x64/*
 nupkg
 problems.txt
 src/obj/*
+src/aursh-update/obj/*
+src/aursh-update/bin/*

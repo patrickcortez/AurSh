@@ -103,4 +103,4 @@ To uninstall you can simply run `make uninstall`.
 
 ## LICENSE
 
-This project is under GNU General Public License, see license file for more information.
+This project is under GNU General Public License, see [license](/LICENSE) file for more information.

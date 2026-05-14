@@ -48,16 +48,15 @@ internal static class Program
 
     private static int PrintHelp()
     {
-        Console.WriteLine("aursh-update — standalone AurShell updater\n");
+        Console.WriteLine("AurSh Update Manager\n");
         Console.WriteLine("Usage:");
-        Console.WriteLine("  aursh-update                       Pull latest and reinstall.");
-        Console.WriteLine("  aursh-update set <path-to-repo>    Remember the AurSh git checkout to update from.");
-        Console.WriteLine("  aursh-update change <branch>       Switch the configured repo to <branch> immediately.");
-        Console.WriteLine("  aursh-update check                 Report how many commits behind the local clone is.");
-        Console.WriteLine("  aursh-update where                 Print the currently configured repo path + branch.");
+        Console.WriteLine("  aursh-update                       Check for updates and install the latest version.");
+        Console.WriteLine("  aursh-update set <path>            Set the source directory for AurSh updates.");
+        Console.WriteLine("  aursh-update change <channel>      Switch the update channel (e.g., main, beta).");
+        Console.WriteLine("  aursh-update check                 Check if a newer version is available.");
+        Console.WriteLine("  aursh-update where                 Display the current update source and channel.");
         Console.WriteLine("");
-        Console.WriteLine("Run under sudo (or as Administrator on Windows) if the install");
-        Console.WriteLine("location requires elevated privileges:");
+        Console.WriteLine("Note: Run under sudo (or as Administrator on Windows) to apply system-wide updates:");
         Console.WriteLine("");
         Console.WriteLine("  sudo aursh-update");
         return 0;
@@ -68,20 +67,20 @@ internal static class Program
         string? repo = GetUpdateRepoPath();
         if (string.IsNullOrEmpty(repo))
         {
-            Console.Error.WriteLine("aursh-update: no repository configured. Run 'aursh-update set <path>' first.");
+            Console.Error.WriteLine("aursh-update: no update source configured. Run 'aursh-update set <path>' first.");
             return 1;
         }
-        Console.WriteLine(repo);
+        Console.WriteLine($"Update Source: {repo}");
         string? branch = GetUpdateBranch();
         if (!string.IsNullOrEmpty(branch))
-            Console.WriteLine($"branch: {branch}");
+            Console.WriteLine($"Update Channel: {branch}");
         return 0;
     }
 
     private static int SetRepo(string[] args)
     {
         if (args.Length < 2)
-            return Fail("aursh-update set <path-to-repo>");
+            return Fail("aursh-update set <path>");
 
         string path = Path.GetFullPath(args[1]);
         if (!Directory.Exists(path))
@@ -91,7 +90,7 @@ internal static class Program
             return 1;
 
         SetUpdateRepoPath(path);
-        Console.WriteLine($"Update repository set to: {path}");
+        Console.WriteLine($"Update source successfully set to: {path}");
         return 0;
     }
 
@@ -99,57 +98,51 @@ internal static class Program
     {
         string? repoPath = GetUpdateRepoPath();
         if (string.IsNullOrEmpty(repoPath))
-            return Fail("no repository set. Use 'aursh-update set <path>'.");
+            return Fail("no update source set. Use 'aursh-update set <path>'.");
 
         if (!Directory.Exists(repoPath))
-            return Fail($"repository directory '{repoPath}' not found.");
+            return Fail($"update source directory '{repoPath}' not found.");
 
-        RunGit(repoPath, "fetch");
+        RunGit(repoPath, "fetch --quiet");
 
-        // Prefer the explicit branch from update_configs.txt, then the
-        // currently checked-out branch, then main/master as last resort.
         string branch = ResolveUpdateBranch(repoPath);
         string behind = RunGitOutput(repoPath, $"rev-list HEAD..origin/{branch} --count");
 
         if (!int.TryParse(behind, out int count))
-            return Fail($"failed to check remote status against origin/{branch}.");
+            return Fail($"failed to check update status against channel '{branch}'.");
 
         Console.WriteLine(count == 0
-            ? $"AurShell is up to date (origin/{branch})."
-            : $"AurShell is {count} commit(s) behind origin/{branch}.");
+            ? $"AurShell is up to date on channel '{branch}'."
+            : $"AurShell has {count} update(s) available on channel '{branch}'. Run 'aursh-update' to install.");
         return 0;
     }
 
     private static int ChangeBranch(string[] args)
     {
         if (args.Length < 2)
-            return Fail("aursh-update change <branch-name>");
+            return Fail("aursh-update change <channel>");
 
         string branch = args[1].Trim();
         if (string.IsNullOrEmpty(branch))
-            return Fail("branch name is empty.");
+            return Fail("channel name is empty.");
         if (branch.IndexOfAny(new[] { ' ', '\t', ',', '\n', '\r' }) >= 0)
-            return Fail($"branch name '{branch}' contains invalid whitespace or commas.");
+            return Fail($"channel name '{branch}' contains invalid whitespace or commas.");
 
         string? repoPath = GetUpdateRepoPath();
         if (string.IsNullOrEmpty(repoPath))
-            return Fail("no repository set. Use 'aursh-update set <path>' first.");
+            return Fail("no update source set. Use 'aursh-update set <path>' first.");
         if (!Directory.Exists(repoPath))
-            return Fail($"repository directory '{repoPath}' not found.");
+            return Fail($"update source directory '{repoPath}' not found.");
 
-        // Make sure the remote has heard of the requested branch before we
-        // switch. `git fetch` is cheap; this also lets `checkout <branch>`
-        // succeed if the branch only exists on the remote.
-        RunGit(repoPath, "fetch origin");
+        RunGit(repoPath, "fetch origin --quiet");
 
-        Console.WriteLine($"Switching {repoPath} to branch '{branch}'...");
-        int rc = RunGit(repoPath, $"checkout {branch}");
+        Console.WriteLine($"Switching update channel to '{branch}'...");
+        int rc = RunGit(repoPath, $"checkout {branch} --quiet");
         if (rc != 0)
-            return Fail($"git checkout {branch} failed (exit {rc}).");
+            return Fail($"failed to switch to channel '{branch}'.");
 
-        // Persist so subsequent `check` / `update` runs use this branch.
         SetUpdateBranch(branch);
-        Console.WriteLine($"Now on branch '{branch}'. Stored in update_configs.txt.");
+        Console.WriteLine($"Update channel is now set to '{branch}'.");
         return 0;
     }
 
@@ -174,19 +167,19 @@ internal static class Program
     {
         string? sourceDir = ResolveSourceDir();
         if (string.IsNullOrEmpty(sourceDir))
-            return Fail("no repository set. Use 'aursh-update set <path>'.");
+            return Fail("no update source set. Use 'aursh-update set <path>'.");
 
         if (!Directory.Exists(sourceDir))
-            return Fail($"repository directory '{sourceDir}' not found.");
+            return Fail($"update source directory '{sourceDir}' not found.");
 
         string branch = ResolveUpdateBranch(sourceDir);
-        Console.WriteLine($"Updating AurShell from {sourceDir} (branch '{branch}')...");
+        Console.WriteLine($"Synchronizing updates from channel '{branch}'...");
 
-        int pullCode = RunGit(sourceDir, $"pull origin {branch}");
+        int pullCode = RunGit(sourceDir, $"pull origin {branch} --quiet");
         if (pullCode != 0)
-            return Fail($"git pull origin {branch} failed.");
+            return Fail($"failed to download updates from channel '{branch}'.");
 
-        Console.WriteLine("Installing AurShell...");
+        Console.WriteLine("Installing AurShell updates...");
         bool useMake = File.Exists(Path.Combine(sourceDir, "Makefile"));
         string installExe = useMake ? "make" : "dotnet";
         string installArgs = useMake
@@ -195,9 +188,9 @@ internal static class Program
 
         int installCode = RunForeground(sourceDir, installExe, installArgs);
         if (installCode != 0)
-            return Fail("install failed.");
+            return Fail("installation failed.");
 
-        Console.WriteLine("Update complete.");
+        Console.WriteLine("AurShell Update complete!");
         return 0;
     }
 
@@ -223,7 +216,7 @@ internal static class Program
     {
         if (!Directory.Exists(Path.Combine(path, ".git")))
         {
-            Console.Error.WriteLine($"aursh-update: '{path}' is not a git repository.");
+            Console.Error.WriteLine($"aursh-update: '{path}' is not a valid update source.");
             return false;
         }
 
@@ -247,7 +240,7 @@ internal static class Program
             }
         }
 
-        Console.Error.WriteLine($"aursh-update: repository does not have the expected remote ({ExpectedRemote}).");
+        Console.Error.WriteLine($"aursh-update: source directory must be tied to the official AurSh project ({ExpectedRemote}).");
         return false;
     }
 
@@ -357,7 +350,6 @@ internal static class Program
 
     private static void SetUpdateRepoPath(string path)
     {
-        Directory.CreateDirectory(ConfigDirectory);
         WriteConfigField("path", path);
     }
 
@@ -369,7 +361,6 @@ internal static class Program
 
     private static void SetUpdateBranch(string branch)
     {
-        Directory.CreateDirectory(ConfigDirectory);
         WriteConfigField("branch", branch);
     }
 
@@ -427,11 +418,6 @@ internal static class Program
 
         entries[key] = value;
 
-        // Serialize one `key=value,` pair per line. `path` is always
-        // written first (when present) so it sits at the top of the file
-        // as the most-important field; `branch` follows next when set so
-        // it appears "a line below repo path". Any other future keys are
-        // appended after, in insertion order.
         var ordered = new List<KeyValuePair<string, string>>();
         if (entries.TryGetValue("path", out string? p)) ordered.Add(new("path", p));
         if (entries.TryGetValue("branch", out string? b)) ordered.Add(new("branch", b));
@@ -439,7 +425,7 @@ internal static class Program
         {
             if (kv.Key.Equals("path", StringComparison.OrdinalIgnoreCase)) continue;
             if (kv.Key.Equals("branch", StringComparison.OrdinalIgnoreCase)) continue;
-            ordered.Add(new(kv.Key, kv.Value));
+            ordered.Add(new KeyValuePair<string, string>(kv.Key, kv.Value));
         }
 
         var sb = new System.Text.StringBuilder();
@@ -451,26 +437,24 @@ internal static class Program
             sb.Append(',');
             sb.Append('\n');
         }
-        File.WriteAllText(UpdateConfigPath, sb.ToString());
+
+        try
+        {
+            Directory.CreateDirectory(ConfigDirectory);
+            File.WriteAllText(UpdateConfigPath, sb.ToString());
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"\naursh-update: Permission denied writing to {UpdateConfigPath}");
+            Console.Error.WriteLine("Please run this command with 'sudo' or as Administrator to modify the system-wide configuration.");
+            Environment.Exit(1);
+        }
     }
 
     /// <summary>
-    /// Mirror of AurShell.Utils.Platform.ConfigDirectory so that aursh-update
-    /// reads/writes the same config file the main shell does.
+    /// Configuration is stored alongside the updater executable (e.g. C:\Program Files\AurShell)
+    /// to ensure the configured update repository is system-wide and accessible regardless 
+    /// of whether it is run with elevated privileges (sudo/Admin) or not.
     /// </summary>
-    private static string ConfigDirectory
-    {
-        get
-        {
-            if (OperatingSystem.IsWindows())
-            {
-                string? ad = Environment.GetEnvironmentVariable("APPDATA");
-                if (!string.IsNullOrEmpty(ad)) return Path.Combine(ad, "aurshell");
-            }
-            string? xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
-            if (!string.IsNullOrEmpty(xdg)) return Path.Combine(xdg, "aurshell");
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            return Path.Combine(home, ".config", "aurshell");
-        }
-    }
+    private static string ConfigDirectory => AppContext.BaseDirectory;
 }

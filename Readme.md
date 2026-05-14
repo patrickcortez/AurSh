@@ -36,7 +36,7 @@ Has:
 - Job control.
 - Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)
 - File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
-- BlackBox: TUI execution viewport that displays processes invoked from the command line in a unicode box with
+- BlackBox: TUI execution viewport that displays processes invoked from the command line inside a unicode box with
 round edges.
 - Updater: A tool to update the shell from the remote repository.
 

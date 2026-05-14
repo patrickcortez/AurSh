@@ -29,6 +29,7 @@ public sealed class BlackBoxBuffer
     private readonly List<BufferLine> _lines = new();
     private readonly int _capacity;
     private int _topLineIdx;
+    private BufferLine? _partialLine;
 
     public BlackBoxBuffer(int capacity = 5000)
     {
@@ -36,6 +37,12 @@ public sealed class BlackBoxBuffer
     }
 
     public int Count => _lines.Count;
+
+    public BufferLine? PartialLine
+    {
+        get => _partialLine;
+        set => _partialLine = value;
+    }
 
     public int TopLineIdx => _topLineIdx;
 

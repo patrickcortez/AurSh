@@ -26,8 +26,26 @@ public sealed class BlackBoxSession : System.IDisposable
 
     public BlackBoxBuffer Buffer { get; }
 
+    private readonly object _inputLock = new();
+    public string InputLine { get; private set; } = "";
+    public int InputCursor { get; private set; } = 0;
+
     /// <summary>The real terminal stdout, captured at Open() before any redirection.</summary>
     public System.IO.TextWriter TerminalOut { get; }
+
+    public void UpdateInput(string text, int cursor)
+    {
+        lock (_inputLock)
+        {
+            InputLine = text ?? "";
+            InputCursor = cursor;
+        }
+    }
+
+    public (string text, int cursor) GetInput()
+    {
+        lock (_inputLock) return (InputLine, InputCursor);
+    }
 
     public BlackBoxSession(
         int id,

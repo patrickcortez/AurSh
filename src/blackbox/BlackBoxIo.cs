@@ -72,7 +72,7 @@ public static class BlackBoxIo
         if (process.StartInfo.RedirectStandardInput && !userFlags.StdinRedirected)
         {
             stdinCancel = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            stdinTask = ForwardStdinAsync(process, owner.LiveRenderer, stdinCancel.Token);
+            stdinTask = ForwardStdinAsync(process, session, owner.LiveRenderer, stdinCancel.Token);
         }
 
         try
@@ -154,12 +154,19 @@ public static class BlackBoxIo
                         string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
                         ansiTracker.ProcessLine(rawLine);
                         session.Buffer.Append(line, kind, stageIndex);
+                        session.Buffer.PartialLine = null;
                         lineBuf.SetLength(0);
                         owner.LiveRenderer.Update(session, session.TerminalOut);
                         continue;
                     }
 
                     lineBuf.WriteByte(b);
+                    
+                    // Update partial line so the renderer can show it immediately (prompts, etc.)
+                    string partialRaw = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                    string pPrefix = ansiTracker.GetStatePrefix();
+                    session.Buffer.PartialLine = new BufferLine(pPrefix + partialRaw, kind, stageIndex);
+                    owner.LiveRenderer.Update(session, session.TerminalOut);
 
                     if (r == AltScreenResult.Entered)
                     {
@@ -209,6 +216,7 @@ public static class BlackBoxIo
                 string statePrefix = ansiTracker.GetStatePrefix();
                 string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
                 session.Buffer.Append(line, kind, stageIndex);
+                session.Buffer.PartialLine = null;
                 owner.LiveRenderer.Update(session, session.TerminalOut);
             }
         }
@@ -315,10 +323,14 @@ public static class BlackBoxIo
     /// </summary>
     private static async Task ForwardStdinAsync(
         Process process,
+        BlackBoxSession session,
         BlackBoxLiveRenderer liveRenderer,
         CancellationToken cancel)
     {
         TerminalRawMode? rawMode = null;
+        var inputBuilder = new StringBuilder();
+        int cursor = 0;
+
         try
         {
             using var stdin = process.StandardInput;
@@ -353,11 +365,74 @@ public static class BlackBoxIo
 
                     if (key.Key == System.ConsoleKey.Enter)
                     {
-                        try { await stdin.WriteLineAsync().ConfigureAwait(false); } catch { return; }
+                        string line = inputBuilder.ToString();
+                        inputBuilder.Clear();
+                        cursor = 0;
+                        session.UpdateInput("", 0);
+                        
+                        try 
+                        { 
+                            await stdin.WriteLineAsync(line).ConfigureAwait(false); 
+                            session.Buffer.Append(line, LineKind.StdinEcho);
+                            liveRenderer.ForceUpdate(session, session.TerminalOut);
+                        } 
+                        catch { return; }
                     }
-                    else if (key.KeyChar != '\0')
+                    else if (key.Key == System.ConsoleKey.Backspace)
                     {
-                        try { await stdin.WriteAsync(key.KeyChar.ToString()).ConfigureAwait(false); } catch { return; }
+                        if (cursor > 0)
+                        {
+                            cursor--;
+                            inputBuilder.Remove(cursor, 1);
+                            session.UpdateInput(inputBuilder.ToString(), cursor);
+                            liveRenderer.ForceUpdate(session, session.TerminalOut);
+                        }
+                    }
+                    else if (key.Key == System.ConsoleKey.Delete)
+                    {
+                        if (cursor < inputBuilder.Length)
+                        {
+                            inputBuilder.Remove(cursor, 1);
+                            session.UpdateInput(inputBuilder.ToString(), cursor);
+                            liveRenderer.ForceUpdate(session, session.TerminalOut);
+                        }
+                    }
+                    else if (key.Key == System.ConsoleKey.LeftArrow)
+                    {
+                        if (cursor > 0)
+                        {
+                            cursor--;
+                            session.UpdateInput(inputBuilder.ToString(), cursor);
+                            liveRenderer.ForceUpdate(session, session.TerminalOut);
+                        }
+                    }
+                    else if (key.Key == System.ConsoleKey.RightArrow)
+                    {
+                        if (cursor < inputBuilder.Length)
+                        {
+                            cursor++;
+                            session.UpdateInput(inputBuilder.ToString(), cursor);
+                            liveRenderer.ForceUpdate(session, session.TerminalOut);
+                        }
+                    }
+                    else if (key.Key == System.ConsoleKey.Home)
+                    {
+                        cursor = 0;
+                        session.UpdateInput(inputBuilder.ToString(), cursor);
+                        liveRenderer.ForceUpdate(session, session.TerminalOut);
+                    }
+                    else if (key.Key == System.ConsoleKey.End)
+                    {
+                        cursor = inputBuilder.Length;
+                        session.UpdateInput(inputBuilder.ToString(), cursor);
+                        liveRenderer.ForceUpdate(session, session.TerminalOut);
+                    }
+                    else if (key.KeyChar != '\0' && !char.IsControl(key.KeyChar))
+                    {
+                        inputBuilder.Insert(cursor, key.KeyChar);
+                        cursor++;
+                        session.UpdateInput(inputBuilder.ToString(), cursor);
+                        liveRenderer.ForceUpdate(session, session.TerminalOut);
                     }
                 }
                 else

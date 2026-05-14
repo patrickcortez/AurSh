@@ -24,6 +24,8 @@ public sealed class BlackBoxLiveRenderer
     private readonly object _lock = new();
     private int _emittedBodyRows;
     private bool _footerEmitted;
+    private int _lastTransientRows;
+    private int _lastCursorRowOffset;
     private bool _started;
     private bool _completed;
     private bool _cursorHidden;
@@ -134,6 +136,8 @@ public sealed class BlackBoxLiveRenderer
             writer.Write('\n');
             writer.Flush();
             _footerEmitted = true;
+            _lastTransientRows = 1;
+            _lastCursorRowOffset = 0;
             _lastUpdate = DateTime.UtcNow;
 
             AttachResize();
@@ -253,25 +257,36 @@ public sealed class BlackBoxLiveRenderer
     }
 
     /// <summary>
-    /// Move cursor up to overwrite the previously emitted footer, append any
-    /// new body rows that have arrived since the last render, then re-emit the
-    /// footer (which now reflects current elapsed time / final exit code).
+    /// Move cursor up to overwrite the previously emitted footer and active input, append any
+    /// new body rows that have arrived since the last render, then re-emit the active input
+    /// and footer (which now reflects current elapsed time / final exit code).
     /// </summary>
     private void EmitPending(BlackBoxSession session, System.IO.TextWriter writer)
     {
         int bufCount = session.Buffer.Count;
-        bool needFooterRefresh = !_footerEmitted || bufCount > _emittedBodyRows || _completed;
+        var (inputLine, inputCursor) = session.GetInput();
+        var partialLine = session.Buffer.PartialLine;
+        bool hasInput = !string.IsNullOrEmpty(inputLine);
+        bool hasPartial = partialLine != null;
+
+        bool needFooterRefresh = !_footerEmitted || bufCount > _emittedBodyRows || _completed || hasInput || hasPartial;
         if (!needFooterRefresh) return;
 
         var sb = new StringBuilder();
 
         if (_footerEmitted)
         {
-            // Cursor is on the blank line below the previous footer. Move up 1
-            // to land on the footer line itself, then \r to col 0, then clear
-            // from cursor to end of screen. Since the footer is always 1 row,
-            // this MoveCursorUp(1) is always within the viewport.
-            sb.Append(Ansi.MoveCursorUp(1));
+            // If we moved the cursor up to show the input cursor last time, 
+            // move it back down to the baseline (the line below the footer) 
+            // before calculating the move-up to clear the transient area.
+            if (_lastCursorRowOffset > 0)
+            {
+                sb.Append(Ansi.MoveCursorDown(_lastCursorRowOffset));
+                sb.Append('\r');
+            }
+
+            // Move up by the number of transient rows emitted last time (footer + any input rows).
+            sb.Append(Ansi.MoveCursorUp(_lastTransientRows > 0 ? _lastTransientRows : 1));
             sb.Append('\r');
             sb.Append(Ansi.ClearScreenFromCursor);
         }
@@ -285,13 +300,80 @@ public sealed class BlackBoxLiveRenderer
         }
         _emittedBodyRows = bufCount;
 
+        int transientRows = 0;
+        int cursorRowOffset = 0;
+        int cursorColOffset = 0;
+
+        if ((hasInput || hasPartial) && !_completed)
+        {
+            int innerWidth = System.Math.Max(4, _lastRenderedWidth - (_renderer.Tier == LayoutTier.Bar ? 0 : 2));
+            int contentWidth = System.Math.Max(1, innerWidth - 2);
+
+            string partialText = partialLine?.Text ?? "";
+            string fullText = partialText + inputLine;
+            
+            // Calculate physical cursor position based on visible length of the partial line
+            int cursorPhysicalIndex = Ansi.VisibleLength(partialText) + inputCursor;
+
+            var chunks = SplitIntoChunks(fullText, contentWidth);
+            if (chunks.Count == 0) chunks.Add("");
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                var kind = partialLine?.Kind ?? LineKind.Stdout;
+                string renderedRow = _renderer.RenderBodyRowToString(new BufferLine(chunks[i], kind, partialLine?.StageIndex));
+                sb.Append(renderedRow);
+                sb.Append('\n');
+                transientRows++;
+            }
+
+            int cursorChunk = cursorPhysicalIndex / contentWidth;
+            int cursorCol = cursorPhysicalIndex % contentWidth;
+            
+            cursorRowOffset = 1 + (chunks.Count - cursorChunk);
+            cursorColOffset = (_renderer.Tier == LayoutTier.Compact || _renderer.Tier == LayoutTier.Bar) ? cursorCol : cursorCol + 2;
+        }
+
         // Re-emit the footer in its current state.
         sb.Append(_renderer.RenderFooterToString(session));
         sb.Append('\n');
+        transientRows++;
+
+        _lastTransientRows = transientRows;
+        _lastCursorRowOffset = ((hasInput || hasPartial) && !_completed) ? cursorRowOffset : 0;
         _footerEmitted = true;
+
+        if ((hasInput || hasPartial) && !_completed && cursorRowOffset > 0)
+        {
+            sb.Append(Ansi.MoveCursorUp(cursorRowOffset));
+            sb.Append('\r');
+            if (cursorColOffset > 0)
+                sb.Append(Ansi.MoveCursorRight(cursorColOffset));
+        }
 
         writer.Write(sb.ToString());
         writer.Flush();
+
+        if ((hasInput || hasPartial) && !_completed)
+        {
+            ShowCursor(writer);
+        }
+        else
+        {
+            HideCursor(writer);
+        }
+    }
+
+    private List<string> SplitIntoChunks(string text, int chunkLength)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrEmpty(text)) return list;
+        for (int i = 0; i < text.Length; i += chunkLength)
+        {
+            int len = System.Math.Min(chunkLength, text.Length - i);
+            list.Add(text.Substring(i, len));
+        }
+        return list;
     }
 
     private void ResetState()
@@ -300,6 +382,8 @@ public sealed class BlackBoxLiveRenderer
         _started = false;
         _emittedBodyRows = 0;
         _footerEmitted = false;
+        _lastTransientRows = 0;
+        _lastCursorRowOffset = 0;
         _lastUpdate = DateTime.MinValue;
         _passthrough = false;
         _altScreen = false;

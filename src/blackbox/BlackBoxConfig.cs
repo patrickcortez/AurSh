@@ -24,7 +24,8 @@ public sealed class BlackBoxConfig
         "vim", "nvim", "vi", "nano",
         "less", "more", "man",
         "top", "htop", "btop",
-        "fzf", "tmux", "screen", "ssh"
+        "fzf", "tmux", "screen", "ssh",
+        "aursh-cat","aursh-ls","aursh-history show"
     };
 
     public static BlackBoxConfig FromEnvironment()

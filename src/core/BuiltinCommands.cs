@@ -514,10 +514,10 @@ public static class BuiltinCommands
         string about = $@"
         {Ansi.FgBrightCyan}-------------------------------------------------------------------------------------------------------
         
-        {Ansi.FgBrightBlue}                 About:
-                            - This frontend shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
-                            As a cross platform shell with a purpose to make the command-line
-                            look aesthetically pleasing while working. This Shell is under the license of
+                        {Ansi.FgBrightBlue}                 About:
+                           {Ansi.FgBrightBlue} - This frontend shell is developed in C# by {Ansi.FgBrightCyan}Tezzz{Ansi.FgBrightBlue}.
+                           {Ansi.FgBrightBlue} As a cross platform shell with a purpose to make the command-line
+                          {Ansi.FgBrightBlue}  look aesthetically pleasing while working. This Shell is under the license of
                             {Ansi.FgBrightCyan}GNU General Public License.
 
                             {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}

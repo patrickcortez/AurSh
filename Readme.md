@@ -67,11 +67,23 @@ round edges.
 
 **Android**
 
-![Android](/Assets/Images/Screenshot_2026-05-09-21-57-45-17_84d3000e3f4017145260f7618db1d683.jpg)
+![Android](/Assets/Images/Android1.png)
 
 **MacOS**
 
 > (Image Unavailable because I dont own a Mac)
+
+---
+
+## Structure
+
+This repositories structure is relatively simple:
+
+- **Assets** : Contains fonts and images
+- **src** : Contains all the source code
+- **docs** : Contains documentations
+- **scripts** : Contains Helper scripts
+
 
 ---
 

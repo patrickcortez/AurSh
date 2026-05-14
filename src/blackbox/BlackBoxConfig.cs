@@ -3,6 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace AurShell.BlackBoxView;
 
+[JsonSerializable(typeof(BlackBoxConfig.BlackBoxConfigFile))]
+internal partial class BlackBoxConfigJsonContext : JsonSerializerContext
+{
+}
+
 public sealed class BlackBoxConfig
 {
     public BoxStyle Border { get; set; } = BoxStyle.Rounded;
@@ -87,7 +92,7 @@ public sealed class BlackBoxConfig
         };
     }
 
-    private class BlackBoxConfigFile
+    public class BlackBoxConfigFile
     {
         [JsonPropertyName("Blackbox Title")]
         public string? Title { get; set; }
@@ -128,7 +133,12 @@ public sealed class BlackBoxConfig
                     Enabled = true,
                     BorderStyle = "Rounded"
                 };
-                string defaultJson = JsonSerializer.Serialize(defaultData, new JsonSerializerOptions { WriteIndented = true });
+                var writeOptions = new JsonSerializerOptions 
+                { 
+                    WriteIndented = true,
+                    TypeInfoResolver = BlackBoxConfigJsonContext.Default
+                };
+                string defaultJson = JsonSerializer.Serialize(defaultData, writeOptions);
                 File.WriteAllText(configPath, defaultJson);
             }
 
@@ -142,7 +152,8 @@ public sealed class BlackBoxConfig
             {
                 PropertyNameCaseInsensitive = true,
                 AllowTrailingCommas = true,
-                ReadCommentHandling = JsonCommentHandling.Skip
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                TypeInfoResolver = BlackBoxConfigJsonContext.Default
             };
             var fileConfig = JsonSerializer.Deserialize<BlackBoxConfigFile>(json, options);
 
@@ -169,9 +180,9 @@ public sealed class BlackBoxConfig
                 };
             }
         }
-        catch
+        catch(Exception ex)
         {
-            // Ignore errors reading config
+            Console.Error.WriteLine($"{Ansi.FgRed}Aursh: {ex.Message}");
         }
     }
 

@@ -1,6 +1,9 @@
+// The actual json handler of the Contexts
+using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace AurShell.Contexts.Core;
 
@@ -10,7 +13,7 @@ internal static class JsonHandler // Read and Write to json file.
 {
     private static readonly string BaseDirectory = AppContext.BaseDirectory; // .aursh
 
-    public static void WriteToJson(Context[] contexts)
+    public static void WriteToJson(Context context)
     {
         string jsonfile = Path.Combine(BaseDirectory,"Contexts.json");
 
@@ -22,20 +25,28 @@ internal static class JsonHandler // Read and Write to json file.
         JsonSerializerOptions opts = new JsonSerializerOptions
         {
           WriteIndented = true,  
+        
         };
         
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new();
 
-        using(StreamWriter sw = new StreamWriter(jsonfile)){
-            
-            foreach(Context con in contexts)
-            {
-                string? json = JsonSerializer.Serialize(con,opts);
+        using(FileStream fs = File.OpenWrite(jsonfile))
 
-                sw.WriteLine(json);
-            }
+        JsonSerializer.Serialize(fs,context);
+    }
+
+    public static Context[] ReadFromFile() // Our most important function of all
+    {
+        string jsonpath = Path.Combine(BaseDirectory,"Contexts.json");
+
+        if (!File.Exists(jsonpath))
+        {
+            File.Create(jsonpath);
         }
 
+        using(FileStream fs = File.OpenRead(jsonpath))
+
+       return JsonSerializer.Deserialize<List<Context>>(fs).ToArray() ?.ToArray() ;
     }
 
 
@@ -51,7 +62,7 @@ internal static class JsonHandler // Read and Write to json file.
             {
                 if(con.name == ContextName)
                 {
-                    target = con.GetValue(AttributeName);
+                    target = con.GetValue(AttributeName); // grabs the target value in the target attribute.
                 }
             }
 

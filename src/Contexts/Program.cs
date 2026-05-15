@@ -7,12 +7,6 @@ namespace AurShell.Contexts;
 
 internal class ContextEntry
 {
-
-    List<string> builtins = new () // builtins commands
-    {
-      "add","del","list","insert","remove","update"  
-    };
-    // List<Context> ContextList;
     Action<string,bool> print = (string data,bool isError) =>{
 
         if(data.Length < 1)
@@ -58,6 +52,6 @@ internal class ContextEntry
             return;
         }
 
-
+        Builtins built = new Builtins(args);
     }
 }

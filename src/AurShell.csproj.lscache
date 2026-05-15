@@ -71,6 +71,7 @@ blackbox/
  TerminalRawMode.cs
 BuiltinCommands.cs
 Contexts/Core/
+ BuiltinCommands.cs
  Context.cs
  JsonHandler.cs
 Contexts/Program.cs
@@ -106,6 +107,7 @@ plugins/
 Program.cs
 utils/
  AnsiHelper.cs
+ Exceptions.cs
  FileSystem.cs
  GitInfo.cs
  Platform.cs

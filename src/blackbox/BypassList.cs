@@ -79,9 +79,6 @@ public static class BypassList
         if (IsBypassed(name, config))
             return false;
 
-        // We use the unconditional NeedsPty list here (not the AURSH_NO_PTY-gated
-        // one) so that explicitly disabling PTY-wrap on POSIX still gives the user
-        // an in-box framing for known interactive commands.
         if (!IsInteractiveCommand(name)) return false;
         return !PtyHost.IsAvailable();
     }
@@ -107,10 +104,7 @@ public static class BypassList
 
     private static bool IsInteractiveCommand(string basename)
     {
-        // Re-uses PtyHost's known-REPL list via NeedsPty(). If a user sets
-        // AURSH_NO_PTY=1 on POSIX, NeedsPty returns false and passthrough
-        // doesn't trigger either — they get a regular box (which is the user's
-        // explicit choice).
+
         return PtyHost.NeedsPty(basename);
     }
 
@@ -183,8 +177,7 @@ public static class BypassList
 
     private static void DiscoverPosixShells(HashSet<string> shells)
     {
-        // /etc/shells is the POSIX-standard file listing valid shells.
-        // Format: one absolute path per line, '#' comments, blank lines.
+
         string shellsFile = "/etc/shells";
 
         // Termux may also have shells at a non-standard prefix

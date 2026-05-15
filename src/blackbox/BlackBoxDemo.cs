@@ -1,4 +1,5 @@
 using AurShell.Utils;
+// Demo version of the blackbox, no longer in use.
 
 namespace AurShell.BlackBoxView;
 

@@ -34,10 +34,7 @@ public static class PtyHost
     public static bool IsAvailable()
     {
         if (Platform.CurrentOS == OperatingSystemType.Windows) return false;
-        // Test/escape hatch: AURSH_DISABLE_PTY=1 forces IsAvailable() to false
-        // on POSIX too, which makes BypassList route interactive REPLs to
-        // passthrough mode. Useful for verifying the Windows code path on
-        // a Linux box.
+
         string disable = System.Environment.GetEnvironmentVariable("AURSH_DISABLE_PTY") ?? "";
         if (disable == "1" || string.Equals(disable, "true", System.StringComparison.OrdinalIgnoreCase))
             return false;

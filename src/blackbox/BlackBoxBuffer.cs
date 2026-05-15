@@ -1,3 +1,4 @@
+// Black box buffer handler, for stdin/err/out in a process
 namespace AurShell.BlackBoxView;
 
 public enum LineKind

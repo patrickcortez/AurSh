@@ -178,9 +178,7 @@ public sealed class BlackBoxLiveRenderer
             try { EmitPending(session, writer); } catch { }
 
             _altScreen = true;
-            // Show the cursor again so the child app's cursor positioning
-            // is visible. The child is expected to manage cursor state from
-            // here on (it will re-hide if it wants to).
+
             ShowCursor(writer);
             try { writer.Flush(); } catch { }
         }
@@ -205,10 +203,7 @@ public sealed class BlackBoxLiveRenderer
 
             if (_altScreen)
             {
-                // The child used the alternate screen buffer. Emit the
-                // standard DECRST sequence to leave it so the terminal
-                // switches back to the main buffer where our box header
-                // and body rows live, then emit the footer below them.
+
                 try
                 {
                     writer.Write("\x1b[?1049l");
@@ -427,10 +422,7 @@ public sealed class BlackBoxLiveRenderer
             LayoutTier newTier = _renderer.Tier;
             if (newWidth == _lastRenderedWidth && newTier == _lastRenderedTier) return;
 
-            // Force a redraw of every body row already emitted PLUS the
-            // footer, all at the new width. We can't retroactively rewrite
-            // rows already in terminal scrollback, but for rows still
-            // inside the viewport this gives a clean reflow.
+
             try
             {
                 _emittedBodyRows = 0;
@@ -438,7 +430,10 @@ public sealed class BlackBoxLiveRenderer
                 _lastRenderedWidth = newWidth;
                 _lastRenderedTier = newTier;
             }
-            catch { /* writer may have been disposed mid-resize */ }
+            catch(Exception ex)
+            {
+                Console.Error.WriteLine($"{Ansi.FgRed}AurSh: {ex.Message} | {ex.StackTrace}");
+            }
         }
     }
 

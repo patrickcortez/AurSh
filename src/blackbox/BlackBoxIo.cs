@@ -122,10 +122,6 @@ public static class BlackBoxIo
                     catch { }
                 }
 
-                // Fast path: once a process has activated the alternate
-                // screen, forward the byte stream raw to the terminal. The
-                // child owns the screen until it exits or sends ?1049l;
-                // wrapping its output in the box would corrupt its layout.
                 if (owner.LiveRenderer.IsAltScreenActive)
                 {
                     if (rawOut == null) rawOut = System.Console.OpenStandardOutput();
@@ -184,16 +180,8 @@ public static class BlackBoxIo
                         lineBuf.SetLength(0);
                         sniffer.Reset();
 
-                        // Tell the live renderer to finalize body emission
-                        // and switch to passthrough mode. The footer will be
-                        // emitted by the normal Finish() at end-of-command,
-                        // so the user still sees "exit:N <elapsed>" once the
-                        // app exits.
                         owner.LiveRenderer.EnterAltScreen(session, session.TerminalOut);
 
-                        // Forward the alt-screen-enter sequence (so the
-                        // terminal actually switches buffers) plus any
-                        // remaining bytes from this read.
                         if (rawOut == null) rawOut = System.Console.OpenStandardOutput();
                         byte[] enterSeq = Encoding.ASCII.GetBytes($"\x1b[?{decValue}h");
                         try
@@ -229,7 +217,7 @@ public static class BlackBoxIo
         catch (IOException) { }
         catch (System.Exception)
         {
-            // Defensive: never let a pump task break the shell.
+            // we never let a pump task break the shell.
         }
     }
 

@@ -39,10 +39,11 @@ public sealed class BlackBoxConfig
         "aursh-cat","aursh-ls","aursh-history show"
     };
 
+    // Blackbox config from Env variables handler
     public static BlackBoxConfig FromEnvironment()
     {
         var c = new BlackBoxConfig
-        {
+        { // Get user declared configs from environmental variables
             Border = BoxChars.Detect(System.Environment.GetEnvironmentVariable("BLACKBOX_BORDER")),
             MaxHeight = TryParseInt(System.Environment.GetEnvironmentVariable("BLACKBOX_MAX_HEIGHT")),
             BufferLines = TryParseInt(System.Environment.GetEnvironmentVariable("BLACKBOX_BUFFER_LINES")) ?? 5000,
@@ -61,7 +62,7 @@ public sealed class BlackBoxConfig
                 System.StringSplitOptions.RemoveEmptyEntries));
         }
 
-        LoadFromJson(c);
+        LoadFromJson(c); // finally load it the json
 
         return c;
     }
@@ -75,6 +76,8 @@ public sealed class BlackBoxConfig
         int derived = System.Math.Min(20, System.Math.Max(MinHeight + 2, termHeight - 4));
         return derived;
     }
+
+    // Helper methods
 
     private static int? TryParseInt(string? value)
     {
@@ -122,7 +125,7 @@ public sealed class BlackBoxConfig
 
             string configPath = Path.Combine(aurshDir, "blackconfig.json");
             
-            if (!File.Exists(configPath))
+            if (!File.Exists(configPath)) // if the config file does not exist, we make a new one
             {
                 var defaultData = new BlackBoxConfigFile
                 {
@@ -182,11 +185,11 @@ public sealed class BlackBoxConfig
         }
         catch(Exception ex)
         {
-            Console.Error.WriteLine($"{Ansi.FgRed}Aursh: {ex.Message}");
+            Console.Error.WriteLine($"{Ansi.FgRed}Aursh: {ex.Message} | {ex.StackTrace}");
         }
     }
 
-    private static string ParseColorName(string name, bool isBackground)
+    private static string ParseColorName(string name, bool isBackground) // background Colors,  its very limited for now
     {
         return name.Trim().ToLowerInvariant() switch
         {

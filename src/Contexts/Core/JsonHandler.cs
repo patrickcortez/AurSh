@@ -13,7 +13,7 @@ internal static class JsonHandler // Read and Write to json file.
 {
     private static readonly string BaseDirectory = AppContext.BaseDirectory; // .aursh
 
-    public static void WriteToJson(Context context)
+    public static void WriteToJson(Context[] context)
     {
         string jsonfile = Path.Combine(BaseDirectory,"Contexts.json");
 

@@ -78,6 +78,7 @@ Contexts/Program.cs
 core/
  Banner.cs
  BuiltinCommands.cs
+ ContextRead.cs
  Environment.cs
  Executor.cs
  FileAssociator.cs

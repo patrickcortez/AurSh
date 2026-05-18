@@ -15,7 +15,7 @@ similar to most shells like bash, zsh and fish.
 
 This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
 
-It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua or F# scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands or create new behaviors for the shell.
+It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua or F# scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands,modify the UI or create new behaviors for the shell.
 
 It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
 
@@ -29,16 +29,17 @@ Has:
 - Shell Scripting: .aur scripts
 - A rc script: .aurc
 - Text and object Piping and redirection
-- ghost text and auto suggestions
+- Ghost text and auto suggestions
 - Persistent History
 - Environmental variable handling.
 - resolves commands to native OS Commands.
 - Job control.
 - Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)
-- File Association (e.g: aursh-assoc .py "python", then: ./script.py arg...)
-- BlackBox: TUI execution viewport that displays processes invoked from the command line inside a unicode box with
+- File Associations (e.g: aursh-assoc .py "python", then: ./script.py arg...)
+- `BlackBox`: TUI execution viewport that displays processes invoked from the command line inside a unicode box with
 round edges.
-- Updater: A tool to update the shell from the remote repository.
+- `Updater`: A tool to update the shell from the remote repository.
+- `Contexts`: A disk backed object like that can hold multiple attributes to structurize and organize variables.
 
 ---
 
@@ -52,6 +53,7 @@ round edges.
 - `aursh-ls` : A TUI file system explorer.
 - `aursh-cat <options: -e> <file>` : A pipable file reader and a *vim-like* TUI text editor ( with `-e` flag ).
 - `aursh-update` : updates the shell from the remote repository then exits the shell to apply changes.
+- `aursh-context` : A disk backed object like that can hold multiple attributes to structurize and organize variables. `aursh-context <new,del,list,insert,remove,update> <args...>`
 
 ---
 

@@ -188,7 +188,7 @@ internal class Builtins
     {
         foreach(Context con in cons)
         {
-            if (con.Equals(ContextName))
+            if (con.ContextName.Equals(ContextName))
             {
                 return con.RemoveAttribute(AttributeName);
             }

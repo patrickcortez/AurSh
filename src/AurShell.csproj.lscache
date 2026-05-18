@@ -73,7 +73,10 @@ BuiltinCommands.cs
 Contexts/Core/
  BuiltinCommands.cs
  Context.cs
- JsonHandler.cs
+Contexts/obj/Debug/
+ .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+ Contexts.AssemblyInfo.cs
+ Contexts.GlobalUsings.g.cs
 Contexts/Program.cs
 core/
  Banner.cs
@@ -102,6 +105,10 @@ obj/Debug/
  .NETCoreApp,Version=v8.0.AssemblyAttributes.cs
  AurShell.AssemblyInfo.cs
  AurShell.GlobalUsings.g.cs
+Parser/
+ Definitions.cs
+ Reader.cs
+ Writer.cs
 plugins/
  PluginManager.cs
  PluginManifest.cs

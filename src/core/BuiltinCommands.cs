@@ -2106,9 +2106,6 @@ public static class BuiltinCommands
 
     private static int ExecuteUpdate(CommandNode cmd)
     {
-        // Try the standalone aursh-update binary first. Living outside the
-        // shell is the whole point — it lets users run `sudo aursh-update`
-        // without elevating the whole interactive aursh process.
         string? updaterPath = FindAurshUpdateExecutable();
         if (!string.IsNullOrEmpty(updaterPath))
         {
@@ -2116,10 +2113,7 @@ public static class BuiltinCommands
             {
                 UseShellExecute = false,
                 CreateNoWindow = false,
-                // Redirect so the bytes flow through Console.Out / Console.Error,
-                // which the BlackBox builtin path has already swapped over to
-                // its BlackBoxWriter. Otherwise the child writes directly to
-                // the real terminal fd and the box renders an empty body.
+
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
@@ -2156,8 +2150,6 @@ public static class BuiltinCommands
             }
         }
 
-        // Fallback: inline updater. Kept around so the shell still works on
-        // dev checkouts where the standalone binary hasn't been built yet.
         if (cmd.Args.Count == 0)
             return DoUpdate();
 

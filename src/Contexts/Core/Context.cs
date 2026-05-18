@@ -27,7 +27,7 @@ namespace AurShell.Contexts.Core;
 internal record Context(string name,List<Attribute> attr)
     : IEnumerable<Context>
 {
-    List<Attribute> attrs = attr;
+    public List<Attribute> attrs = attr;
     public string ContextName {get;} = name;
 
     public IEnumerator<Context> GetEnumerator()

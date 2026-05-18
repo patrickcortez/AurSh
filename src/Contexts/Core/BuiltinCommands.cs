@@ -1,6 +1,8 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json.Nodes;
+using AurShell.Parser;
 using Attribute = (string key ,string value);
 namespace AurShell.Contexts.Core;
 
@@ -74,8 +76,10 @@ sealed class Utility
 
 internal class Builtins
 {
+    Reader read;
+
     string Command;
-    List<Context>? cons;
+    List<Parser.Context>? cons;
     List<string> cmds = new()
     {
         "new","del","list","update", "insert","remove" // new, del and list: Done!
@@ -96,12 +100,12 @@ internal class Builtins
     {
         string[] data = contextdata.Split('=',StringSplitOptions.TrimEntries);
         Attribute[] attrs = Utility.AttributeTokenizer(data[1]);
-        Context con = new Context(data[0],attrs.ToList<Attribute>());
+        Parser.Context con = new Parser.Context(data[0],attrs.ToDictionary());
 
         if(attrs.Count() >= 1){
             cons.Add(con);
 
-            JsonHandler.WriteToJson(cons.ToArray<Context>());
+            Writer.AddContext(con.ContextName,con.GetAttributes());
             return 0;
         }
 
@@ -110,7 +114,7 @@ internal class Builtins
 
     private int DeleteContext(string ContextName)
     {
-        foreach(Context con in cons)
+        foreach(Parser.Context con in cons)
         {
             if(con.ContextName == ContextName)
             {
@@ -118,7 +122,7 @@ internal class Builtins
 
                 if (cons.Remove(con))
                 {
-                    JsonHandler.WriteToJson(cons.ToArray<Context>());
+                    Writer.OverWriteFile(cons.ToArray());
                     return 0;
                 }
 
@@ -136,7 +140,7 @@ internal class Builtins
         }
 
         Console.WriteLine("Contexts:\n---------------");
-        foreach(Context con in cons)
+        foreach(Parser.Context con in cons)
         {
             Console.WriteLine(con.ContextName);
         }
@@ -161,7 +165,8 @@ internal class Builtins
         }
 
         Command = cmd;
-        cons = JsonHandler.ReadFromFile().ToList<Context>();
+        read = new();
+        cons = read.GetContexts().ToList();
         List<string> newargs = new(args.Skip(1));
         
         ExecuteCommand(cmd,newargs.ToArray());

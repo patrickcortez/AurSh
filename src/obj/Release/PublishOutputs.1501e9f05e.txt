@@ -1,2 +1,0 @@
-C:\Users\Cortez\Documents\Projects\Aurshell\publish\win-x64\aursh.pdb
-C:\Users\Cortez\Documents\Projects\Aurshell\publish\win-x64\aursh.exe

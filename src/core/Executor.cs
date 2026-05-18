@@ -91,6 +91,17 @@ public class Executor
             if (tokens[i].Type == TokenType.Word && !tokens[i].WasSingleQuoted)
             {
                 string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
+                if (ContextReader.isContext(resolved))
+                {
+                    int colonIdx = resolved.IndexOf(':');
+                    if (colonIdx > 0)
+                    {
+                        string contextName = resolved.Substring(0, colonIdx);
+                        string attributeName = resolved.Substring(colonIdx + 1);
+                        ContextReader contextReader = new ContextReader();
+                        resolved = contextReader.GetAttributeValue(contextName, attributeName);
+                    }
+                }
                 tokens[i] = new Token(TokenType.Word, resolved, tokens[i].WasQuoted, tokens[i].WasSingleQuoted);
             }
         }

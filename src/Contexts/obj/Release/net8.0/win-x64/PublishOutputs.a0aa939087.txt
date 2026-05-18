@@ -1,0 +1,2 @@
+C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh-context.pdb
+C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh-context.exe

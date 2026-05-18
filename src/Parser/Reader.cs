@@ -14,7 +14,7 @@ Attribute3=Value
 */
 
 
-internal class Reader //instance based.
+public class Reader //instance based.
 {
     private List<string> LineBuffer; // store all lines in file in here.
     private string configfile = Helper.configfile;
@@ -24,8 +24,8 @@ internal class Reader //instance based.
     {
         Helper.EnsureConfigExists(); // Always make sure the config file exists
         LineBuffer = new();
-        ReadLines();
         contexts = new();
+        ReadLines();
     }
 
     private void ReadLines()
@@ -43,8 +43,8 @@ internal class Reader //instance based.
 
     private void InterpretLines()
     {
-        StringBuilder Current_ContextName = new(),Current_Attribute = new(),Current_Value = new();
-        Dictionary<string,string> Attributes = new();;
+        StringBuilder Current_ContextName = new();
+        Dictionary<string,string> Attributes = new();
         foreach(string line in LineBuffer)
         {
             if (string.IsNullOrWhiteSpace(line)) // for every whitespace if the current contextname length isnt 0 and attribute coun isnt zero, we append a new context in our contexts.
@@ -66,15 +66,11 @@ internal class Reader //instance based.
 
             if (Helper.isAttribute(line))
             {
-                if(Current_Attribute.Length > 0 && Current_Value.Length > 0)
+                var kvp = Helper.TokenizeAttribute(line);
+                if (!string.IsNullOrEmpty(kvp.Key))
                 {
-                    Attributes.Add(Current_Attribute.ToString(),Current_Value.ToString());
-                    Current_Attribute.Clear();
-                    Current_Value.Clear();
+                    Attributes[kvp.Key] = kvp.Value;
                 }
-
-                Current_Attribute.Append(Helper.TokenizeAttribute(line).Key);
-                Current_Value.Append(Helper.TokenizeAttribute(line).Value);
             }
         }
 

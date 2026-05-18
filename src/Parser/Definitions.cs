@@ -3,7 +3,7 @@ namespace AurShell.Parser;
 using System.Text;
 using AurShell.Utils;
 
-internal struct Context
+public struct Context
 {
     public string ContextName {get;set;}
 
@@ -85,81 +85,57 @@ internal static class Helper
             return;
         }
 
-        File.Create(configfile);
-        return;
+        File.Create(configfile).Dispose();
+    }
+
+    public static int FindDelimiterIndex(string line)
+    {
+        bool inQuotes = false;
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if ((c == '=' || c == ':') && !inQuotes)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public static bool isAttribute(string data)
     {
-        bool hasSemicolon = false;
-        StringBuilder AttributeName = new(),AttributeValue = new();
-
-        foreach(char c in data)
-        {
-            if (char.IsWhiteSpace(c))
-            {
-                continue;
-            }
-
-            if(c.Equals(':')){
-
-                hasSemicolon = true;
-            }
-
-            if (hasSemicolon)
-            {
-                AttributeValue.Append(c);
-                continue;
-            }
-
-            AttributeName.Append(c);
-
-
-        }
-
-        if(AttributeName.Length >= 1 && AttributeValue.Length >= 1)
-        {
-            return true;
-        }
-
-        return false;
-
+        if (string.IsNullOrWhiteSpace(data)) return false;
+        string trimmed = data.Trim();
+        if (trimmed.StartsWith("[") && trimmed.EndsWith("]")) return false;
+        return FindDelimiterIndex(trimmed) != -1;
     }
 
     public static KeyValuePair<string,string> TokenizeAttribute(string line)
     {
-        bool inQoutes = true,isFirst = true;
-        StringBuilder Name = new(),Value = new();
-        foreach(char c in line)
+        string trimmed = line.Trim();
+        int delimIdx = FindDelimiterIndex(trimmed);
+        if (delimIdx == -1)
         {
-            if (char.IsWhiteSpace(c) && !inQoutes)
-            {
-                continue;
-            }
+            return new KeyValuePair<string, string>(string.Empty, string.Empty);
+        }
 
-            if (c.Equals('"'))
-            {
-                inQoutes = !inQoutes;
-                continue;
-            }
+        string keyPart = trimmed.Substring(0, delimIdx).Trim();
+        string valuePart = trimmed.Substring(delimIdx + 1).Trim();
 
-            if (c.Equals(':') && !inQoutes)
-            {
-                isFirst = false;
-                continue;
-            }
+        if (keyPart.StartsWith("\"") && keyPart.EndsWith("\"") && keyPart.Length >= 2)
+        {
+            keyPart = keyPart.Substring(1, keyPart.Length - 2);
+        }
+        if (valuePart.StartsWith("\"") && valuePart.EndsWith("\"") && valuePart.Length >= 2)
+        {
+            valuePart = valuePart.Substring(1, valuePart.Length - 2);
+        }
 
-            if (!isFirst)
-            {
-                Value.Append(c);
-                continue;
-            }
-
-            Name.Append(c);
-
-        }   
-
-        return new(Name.ToString(),Value.ToString());
+        return new KeyValuePair<string, string>(keyPart, valuePart);
     }
 
 }

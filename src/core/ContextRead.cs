@@ -1,6 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using AurShell.Contexts.Core;
 using AurShell.Parser;
 using AurShell.Utils;
 
@@ -12,11 +11,11 @@ internal class ContextReader
 
     Context[]? cons;
 
-   public ContextReader()
+    public ContextReader()
     {
         if (!File.Exists(confile))
         {
-            File.Create(confile);
+            File.Create(confile).Dispose();
         }
 
         Reader read = new Reader();
@@ -40,35 +39,25 @@ internal class ContextReader
 
     public static bool isContext(string data)
     {
+        if (string.IsNullOrEmpty(data)) return false;
+        int colonIdx = data.IndexOf(':');
+        if (colonIdx <= 0) return false;
+
+        string contextCandidate = data.Substring(0, colonIdx).Trim();
+
         Reader read = new Reader();
         Context[]? cons = read.GetContexts();
-        StringBuilder sb = new();
-
-        foreach(char c in data)
-        {
-            if (char.IsWhiteSpace(c))
-            {
-                continue;
-            }
-
-            if (c.Equals(':'))
-            {
-                break;
-            }
-
-            sb.Append(c);
-        }
+        if (cons == null) return false;
 
         foreach(Context con in cons)
         {
-            if (con.ContextName.Equals(sb.ToString()))
+            if (con.ContextName.Equals(contextCandidate))
             {
                 return true;
             }
         }
 
         return false;
-
     }
 
 

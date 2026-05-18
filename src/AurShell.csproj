@@ -34,6 +34,9 @@
     <Compile Remove="aursh-update/**/*.cs" />
     <None Remove="aursh-update/**/*" />
     <EmbeddedResource Remove="aursh-update/**/*" />
+    <Compile Remove="Contexts/**/*.cs" />
+    <None Remove="Contexts/**/*" />
+    <EmbeddedResource Remove="Contexts/**/*" />
   </ItemGroup>
 
 </Project>

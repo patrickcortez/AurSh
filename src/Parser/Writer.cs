@@ -2,7 +2,7 @@ using AurShell.Utils;
 
 namespace AurShell.Parser;
 
-internal static class Writer
+public static class Writer
 {
     static string configfile = Path.Combine(Platform.HomeDirectory,".aursh","Contexts.con");
 

@@ -20,4 +20,8 @@
     <Description>AurShell Contexts is a disk backed object like that can hold multiple attributes to structurize and organize variables.</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AurShell.csproj" />
+  </ItemGroup>
+
 </Project>

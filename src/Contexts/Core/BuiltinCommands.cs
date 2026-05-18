@@ -13,7 +13,9 @@ sealed class Utility
     private static char[] endings =
     {
         '{',
-        '}'
+        '}',
+        '(',
+        ')'
     };
 
    public static Dictionary<string,string> AttributeTokenizer(string data) // {"Attribute":"Value1","Attribute":"Value2"}

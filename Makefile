@@ -4,9 +4,11 @@
 
 PROJECT := src/AurShell.csproj
 UPDATE_PROJECT := src/aursh-update/AurShUpdate.csproj
+CONTEXT_PROJECT := src/Contexts/Contexts.csproj
 BIN_DIR := bin
 APP_NAME := aursh
 UPDATE_APP_NAME := aursh-update
+CONTEXT_APP_NAME := aursh-context
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 1.5.0
@@ -74,6 +76,7 @@ ifeq ($(DETECTED_OS),Windows)
     RID := win-$(ARCH)
     EXE := $(APP_NAME).exe
     UPDATE_EXE := $(UPDATE_APP_NAME).exe
+    CONTEXT_EXE := $(CONTEXT_APP_NAME).exe
     INSTALL_DIR := C:/Program Files/AurShell
     USER_INSTALL_DIR := $(subst \,/,$(LOCALAPPDATA))/AurShell
     ifeq ($(USER_INSTALL_DIR),/AurShell)
@@ -85,6 +88,7 @@ else ifeq ($(DETECTED_OS),macOS)
     RID := osx-$(ARCH)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
+    CONTEXT_EXE := $(CONTEXT_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -93,6 +97,7 @@ else ifeq ($(DETECTED_OS),Termux)
     RID := linux-$(ARCH)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
+    CONTEXT_EXE := $(CONTEXT_APP_NAME)
     INSTALL_DIR := $(PREFIX)/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -101,6 +106,7 @@ else
     RID := linux-$(ARCH)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
+    CONTEXT_EXE := $(CONTEXT_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -184,22 +190,26 @@ build:
 ifeq ($(WIN_ENV),native)
 	@echo [build] Compiling debug build...
 	dotnet build $(PROJECT) -c Debug
-	@echo [build] Output: $(BIN_DIR)/$(EXE)
+	dotnet build $(CONTEXT_PROJECT) -c Debug
+	@echo [build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)
 else
 	@echo "[build] Compiling debug build..."
 	dotnet build $(PROJECT) -c Debug
-	@echo "[build] Output: $(BIN_DIR)/$(EXE)"
+	dotnet build $(CONTEXT_PROJECT) -c Debug
+	@echo "[build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
 endif
 
 release:
 ifeq ($(WIN_ENV),native)
 	@echo [release] Compiling release build...
 	dotnet build $(PROJECT) -c Release
-	@echo [release] Output: $(BIN_DIR)/$(EXE)
+	dotnet build $(CONTEXT_PROJECT) -c Release
+	@echo [release] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)
 else
 	@echo "[release] Compiling release build..."
 	dotnet build $(PROJECT) -c Release
-	@echo "[release] Output: $(BIN_DIR)/$(EXE)"
+	dotnet build $(CONTEXT_PROJECT) -c Release
+	@echo "[release] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
 endif
 
 publish:
@@ -207,7 +217,8 @@ ifeq ($(WIN_ENV),native)
 	@echo [publish] Publishing self-contained $(RID) binary...
 	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
 	dotnet publish $(UPDATE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-update/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
-	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE)
+	dotnet publish $(CONTEXT_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-contexts/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:IncludeNativeLibrariesForSelfExtract=true -o $(PUBLISH_DIR)
+	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)
 else
 	@echo "[publish] Publishing self-contained $(RID) binaries..."
 	dotnet publish $(PROJECT) \
@@ -232,7 +243,18 @@ else
 		-p:PublishTrimmed=true \
 		-p:IncludeNativeLibrariesForSelfExtract=true \
 		-o $(PUBLISH_DIR)
-	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE)"
+	dotnet publish $(CONTEXT_PROJECT) \
+		-c Release \
+		-r $(RID) \
+		--self-contained true \
+		-p:OutputPath=obj/publish-build-contexts/ \
+		-p:AppendTargetFrameworkToOutputPath=true \
+		-p:AppendRuntimeIdentifierToOutputPath=true \
+		-p:PublishSingleFile=true \
+		-p:PublishTrimmed=true \
+		-p:IncludeNativeLibrariesForSelfExtract=true \
+		-o $(PUBLISH_DIR)
+	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)"
 endif
 
 # ──────────────────────────────────────────────
@@ -245,7 +267,8 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force"
-	@echo [install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)
+	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
+	@echo [install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE) + $(INSTALL_DIR)/$(CONTEXT_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@cmd /c "echo."
@@ -254,7 +277,8 @@ else ifeq ($(DETECTED_OS),Windows)
 	mkdir -p "$(INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
-	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)"
+	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(INSTALL_DIR)/$(CONTEXT_EXE)"
+	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE) + $(INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
 	@echo ""
@@ -263,6 +287,7 @@ else
 	install -d "$(INSTALL_DIR)"
 	install -m 755 "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	install -m 755 "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
+	install -m 755 "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(INSTALL_DIR)/$(CONTEXT_EXE)"
 	@if [ -w "$(PREFIX)/etc/shells" ] && ! grep -Fxq "$(INSTALL_DIR)/$(EXE)" "$(PREFIX)/etc/shells"; then \
 		echo "$(INSTALL_DIR)/$(EXE)" >> "$(PREFIX)/etc/shells"; \
 		echo "[install] Added $(INSTALL_DIR)/$(EXE) to $(PREFIX)/etc/shells"; \
@@ -270,8 +295,8 @@ else
 		echo "$(INSTALL_DIR)/$(EXE)" >> /etc/shells; \
 		echo "[install] Added $(INSTALL_DIR)/$(EXE) to /etc/shells"; \
 	fi
-	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE)"
-	@echo "[install] Run 'aursh' to start, or 'sudo aursh-update' to update."
+	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE) + $(INSTALL_DIR)/$(CONTEXT_EXE)"
+	@echo "[install] Run 'aursh' to start, or 'aursh-context' to manage contexts."
 endif
 
 install-user: publish
@@ -280,7 +305,8 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "New-Item -Path '$(USER_INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force"
-	@echo [install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE)
+	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
+	@echo [install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE) + $(USER_INSTALL_DIR)/$(CONTEXT_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated. Restart your terminal to use aursh.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
 	@cmd /c "echo."
@@ -290,7 +316,8 @@ else ifeq ($(DETECTED_OS),Windows)
 	mkdir -p "$(USER_INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
-	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
+	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE) + $(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated (User). Restart your terminal.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
 	@echo ""
@@ -300,8 +327,10 @@ else
 	mkdir -p "$(USER_INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	chmod +x "$(USER_INSTALL_DIR)/$(EXE)"
 	chmod +x "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	chmod +x "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo ""
 	@if echo "$$PATH" | grep -q "$(USER_INSTALL_DIR)"; then \
 		echo "[install] $(USER_INSTALL_DIR) is already in PATH."; \
@@ -319,22 +348,28 @@ ifeq ($(WIN_ENV),native)
 	@echo [uninstall] Removing aursh...
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE)') { Remove-Item '$(INSTALL_DIR)/$(EXE)' -Force }"
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE)') { Remove-Item '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE)') { Remove-Item '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Force }"
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE)') { Remove-Item '$(USER_INSTALL_DIR)/$(EXE)' -Force }"
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)') { Remove-Item '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)') { Remove-Item '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Force }"
 	@echo [uninstall] Done.
 else ifeq ($(DETECTED_OS),Windows)
 	@echo "[uninstall] Removing aursh..."
 	rm -f "$(INSTALL_DIR)/$(EXE)"
 	rm -f "$(INSTALL_DIR)/$(UPDATE_EXE)"
+	rm -f "$(INSTALL_DIR)/$(CONTEXT_EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	rm -f "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo "[uninstall] Done."
 else
 	@echo "[uninstall] Removing aursh..."
 	rm -f "$(INSTALL_DIR)/$(EXE)"
 	rm -f "$(INSTALL_DIR)/$(UPDATE_EXE)"
+	rm -f "$(INSTALL_DIR)/$(CONTEXT_EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
+	rm -f "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo "[uninstall] Done."
 endif
 
@@ -358,12 +393,16 @@ ifeq ($(WIN_ENV),native)
 	-@dotnet clean $(PROJECT) -c Release --nologo -v q 2>nul
 	-@dotnet clean $(UPDATE_PROJECT) -c Debug --nologo -v q 2>nul
 	-@dotnet clean $(UPDATE_PROJECT) -c Release --nologo -v q 2>nul
+	-@dotnet clean $(CONTEXT_PROJECT) -c Debug --nologo -v q 2>nul
+	-@dotnet clean $(CONTEXT_PROJECT) -c Release --nologo -v q 2>nul
 	@$(PS) "if (Test-Path '$(BIN_DIR)') { Remove-Item '$(BIN_DIR)/*' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'publish') { Remove-Item 'publish' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/obj') { Remove-Item 'src/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/bin') { Remove-Item 'src/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/aursh-update/obj') { Remove-Item 'src/aursh-update/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path 'src/aursh-update/bin') { Remove-Item 'src/aursh-update/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path 'src/Contexts/obj') { Remove-Item 'src/Contexts/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path 'src/Contexts/bin') { Remove-Item 'src/Contexts/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
 	@echo [clean] Done.
 else
 	@echo "[clean] Removing build artifacts..."
@@ -371,12 +410,16 @@ else
 	dotnet clean $(PROJECT) -c Release --nologo -v q 2>/dev/null || true
 	dotnet clean $(UPDATE_PROJECT) -c Debug --nologo -v q 2>/dev/null || true
 	dotnet clean $(UPDATE_PROJECT) -c Release --nologo -v q 2>/dev/null || true
+	dotnet clean $(CONTEXT_PROJECT) -c Debug --nologo -v q 2>/dev/null || true
+	dotnet clean $(CONTEXT_PROJECT) -c Release --nologo -v q 2>/dev/null || true
 	rm -rf $(BIN_DIR)/* 2>/dev/null || true
 	rm -rf publish 2>/dev/null || true
 	rm -rf src/obj 2>/dev/null || true
 	rm -rf src/bin 2>/dev/null || true
 	rm -rf src/aursh-update/obj 2>/dev/null || true
 	rm -rf src/aursh-update/bin 2>/dev/null || true
+	rm -rf src/Contexts/obj 2>/dev/null || true
+	rm -rf src/Contexts/bin 2>/dev/null || true
 	@echo "[clean] Done."
 endif
 

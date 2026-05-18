@@ -43,15 +43,20 @@ internal class ContextEntry
         print(msg,false);
     }
 
-    public void Main(params string[] args)
+    public int Main(params string[] args)
     {
 
         if(args.Count() < 1)
         {
             DisplayHelp();
-            return;
+            return 0;
         }
 
-        Builtins built = new Builtins(args);
+        int exit = new();
+
+    
+        Builtins built = new Builtins(ref exit,args);
+
+        return exit;
     }
 }

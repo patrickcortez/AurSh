@@ -58,6 +58,16 @@ internal struct Context
         return 0;
     }
 
+    public int RemoveAttribute(string AttributeName)
+    {
+        if (Attributes.Remove(AttributeName))
+        {
+            return 0;
+        }
+        
+        return 1;
+    }
+
     public Dictionary<string,string> GetAttributes()
     {
         return Attributes;

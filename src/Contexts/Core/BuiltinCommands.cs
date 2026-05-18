@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Nodes;
+using AurShell.Lua;
 using AurShell.Parser;
 using Attribute = (string key ,string value);
 namespace AurShell.Contexts.Core;
@@ -15,9 +16,9 @@ sealed class Utility
         '}'
     };
 
-   public static Attribute[] AttributeTokenizer(string data) // {"Attribute":"Value1","Attribute":"Value2"}
+   public static Dictionary<string,string> AttributeTokenizer(string data) // {"Attribute":"Value1","Attribute":"Value2"}
     {
-        List<Attribute> attrs = new();
+        Dictionary<string,string> attrs = new();
         bool inQoutes = false;
         StringBuilder sb = new(),attrname = new(), attrval = new();
         
@@ -38,7 +39,7 @@ sealed class Utility
             {
                 // Next Attribute
                 attrval.Append(sb);
-                attrs.Add(new Attribute(attrname.ToString(),attrval.ToString()));
+                attrs.Add(attrname.ToString(),attrval.ToString());
                 attrname.Clear();
                 attrval.Clear();
                 sb.Clear();
@@ -67,10 +68,10 @@ sealed class Utility
         if(sb.Length >= 1)
         {
             attrval = new(sb.ToString());
-            attrs.Add(new Attribute(attrname.ToString(),attrval.ToString()));
+            attrs.Add(attrname.ToString(),attrval.ToString());
         }
 
-        return attrs.ToArray();
+        return attrs;
     }
 }
 
@@ -91,9 +92,12 @@ internal class Builtins
 
         return cmd switch
         {
-            "new" => AddContext(args[1]),
-            "del" => DeleteContext(args[1]),
+            "new" => AddContext(args[0]),
+            "del" => DeleteContext(args[0]),
             "list" => ListContexts(),
+            "update" => UpdateAttribute(args[0],args[1],args[2]),
+            "insert" => InsertAttribute(args[0],args[1],args[2]),
+            "remove" => RemoveAttribute(args[0],args[1]),
              _ => commandnotfound(cmd)
         };
     }
@@ -101,8 +105,8 @@ internal class Builtins
     private int AddContext(string contextdata) // void to int for exit codes.
     {
         string[] data = contextdata.Split('=',StringSplitOptions.TrimEntries);
-        Attribute[] attrs = Utility.AttributeTokenizer(data[1]);
-        Parser.Context con = new Parser.Context(data[0],attrs.ToDictionary());
+        Dictionary<string,string> attrs = new(Utility.AttributeTokenizer(data[1]));
+        Parser.Context con = new Parser.Context(data[0],attrs);
 
         if(attrs.Count() >= 1){
             cons.Add(con);
@@ -150,6 +154,51 @@ internal class Builtins
         return 0;
     }
 
+    private int UpdateAttribute(string ContextName,string AttributeName,string NewValue)
+    {
+        foreach(Parser.Context con in cons)
+        {
+            if (con.ContextName.Equals(ContextName))
+            {
+               con.ChangeAttributeValue(AttributeName,NewValue);
+               Writer.OverWriteFile(cons.ToArray());
+               return 0;
+            }
+        }
+
+        return 1;
+    }
+
+    private int InsertAttribute(string ContextName,string AttributeName,string NewValue)
+    {
+        foreach(Parser.Context con in cons)
+        {
+            if (con.ContextName.Equals(ContextName))
+            {
+                con.InsertAttribute(AttributeName,NewValue);
+                Writer.OverWriteFile(cons.ToArray());
+                return 0;
+            }
+        }
+
+        return 1;
+    }
+
+    private int RemoveAttribute(string ContextName,string AttributeName)
+    {
+        foreach(Context con in cons)
+        {
+            if (con.Equals(ContextName))
+            {
+                return con.RemoveAttribute(AttributeName);
+            }
+        }
+
+        return 1;
+    }
+
+
+
     private int commandnotfound(string cmd)
     {
         Console.Error.WriteLine($"Command: {cmd} ,does not exist!");
@@ -157,7 +206,7 @@ internal class Builtins
     }
     
 
-    public Builtins(params string[] args)
+    public Builtins(ref int exitcode,params string[] args)
     {
         string cmd = args[0];
         if (string.IsNullOrEmpty(cmd))
@@ -171,6 +220,6 @@ internal class Builtins
         cons = read.GetContexts().ToList();
         List<string> newargs = new(args.Skip(1));
         
-        ExecuteCommand(cmd,newargs.ToArray());
+        exitcode = ExecuteCommand(cmd,newargs.ToArray());
     }
 }

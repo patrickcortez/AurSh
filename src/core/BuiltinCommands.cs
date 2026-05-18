@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
@@ -14,7 +15,7 @@ public static class BuiltinCommands
     {
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
-        "true", "false", "shift", "read", "test", "return",
+        "true", "false", "shift", "read", "test", "return", "aursh-context",
         "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update"
     };
 
@@ -53,8 +54,28 @@ public static class BuiltinCommands
             "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
             "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
             "aursh-update" => ExecuteUpdate(cmd),
+            "aursh-context" => ExecuteContext(cmd),
             _ => ExecuteFallback(cmd)
         };
+    }
+
+    private static int ExecuteContext(CommandNode cmd) //Unfinished =(
+    {
+        string FileName = "aursh-context";
+        using(Process proc = new()
+        {
+            StartInfo = new()
+            {
+                UseShellExecute = true,
+                FileName = FileName,
+               // Arguments = 
+            }
+        })
+        {
+            
+        }
+
+        return 0;
     }
 
     private static int ExecuteCat(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)

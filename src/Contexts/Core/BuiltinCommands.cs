@@ -87,6 +87,8 @@ internal class Builtins
 
     int ExecuteCommand(string cmd,params string[] args)
     {
+
+
         return cmd switch
         {
             "new" => AddContext(args[1]),

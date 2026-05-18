@@ -237,6 +237,9 @@ public class Lexer
                     wasSingleQuoted = false;
                     continue;
                 }
+
+                
+
                 sb.Append(ExpandInline());
                 wasSingleQuoted = false;
                 continue;

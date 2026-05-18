@@ -7,10 +7,10 @@
   "targets": {
     ".NETCoreApp,Version=v8.0": {},
     ".NETCoreApp,Version=v8.0/win-x64": {
-      "aursh-context/1.5.0": {
+      "aursh-context/1.6.0": {
         "dependencies": {
-          "Aursh": "1.5.0",
-          "aursh.Reference": "1.5.0.0",
+          "Aursh": "1.6.0",
+          "aursh.Reference": "1.6.0.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.24"
         },
         "runtime": {
@@ -737,25 +737,25 @@
           }
         }
       },
-      "Aursh/1.5.0": {
+      "Aursh/1.6.0": {
         "runtime": {
           "aursh.dll": {
             "fileVersion": "0.0.0.0"
           }
         }
       },
-      "aursh.Reference/1.5.0.0": {
+      "aursh.Reference/1.6.0.0": {
         "runtime": {
           "aursh.dll": {
-            "assemblyVersion": "1.5.0.0",
-            "fileVersion": "1.5.0.0"
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
           }
         }
       }
     }
   },
   "libraries": {
-    "aursh-context/1.5.0": {
+    "aursh-context/1.6.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -765,12 +765,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "Aursh/1.5.0": {
+    "Aursh/1.6.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "aursh.Reference/1.5.0.0": {
+    "aursh.Reference/1.6.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""

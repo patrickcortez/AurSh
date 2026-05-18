@@ -14,7 +14,7 @@
     <OutputPath>..\..\bin\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <Version>1.5.0</Version>
+    <Version>1.6.0</Version>
     <Authors>Tezzz</Authors>
     <Product>AurShell Contexts</Product>
     <Description>AurShell Contexts is a disk backed object like that can hold multiple attributes to structurize and organize variables.</Description>

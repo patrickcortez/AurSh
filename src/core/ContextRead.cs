@@ -1,31 +1,35 @@
 using AurShell.Contexts.Core;
+using AurShell.Parser;
+using AurShell.Utils;
 
 namespace AurShell.Core;
 
 internal class ContextReader
 {
-    readonly string jsonfile = Path.Combine(AppContext.BaseDirectory,"Contexts.json");
+    readonly string confile = Path.Combine(Platform.HomeDirectory,".aursh","Contexts.con");
 
-    Context[] cons;
+    Context[]? cons;
 
    public ContextReader()
     {
-        if (!File.Exists(jsonfile))
+        if (!File.Exists(confile))
         {
-            File.Create(jsonfile);
+            File.Create(confile);
         }
 
-        cons = JsonHandler.ReadFromFile();
+        Reader read = new Reader();
+
+        cons = read.GetContexts();
 
     }
 
-    public string GetAttributeValue(string AttributeName)
+    public string GetAttributeValue(string ContextName,string AttributeName)
     {
         foreach(Context con in cons)
         {
-            if(con.ContextName == AttributeName)
+            if(con.ContextName == ContextName)
             {
-                return con.GetValue(AttributeName);
+                return con.GetAttributeValue(AttributeName);
             }
         }
 

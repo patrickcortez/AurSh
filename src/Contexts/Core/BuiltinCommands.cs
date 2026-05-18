@@ -84,7 +84,7 @@ internal class Builtins
     List<string> cmds = new()
     {
         "new","del","list","update", "insert","remove" // new, del and list: Done!
-    }; // 3 more to go -_-
+    }; // all done =D
 
     int ExecuteCommand(string cmd,params string[] args)
     {
@@ -190,7 +190,15 @@ internal class Builtins
         {
             if (con.ContextName.Equals(ContextName))
             {
-                return con.RemoveAttribute(AttributeName);
+                int exit = con.RemoveAttribute(AttributeName);
+
+
+                if(exit == 0)
+                {
+                    Writer.OverWriteFile(cons.ToArray());
+                }
+
+                return exit;
             }
         }
 

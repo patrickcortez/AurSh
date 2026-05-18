@@ -27,7 +27,7 @@ sealed class Utility
 
         foreach (char c in data)
         {
-            if (char.IsWhiteSpace(c))
+            if (char.IsWhiteSpace(c) && !inQoutes)
             {
                 continue;
             }

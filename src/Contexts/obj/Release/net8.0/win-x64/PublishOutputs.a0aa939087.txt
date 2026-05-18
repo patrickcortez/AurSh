@@ -1,2 +1,4 @@
 C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh-context.pdb
+C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh.runtimeconfig.json
+C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh.pdb
 C:\Users\Cortez\Repos\AurSh\publish\win-x64\aursh-context.exe

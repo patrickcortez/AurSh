@@ -40,20 +40,20 @@ read_bytes() {
 
 # ── write_u64_le file offset value ────────────────────────────────
 # Write a 64-bit little-endian integer `value` into `file` at `offset`.
+# Uses POSIX octal escapes (\NNN) and writes byte-by-byte to avoid
+# null-byte-in-variable issues that break on dash/mksh/ash.
 write_u64_le() {
     _file="$1"; _off="$2"; _val="$3"
-    # Build 8-byte little-endian sequence
-    _bytes=""
     _v=$_val
     _b=0
     while [ $_b -lt 8 ]; do
         _byte=$(( _v & 0xFF ))
-        _bytes="${_bytes}$(printf '\\x%02x' "$_byte")"
+        _seek=$(( _off + _b ))
+        _oct=$(printf '%03o' "$_byte")
+        printf "\\${_oct}" | dd of="$_file" bs=1 seek="$_seek" count=1 conv=notrunc 2>/dev/null
         _v=$(( _v >> 8 ))
         _b=$((_b + 1))
     done
-    # Use printf to generate raw bytes, then dd to overwrite in-place
-    printf "$_bytes" | dd of="$_file" bs=1 seek="$_off" count=8 conv=notrunc 2>/dev/null
 }
 
 # ── patch_binary file ─────────────────────────────────────────────
@@ -85,7 +85,18 @@ patch_binary() {
 
     info "Scanning $_bin: phoff=$_phoff phentsize=$_phentsize phnum=$_phnum"
 
-    # PT_TLS type = 7 in the p_type field (first 4 bytes of each phdr)
+    # ELF64 Phdr layout (56 bytes):
+    #   Offset  Size  Field
+    #   0       4     p_type
+    #   4       4     p_flags
+    #   8       8     p_offset
+    #   16      8     p_vaddr
+    #   24      8     p_paddr
+    #   32      8     p_filesz
+    #   40      8     p_memsz
+    #   48      8     p_align
+
+    # PT_TLS type = 7
     _found=0
     _idx=0
     while [ $_idx -lt "$_phnum" ]; do
@@ -94,26 +105,78 @@ patch_binary() {
 
         if [ "$_ptype" -eq 7 ]; then
             _found=1
-            # In ELF64, p_align is at offset 48 (0x30) within the phdr entry,
-            # and is 8 bytes wide.
-            _palign_off=$(( _entry_off + 48 ))
-            _cur_align=$(read_bytes "$_bin" "$_palign_off" 8)
 
-            info "Found PT_TLS at phdr[$_idx]: current p_align=$_cur_align"
+            _poffset_off=$(( _entry_off + 8 ))
+            _pvaddr_off=$(( _entry_off + 16 ))
+            _ppaddr_off=$(( _entry_off + 24 ))
+            _pfilesz_off=$(( _entry_off + 32 ))
+            _pmemsz_off=$(( _entry_off + 40 ))
+            _palign_off=$(( _entry_off + 48 ))
+
+            _cur_align=$(read_bytes "$_bin" "$_palign_off" 8)
+            _cur_vaddr=$(read_bytes "$_bin" "$_pvaddr_off" 8)
+            _cur_paddr=$(read_bytes "$_bin" "$_ppaddr_off" 8)
+            _cur_offset=$(read_bytes "$_bin" "$_poffset_off" 8)
+            _cur_filesz=$(read_bytes "$_bin" "$_pfilesz_off" 8)
+            _cur_memsz=$(read_bytes "$_bin" "$_pmemsz_off" 8)
+
+            _skew=$(( _cur_vaddr % REQUIRED_ALIGN ))
+
+            info "Found PT_TLS at phdr[$_idx]:"
+            info "  p_align=$_cur_align p_vaddr=$_cur_vaddr p_offset=$_cur_offset"
+            info "  p_filesz=$_cur_filesz p_memsz=$_cur_memsz skew=$_skew"
+
+            _need_patch=0
 
             if [ "$_cur_align" -lt "$REQUIRED_ALIGN" ]; then
-                info "Patching p_align from $_cur_align to $REQUIRED_ALIGN"
+                _need_patch=1
+            fi
+
+            if [ "$_skew" -ne 0 ]; then
+                _need_patch=1
+            fi
+
+            if [ "$_need_patch" -eq 0 ]; then
+                info "TLS segment already correctly aligned (align=$_cur_align, skew=0), skipping."
+            else
+                # Step 1: Set p_align to REQUIRED_ALIGN
+                info "Setting p_align=$REQUIRED_ALIGN"
                 write_u64_le "$_bin" "$_palign_off" "$REQUIRED_ALIGN"
 
-                # Verify the write
-                _new_align=$(read_bytes "$_bin" "$_palign_off" 8)
-                if [ "$_new_align" -eq "$REQUIRED_ALIGN" ]; then
-                    info "Successfully patched: p_align=$_new_align"
-                else
-                    die "Verification failed: expected $REQUIRED_ALIGN, got $_new_align"
+                if [ "$_skew" -ne 0 ]; then
+                    # Step 2: Align p_vaddr, p_paddr, and p_offset downward to
+                    # the nearest REQUIRED_ALIGN boundary, then extend p_filesz
+                    # and p_memsz by the same delta so the TLS data range is preserved.
+                    _new_vaddr=$(( _cur_vaddr - _skew ))
+                    _new_paddr=$(( _cur_paddr - _skew ))
+                    _new_offset=$(( _cur_offset - _skew ))
+                    _new_filesz=$(( _cur_filesz + _skew ))
+                    _new_memsz=$(( _cur_memsz + _skew ))
+
+                    info "Adjusting addresses by -$_skew to fix skew:"
+                    info "  p_vaddr=$_cur_vaddr -> $_new_vaddr"
+                    info "  p_paddr=$_cur_paddr -> $_new_paddr"
+                    info "  p_offset=$_cur_offset -> $_new_offset"
+                    info "  p_filesz=$_cur_filesz -> $_new_filesz"
+                    info "  p_memsz=$_cur_memsz -> $_new_memsz"
+
+                    write_u64_le "$_bin" "$_pvaddr_off" "$_new_vaddr"
+                    write_u64_le "$_bin" "$_ppaddr_off" "$_new_paddr"
+                    write_u64_le "$_bin" "$_poffset_off" "$_new_offset"
+                    write_u64_le "$_bin" "$_pfilesz_off" "$_new_filesz"
+                    write_u64_le "$_bin" "$_pmemsz_off" "$_new_memsz"
                 fi
-            else
-                info "Alignment already sufficient ($_cur_align >= $REQUIRED_ALIGN), skipping."
+
+                # Verify
+                _ver_align=$(read_bytes "$_bin" "$_palign_off" 8)
+                _ver_vaddr=$(read_bytes "$_bin" "$_pvaddr_off" 8)
+                _ver_skew=$(( _ver_vaddr % REQUIRED_ALIGN ))
+
+                if [ "$_ver_align" -eq "$REQUIRED_ALIGN" ] && [ "$_ver_skew" -eq 0 ]; then
+                    info "Successfully patched: p_align=$_ver_align, skew=0"
+                else
+                    die "Verification failed: p_align=$_ver_align, skew=$_ver_skew"
+                fi
             fi
         fi
 

@@ -289,6 +289,10 @@ else ifeq ($(DETECTED_OS),Windows)
 	@echo ""
 else
 	@echo "[install] Installing to $(INSTALL_DIR)/$(EXE)..."
+ifeq ($(DETECTED_OS),Termux)
+	@echo "[install] Setting up glibc-compatibility symlinks for Bionic..."
+	@sh scripts/linux-termux-macos/termux-compat.sh
+endif
 	install -d "$(INSTALL_DIR)"
 	install -m 755 "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	install -m 755 "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"

@@ -71,6 +71,8 @@
   </Target>
 
   <Target Name="Install" DependsOnTargets="Publish">
+    <Message Text="[install] Setting up glibc-compatibility symlinks for Bionic..." Importance="high" Condition="'$(_IsTermux)' == 'true'" />
+    <Exec Command="sh scripts/linux-termux-macos/termux-compat.sh" Condition="'$(_IsTermux)' == 'true'" />
     <Message Text="[install] Installing to $(_InstallDir)/$(_Exe)..." Importance="high" />
     <MakeDir Directories="$(_InstallDir)" />
     <Copy SourceFiles="$(_PublishDir)/$(_Exe)" DestinationFolder="$(_InstallDir)" />

@@ -8,7 +8,7 @@
           "build/Microsoft.NET.ILLink.Tasks.props": {}
         }
       },
-      "Aursh/1.6.0": {
+      "Aursh/2.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -26,7 +26,7 @@
           "build/Microsoft.NET.ILLink.Tasks.props": {}
         }
       },
-      "Aursh/1.6.0": {
+      "Aursh/2.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
         "compile": {
@@ -90,7 +90,7 @@
         "useSharedDesignerContext.txt"
       ]
     },
-    "Aursh/1.6.0": {
+    "Aursh/2.0.0": {
       "type": "project",
       "path": "../AurShell.csproj",
       "msbuildProject": "../AurShell.csproj"
@@ -98,7 +98,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "Aursh >= 1.6.0",
+      "Aursh >= 2.0.0",
       "Microsoft.NET.ILLink.Tasks >= 8.0.24"
     ]
   },
@@ -107,7 +107,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.6.0",
+    "version": "2.0.0",
     "restore": {
       "projectUniqueName": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\Contexts.csproj",
       "projectName": "aursh-context",

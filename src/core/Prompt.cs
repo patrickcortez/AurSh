@@ -114,7 +114,7 @@ public class Prompt
             "dim" => Utils.Ansi.Dim,
             "exit_code" => lastExitCode.ToString(),
             "shell" => "aursh",
-            "version" => "1.6.0",
+            "version" => "2.0.0",
             "dollar" => System.Environment.UserName == "root" ? "#" : "$",
             "arrow" => "\u276F",
             "lambda" => "\u03BB",

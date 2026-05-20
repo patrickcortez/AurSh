@@ -40,7 +40,7 @@ public class Program
 
         if (args[0] == "--version" || args[0] == "-v")
         {
-            Console.WriteLine("aursh 1.6.0");
+            Console.WriteLine("aursh 2.0.0");
             return 0;
         }
 

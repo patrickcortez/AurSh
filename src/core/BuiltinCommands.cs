@@ -10,7 +10,7 @@ namespace AurShell.Core;
 public static class BuiltinCommands
 {
 
-    private readonly static string version = "1.6";
+    private readonly static string version = "2.0";
     private static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
     {
         "cd", "export", "unset", "exit", "history", "clear", "echo",
@@ -610,6 +610,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-reload : {Ansi.FgBrightBlue}Reloads the Shell to apply newly added plugins.
                                 - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.
                                 - {Ansi.FgBrightCyan}aursh-update : {Ansi.FgBrightBlue}Updates the shell from the remote repository.
+                                - {Ansi.FgBrightCyan}aursh-context : {Ansi.FgBrightBlue}Create, Modify or Delete Contexts.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

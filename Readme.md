@@ -3,7 +3,7 @@
 <h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
 <p align="center">
-<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_1.6-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen"> <img src="https://shields.io/badge/BlackBox-black">
+<img src= "https://shields.io/badge/Aursh-lightblue"> <img src="https://shields.io/badge/Ver_2.0-pink"> <img src="https://shields.io/badge/Cross_Platform-lightgreen"> <img src="https://shields.io/badge/BlackBox-black">
 </p>
 
 <p align="center">
@@ -17,10 +17,12 @@ This is basically a rewrite of Linuxify, my old project. But cross compatible be
 It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua or F# scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands,modify the UI or create new behaviors for the shell.
 
 It also has file associations, so you can associate file extensions with their respective compiler or interpreter.
+The shell also has extensible auto-suggestions. Along with that is its own contexts which are disked back object like
+data structure that can hold multiple attributes that each contain a value that is envokable in the command line for structuring data.
 
-Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good. 
+Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good.
 
-When using the shell, make sure you put any process/app that you have installed that takes over the terminal in the bypass list: `~/.aursh/bypass.txt`. 
+When using the shell, make sure you put any process/app that you have installed that takes over the terminal in the bypass list: `~/.aursh/bypass.txt`.
 
 </div>
 

@@ -14,7 +14,7 @@
     <OutputPath>..\..\bin\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <Version>1.6.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Tezzz</Authors>
     <Product>AurShell Update Tool</Product>
     <Description>Standalone updater for AurShell. Designed to be invoked under sudo / elevated privileges so it can install over a system-wide AurShell binary that the user does not own.</Description>

@@ -281,7 +281,7 @@ public class Shell
     private void InitializeDefaultVariables()
     {
         _env.Set("SHELL", "aursh");
-        _env.Set("AURSH_VERSION", "1.6.0");
+        _env.Set("AURSH_VERSION", "2.0.0");
         _env.Set("PWD", _executor.WorkingDirectory);
         _env.Set("HOME", Utils.Platform.HomeDirectory);
         _env.Set("USER", Utils.Platform.UserName);

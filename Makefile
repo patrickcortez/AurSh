@@ -11,7 +11,7 @@ UPDATE_APP_NAME := aursh-update
 CONTEXT_APP_NAME := aursh-context
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
-VERSION := 1.6.0
+VERSION := 2.0.0
 
 # ──────────────────────────────────────────────
 # OS and Architecture Detection

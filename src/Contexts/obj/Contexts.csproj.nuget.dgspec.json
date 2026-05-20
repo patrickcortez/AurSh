@@ -5,7 +5,7 @@
   },
   "projects": {
     "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj": {
-      "version": "1.6.0",
+      "version": "2.0.0",
       "restore": {
         "projectUniqueName": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj",
         "projectName": "Aursh",
@@ -117,7 +117,7 @@
       }
     },
     "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\Contexts.csproj": {
-      "version": "1.6.0",
+      "version": "2.0.0",
       "restore": {
         "projectUniqueName": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\Contexts.csproj",
         "projectName": "aursh-context",

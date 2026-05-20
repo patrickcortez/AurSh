@@ -101,6 +101,7 @@ else ifeq ($(DETECTED_OS),Termux)
     INSTALL_DIR := $(PREFIX)/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
+    FIX_ELF_TLS := scripts/linux-termux-macos/fix-elf-tls.sh
     PATHSEP := :
 else
     RID := linux-$(ARCH)
@@ -254,53 +255,11 @@ else
 		-p:PublishTrimmed=true \
 		-p:IncludeNativeLibrariesForSelfExtract=true \
 		-o $(PUBLISH_DIR)
-	@if [ "$(DETECTED_OS)" = "Termux" ] || [ "$(RID)" = "linux-arm64" ]; then \
-		echo "[publish] Fixing TLS alignment for Android compatibility..."; \
-		for f in "$(PUBLISH_DIR)/$(EXE)" "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(PUBLISH_DIR)/$(CONTEXT_EXE)"; do \
-			if [ ! -f "$$f" ]; then continue; fi; \
-			magic=$$(od -An -N 4 -t x1 "$$f" | tr -d ' ' 2>/dev/null); \
-			if [ "$$magic" != "7f454c46" ]; then continue; fi; \
-			class=$$(od -An -j 4 -N 1 -t u1 "$$f" | tr -d ' ' 2>/dev/null); \
-			endian=$$(od -An -j 5 -N 1 -t u1 "$$f" | tr -d ' ' 2>/dev/null); \
-			if [ "$$endian" != "1" ]; then continue; fi; \
-			if [ "$$class" = "2" ]; then \
-				e_phoff=$$(od -An -j 32 -N 8 -t u8 "$$f" | tr -d ' ' 2>/dev/null); \
-				e_phentsize=$$(od -An -j 54 -N 2 -t u2 "$$f" | tr -d ' ' 2>/dev/null); \
-				e_phnum=$$(od -An -j 56 -N 2 -t u2 "$$f" | tr -d ' ' 2>/dev/null); \
-				i=0; while [ $$i -lt $$e_phnum ]; do \
-					ph_offset=$$(($$e_phoff + i * $$e_phentsize)); \
-					p_type=$$(od -An -j $$ph_offset -N 4 -t u4 "$$f" | tr -d ' ' 2>/dev/null); \
-					if [ "$$p_type" = "7" ]; then \
-						p_align_offset=$$(($$ph_offset + 48)); \
-						p_align=$$(od -An -j $$p_align_offset -N 8 -t u8 "$$f" | tr -d ' ' 2>/dev/null); \
-						if [ "$$p_align" -lt 64 ]; then \
-							echo "  Patching $$f (64-bit TLS alignment: $$p_align -> 64)"; \
-							printf '\x40\x00\x00\x00\x00\x00\x00\x00' | dd of="$$f" bs=1 seek=$$p_align_offset conv=notrunc 2>/dev/null; \
-						fi; \
-					fi; \
-					i=$$(($$i + 1)); \
-				done; \
-			elif [ "$$class" = "1" ]; then \
-				e_phoff=$$(od -An -j 28 -N 4 -t u4 "$$f" | tr -d ' ' 2>/dev/null); \
-				e_phentsize=$$(od -An -j 42 -N 2 -t u2 "$$f" | tr -d ' ' 2>/dev/null); \
-				e_phnum=$$(od -An -j 44 -N 2 -t u2 "$$f" | tr -d ' ' 2>/dev/null); \
-				i=0; while [ $$i -lt $$e_phnum ]; do \
-					ph_offset=$$(($$e_phoff + i * $$e_phentsize)); \
-					p_type=$$(od -An -j $$ph_offset -N 4 -t u4 "$$f" | tr -d ' ' 2>/dev/null); \
-					if [ "$$p_type" = "7" ]; then \
-						p_align_offset=$$(($$ph_offset + 28)); \
-						p_align=$$(od -An -j $$p_align_offset -N 4 -t u4 "$$f" | tr -d ' ' 2>/dev/null); \
-						if [ "$$p_align" -lt 64 ]; then \
-							echo "  Patching $$f (32-bit TLS alignment: $$p_align -> 64)"; \
-							printf '\x40\x00\x00\x00' | dd of="$$f" bs=1 seek=$$p_align_offset conv=notrunc 2>/dev/null; \
-						fi; \
-					fi; \
-					i=$$(($$i + 1)); \
-				done; \
-			fi; \
-		done; \
-	fi
 	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)"
+ifeq ($(DETECTED_OS),Termux)
+	@echo "[publish] Patching ELF TLS alignment for Android 15+ Bionic..."
+	@sh $(FIX_ELF_TLS) "$(PUBLISH_DIR)/$(EXE)" "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(PUBLISH_DIR)/$(CONTEXT_EXE)"
+endif
 endif
 
 # ──────────────────────────────────────────────

@@ -151,6 +151,20 @@ public static class Pipeline
                 foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
                 return ExecuteExternal(tempCmd, env, workingDirectory, background);
             }
+
+            // F# plugins: build a CommandNode so the process goes through
+            // ExecuteExternal with full BlackBox pipe capture, instead of
+            // the plugin manager's unmanaged child process path.
+            var fsharpArgs = env.PluginManager.BuildFSharpArgs(cmd.Name, cmd.Args.ToList());
+            if (fsharpArgs != null)
+            {
+                var fsharpNode = new CommandNode { Name = "dotnet" };
+                foreach (string arg in fsharpArgs)
+                    fsharpNode.Args.Add(arg);
+                foreach (var r in cmd.Redirections) fsharpNode.Redirections.Add(r);
+                return ExecuteExternal(fsharpNode, env, workingDirectory, background);
+            }
+
             return env.PluginManager.ExecutePluginCommand(cmd.Name, cmd.Args.ToList());
         }
 
@@ -337,9 +351,19 @@ public static class Pipeline
 
             if (boxPumpTask != null)
             {
-                try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
-                boxPumpCancel?.Cancel();
-                try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(200)); } catch { }
+                // The pump must fully drain the child's stdout/stderr pipes
+                // before we return. When the process exits, the OS pipe
+                // buffer may still hold unread data — the pump's ReadAsync
+                // will see it on the next iteration and then return 0 (EOF)
+                // naturally. Give it a generous window; 5 seconds is well
+                // beyond any realistic pipe-drain time. Only cancel as a
+                // safety fallback so the shell never hangs on a broken pipe.
+                try { boxPumpTask.Wait(System.TimeSpan.FromSeconds(5)); } catch { }
+                if (!boxPumpTask.IsCompleted)
+                {
+                    boxPumpCancel?.Cancel();
+                    try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
+                }
                 boxPumpCancel?.Dispose();
             }
 

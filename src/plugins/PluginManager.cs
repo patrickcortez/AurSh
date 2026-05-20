@@ -171,6 +171,39 @@ public class PluginManager
         }
     }
 
+    /// <summary>
+    /// If <paramref name="name"/> is an F# plugin, returns a list of
+    /// arguments for <c>dotnet fsi "entry.fsx" -- "arg1" "arg2"</c>.
+    /// Pipeline uses this to build a CommandNode that goes through
+    /// <see cref="Pipeline.ExecuteExternal"/> with full BlackBox pipe
+    /// capture, instead of the unmanaged child process path in
+    /// <see cref="ExecuteFSharpPlugin"/>.
+    /// Returns <c>null</c> if the command is not an F# plugin.
+    /// </summary>
+    public List<string>? BuildFSharpArgs(string name, List<string> args)
+    {
+        if (!_commandMap.TryGetValue(name, out var plugin)) return null;
+        if (plugin.Manifest.Type.ToLowerInvariant() != "fsharp") return null;
+
+        string entryPath = Path.Combine(plugin.Manifest.PluginDir, plugin.Manifest.Entry);
+        if (!File.Exists(entryPath))
+        {
+            Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}': entry file '{plugin.Manifest.Entry}' not found");
+            return null;
+        }
+
+        var result = new List<string>();
+        result.Add("fsi");
+        result.Add(entryPath);
+        if (args.Count > 0)
+        {
+            result.Add("--");
+            foreach (string a in args)
+                result.Add(a);
+        }
+        return result;
+    }
+
     private int ExecuteFSharpPlugin(LoadedPlugin plugin, List<string> args)
     {
         string entryPath = Path.Combine(plugin.Manifest.PluginDir, plugin.Manifest.Entry);

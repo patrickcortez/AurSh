@@ -264,8 +264,28 @@ public sealed class BlackBoxLiveRenderer
         bool hasInput = !string.IsNullOrEmpty(inputLine);
         bool hasPartial = partialLine != null;
 
-        bool needFooterRefresh = !_footerEmitted || bufCount > _emittedBodyRows || _completed || hasInput || hasPartial;
+        // Check if the last body row was overwritten via ReplaceLast (carriage-
+        // return-based in-place updates from F# interactive, progress bars, etc.)
+        bool dirtyLast = session.Buffer.LastLineDirty;
+
+        bool needFooterRefresh = !_footerEmitted || bufCount > _emittedBodyRows || _completed || hasInput || hasPartial || dirtyLast;
         if (!needFooterRefresh) return;
+
+        // If the last emitted body row was replaced in the buffer, we need to
+        // back up one extra row so the for-loop below re-emits it. Decrement
+        // the emitted counter so it gets picked up, and add 1 to the cursor-up
+        // count so we overwrite the stale row on screen.
+        int extraUp = 0;
+        if (dirtyLast && _emittedBodyRows > 0 && _emittedBodyRows >= bufCount)
+        {
+            _emittedBodyRows--;
+            extraUp = 1;
+            session.Buffer.LastLineDirty = false;
+        }
+        else if (dirtyLast)
+        {
+            session.Buffer.LastLineDirty = false;
+        }
 
         var sb = new StringBuilder();
 
@@ -280,13 +300,17 @@ public sealed class BlackBoxLiveRenderer
                 sb.Append('\r');
             }
 
-            // Move up by the number of transient rows emitted last time (footer + any input rows).
-            sb.Append(Ansi.MoveCursorUp(_lastTransientRows > 0 ? _lastTransientRows : 1));
+            // Move up by the number of transient rows emitted last time
+            // (footer + any input rows), plus one more if we're re-drawing
+            // a dirty body row that was overwritten by ReplaceLast.
+            int upCount = (_lastTransientRows > 0 ? _lastTransientRows : 1) + extraUp;
+            sb.Append(Ansi.MoveCursorUp(upCount));
             sb.Append('\r');
             sb.Append(Ansi.ClearScreenFromCursor);
         }
 
-        // Append every body row we haven't emitted yet.
+        // Append every body row we haven't emitted yet (including any
+        // row we backed up to re-draw due to a ReplaceLast overwrite).
         for (int i = _emittedBodyRows; i < bufCount; i++)
         {
             BufferLine line = session.Buffer[i];

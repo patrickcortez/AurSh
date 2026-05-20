@@ -31,6 +31,7 @@ public sealed class BlackBoxBuffer
     private readonly int _capacity;
     private int _topLineIdx;
     private BufferLine? _partialLine;
+    private volatile bool _lastLineDirty;
 
     public BlackBoxBuffer(int capacity = 5000)
     {
@@ -43,6 +44,17 @@ public sealed class BlackBoxBuffer
     {
         get => _partialLine;
         set => _partialLine = value;
+    }
+
+    /// <summary>
+    /// True when <see cref="ReplaceLast"/> has overwritten a line that may
+    /// have already been emitted by the live renderer. The renderer checks
+    /// and clears this flag so it can back up and re-draw the replaced row.
+    /// </summary>
+    public bool LastLineDirty
+    {
+        get => _lastLineDirty;
+        set => _lastLineDirty = value;
     }
 
     public int TopLineIdx => _topLineIdx;
@@ -74,6 +86,7 @@ public sealed class BlackBoxBuffer
         if (_lines.Count > 0)
         {
             _lines[_lines.Count - 1] = new BufferLine(text, kind, stage);
+            _lastLineDirty = true;
         }
         else
         {

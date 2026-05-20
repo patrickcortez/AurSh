@@ -167,16 +167,44 @@ public static class BlackBoxIo
                         continue;
                     }
 
-                    // Handle \r (carriage return without newline): reset the line
-                    // buffer to simulate a real terminal overwriting from column 0.
-                    // Programs like progress bars, spinners, and dotnet fsi use
-                    // this pattern to update a line in-place.
+                    // Handle \r: distinguish between \r\n (normal Windows line
+                    // ending) and bare \r (in-place overwrite used by progress
+                    // bars, spinners, and F# interactive prompts).
+                    //
+                    // Peek ahead: if the very next byte in this chunk is \n,
+                    // this is a \r\n pair — just put the \r into lineBuf and
+                    // let the \n handler above commit the line normally.
+                    // StripTrailingCr will strip the \r before it reaches the
+                    // buffer. Only bare \r (not followed by \n) triggers the
+                    // in-place overwrite path.
                     if (b == (byte)'\r')
                     {
+                        // Peek ahead: if the next byte in this chunk is \n,
+                        // this is a \r\n pair — a normal line ending, not an
+                        // in-place overwrite. Put the \r in lineBuf and let
+                        // the \n handler commit the line normally.
+                        bool nextIsLf = (i + 1 < read) && buffer[i + 1] == (byte)'\n';
+                        if (nextIsLf)
+                        {
+                            lineBuf.WriteByte(b);
+                            continue;
+                        }
+
+                        // Edge case: \r is the last byte in this read chunk.
+                        // We can't tell if \n follows in the next chunk, so
+                        // buffer the \r and defer. If \n arrives next, the
+                        // \n handler strips it via StripTrailingCr. If new
+                        // text arrives instead, FormatBodyLine strips
+                        // everything before the last \r in the rendered line.
+                        if (i + 1 >= read)
+                        {
+                            lineBuf.WriteByte(b);
+                            continue;
+                        }
+
+                        // Bare \r: genuine carriage return overwrite.
                         if (lineBuf.Length > 0)
                         {
-                            // Commit what we have as an in-place overwrite of the
-                            // last line, then reset for the next overwrite.
                             string crRaw = Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length);
                             crRaw = StripCursorSequences(crRaw);
                             string crPrefix = ansiTracker.GetStatePrefix();

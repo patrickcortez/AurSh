@@ -263,6 +263,78 @@ public static class Platform
 
         if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_GCRetainVM")))
             System.Environment.SetEnvironmentVariable("DOTNET_GCRetainVM", "1");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_TieredCompilation")))
+            System.Environment.SetEnvironmentVariable("DOTNET_TieredCompilation", "0");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_TC_QuickJitForLoops")))
+            System.Environment.SetEnvironmentVariable("DOTNET_TC_QuickJitForLoops", "0");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_ReadyToRun")))
+            System.Environment.SetEnvironmentVariable("DOTNET_ReadyToRun", "1");
+
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_GCConserveMemory")))
+            System.Environment.SetEnvironmentVariable("DOTNET_GCConserveMemory", "9");
+
+        int sdkVersion = DetectAndroidSdkVersion();
+        if (sdkVersion >= 35)
+        {
+            if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DOTNET_JitMinOpts")))
+                System.Environment.SetEnvironmentVariable("DOTNET_JitMinOpts", "1");
+        }
+    }
+
+    /// <summary>
+    /// Reads the Android SDK version from the ANDROID_SDK_VERSION environment
+    /// variable or from /system/build.prop (ro.build.version.sdk). Returns 0
+    /// if the version cannot be determined.
+    /// </summary>
+    private static int DetectAndroidSdkVersion()
+    {
+        string? envSdk = System.Environment.GetEnvironmentVariable("ANDROID_SDK_VERSION");
+        if (!string.IsNullOrEmpty(envSdk) && int.TryParse(envSdk, out int envVersion))
+            return envVersion;
+
+        try
+        {
+            string buildPropPath = "/system/build.prop";
+            if (!File.Exists(buildPropPath))
+                return 0;
+
+            foreach (string line in File.ReadLines(buildPropPath))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("ro.build.version.sdk=", StringComparison.Ordinal))
+                {
+                    string value = trimmed.Substring("ro.build.version.sdk=".Length).Trim();
+                    if (int.TryParse(value, out int sdkVer))
+                        return sdkVer;
+                }
+            }
+        }
+        catch { }
+
+        // Fallback: try getprop via process if build.prop wasn't readable
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("getprop", "ro.build.version.sdk")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc != null)
+            {
+                string output = proc.StandardOutput.ReadToEnd().Trim();
+                proc.WaitForExit();
+                if (int.TryParse(output, out int propVer))
+                    return propVer;
+            }
+        }
+        catch { }
+
+        return 0;
     }
 
     public static void EnsureDirectoriesExist()

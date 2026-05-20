@@ -9,7 +9,6 @@
 <p align="center">
  <img height="256" width="256" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
 </p>
-<div align="center">
 A cross compatible shell developed in C# by Tezzz, is a system shell
 similar to most shells like bash, zsh and fish.
 
@@ -45,7 +44,7 @@ round edges.
 
 ## Built-ins
 
-- `aursh-plugin` <add,list,del,init,debug> : plugin system of the shell 
+- `aursh-plugin` <add,list,del,init,debug> : plugin system of the shell
 - `aursh-assoc` <extension> <command> : file association
 - `aursh-reload` : reloads shell
 - `aursh-history` <clear,show,filter=<pattern>> : TUI history with query abilities

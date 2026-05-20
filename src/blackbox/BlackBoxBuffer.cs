@@ -63,6 +63,24 @@ public sealed class BlackBoxBuffer
     public void Append(string text, LineKind kind = LineKind.Stdout, int? stage = null)
         => Append(new BufferLine(text, kind, stage));
 
+    /// <summary>
+    /// Overwrites the most recently appended line in the buffer. Used for
+    /// carriage-return-based in-place updates (progress bars, spinners,
+    /// prompts that rewrite themselves). If the buffer is empty, the line
+    /// is appended as a new entry instead.
+    /// </summary>
+    public void ReplaceLast(string text, LineKind kind = LineKind.Stdout, int? stage = null)
+    {
+        if (_lines.Count > 0)
+        {
+            _lines[_lines.Count - 1] = new BufferLine(text, kind, stage);
+        }
+        else
+        {
+            Append(new BufferLine(text, kind, stage));
+        }
+    }
+
     public void AppendMany(IEnumerable<string> lines, LineKind kind = LineKind.Stdout, int? stage = null)
     {
         foreach (string line in lines)

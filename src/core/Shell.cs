@@ -55,6 +55,7 @@ public class Shell
 
 
         InitializeDefaultVariables();
+        Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
         LoadPlugins();
@@ -82,6 +83,7 @@ public class Shell
         _running = true;
 
         InitializeDefaultVariables();
+        Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
         LoadPlugins();

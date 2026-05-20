@@ -52,7 +52,7 @@ public class PluginManager
         var manifest = PluginManifest.LoadFrom(manifestPath);
         if (manifest == null) return false;
 
-        if (_plugins.Any(p => p.Manifest.Name == manifest.Name))
+        if (_plugins.Any(p => string.Equals(p.Manifest.Name, manifest.Name, StringComparison.OrdinalIgnoreCase)))
         {
             Console.Error.WriteLine($"aursh: plugin '{manifest.Name}' is already loaded");
             return false;
@@ -300,21 +300,72 @@ public class PluginManager
     public int UpdatePlugin(string name)
     {
         string pluginDir = Path.Combine(_pluginsDir, name);
-        string manifestPath = Path.Combine(pluginDir, "plugin.json");
-        if (!Directory.Exists(pluginDir) || !File.Exists(manifestPath))
+        if (!Directory.Exists(pluginDir))
         {
-            Console.Error.WriteLine($"aursh: plugin '{name}' not found");
+            // Try case-insensitive directory lookup
+            string? matchedDir = null;
+            try
+            {
+                foreach (string dir in Directory.GetDirectories(_pluginsDir))
+                {
+                    string dirName = Path.GetFileName(dir);
+                    if (string.Equals(dirName, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        matchedDir = dir;
+                        break;
+                    }
+                }
+            }
+            catch { }
+
+            if (matchedDir == null)
+            {
+                Console.Error.WriteLine($"aursh: plugin '{name}' not found in {_pluginsDir}");
+                return 1;
+            }
+            pluginDir = matchedDir;
+        }
+
+        string manifestPath = Path.Combine(pluginDir, "plugin.json");
+        if (!File.Exists(manifestPath))
+        {
+            Console.Error.WriteLine($"aursh: plugin '{name}': no plugin.json found in '{pluginDir}'");
             return 1;
         }
 
-        UnloadPlugin(name);
+        // Read the manifest to get the canonical name before unloading
+        var manifest = PluginManifest.LoadFrom(manifestPath);
+        if (manifest == null)
+        {
+            Console.Error.WriteLine($"aursh: plugin '{name}': failed to parse plugin.json");
+            return 1;
+        }
 
+        string entryPath = Path.Combine(manifest.PluginDir, manifest.Entry);
+        if (!File.Exists(entryPath))
+        {
+            Console.Error.WriteLine($"aursh: plugin '{manifest.Name}': entry file '{manifest.Entry}' not found");
+            return 1;
+        }
+
+        // Unload using the canonical name from the manifest for reliable matching
+        string canonicalName = manifest.Name;
+        bool wasLoaded = UnloadPlugin(canonicalName);
+
+        if (!wasLoaded)
+        {
+            // Also try the user-supplied name in case it differs from canonical
+            wasLoaded = UnloadPlugin(name);
+        }
+
+        // Reload the plugin from disk (picks up any file changes)
         if (LoadPlugin(manifestPath))
         {
-            Console.WriteLine($"Updated plugin '{name}'");
+            Console.WriteLine($"Updated plugin '{canonicalName}' v{manifest.Version}");
             return 0;
         }
-        Console.Error.WriteLine($"aursh: failed to reload plugin '{name}'");
+
+        Console.Error.WriteLine($"aursh: failed to reload plugin '{canonicalName}' — check the entry file for errors");
         return 1;
     }
 

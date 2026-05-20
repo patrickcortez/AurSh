@@ -292,6 +292,10 @@ public sealed class BlackBoxRenderer
             sb.Append(_config.BorderColor);
             sb.Append(g.Vertical);
             sb.Append(Ansi.Reset);
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(_config.BackgroundColor);
+
             sb.Append(' ');
 
             string content = FormatBodyLine(line, innerWidth - 2);
@@ -303,6 +307,10 @@ public sealed class BlackBoxRenderer
                 sb.Append(' ', pad);
 
             sb.Append(' ');
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(Ansi.Reset);
+
             sb.Append(_config.BorderColor);
             sb.Append(g.Vertical);
             sb.Append(Ansi.Reset);
@@ -371,16 +379,17 @@ public sealed class BlackBoxRenderer
         }
 
         string body = line.Text ?? "";
+
+
+        int lastCr = body.LastIndexOf('\r');
+        if (lastCr >= 0)
+            body = body.Substring(lastCr + 1);
+
         string combined = prefix + body;
 
-        // Expand tabs *after* the prefix so the tab stops in the rendered
-        // body line up like they did in the original output. Without this,
-        // a single 0x09 byte counts as one visible char but the terminal
-        // renders it as a jump to the next tab stop — pushing the right
-        // wall out of place on every recipe line that uses tabs (Make
-        // recipes, indented diff output, etc.). The body content sits two
-        // columns in from the left wall ("│ "), so that's our startCol.
-        combined = Ansi.ExpandTabs(combined, tabStop: 8, startCol: 0);
+
+        int effectiveStartCol = (ResolveTier() == LayoutTier.Full) ? 2 : 0;
+        combined = Ansi.ExpandTabs(combined, tabStop: 8, startCol: effectiveStartCol);
 
         if (Ansi.VisibleLength(combined) > maxVisible)
             combined = Ansi.TruncateVisible(combined, maxVisible);

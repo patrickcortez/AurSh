@@ -1,10 +1,11 @@
 bin/*
 .agents/*
 .gitignore
-publish/win-x64/*
+publish
 nupkg
 problems.txt
 src/obj/*
 src/aursh-update/obj/*
 src/aursh-update/bin/*
 concepts.txt
+.kiro

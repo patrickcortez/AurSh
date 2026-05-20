@@ -104,6 +104,7 @@ public static class BlackBoxIo
         var sniffer = new AltScreenSniffer();
         var ansiTracker = new AnsiStateTracker();
         Stream? rawOut = null;
+        bool pendingCr = false;  // tracks if last byte was \r (for CR-overwrite)
 
         try
         {
@@ -146,13 +147,50 @@ public static class BlackBoxIo
                     if (b == (byte)'\n')
                     {
                         string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                        rawLine = StripCursorSequences(rawLine);
                         string statePrefix = ansiTracker.GetStatePrefix();
                         string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
                         ansiTracker.ProcessLine(rawLine);
-                        session.Buffer.Append(line, kind, stageIndex);
+
+                        if (pendingCr)
+                        {
+                            session.Buffer.ReplaceLast(line, kind, stageIndex);
+                            pendingCr = false;
+                        }
+                        else
+                        {
+                            session.Buffer.Append(line, kind, stageIndex);
+                        }
                         session.Buffer.PartialLine = null;
                         lineBuf.SetLength(0);
                         owner.LiveRenderer.Update(session, session.TerminalOut);
+                        continue;
+                    }
+
+                    // Handle \r (carriage return without newline): reset the line
+                    // buffer to simulate a real terminal overwriting from column 0.
+                    // Programs like progress bars, spinners, and dotnet fsi use
+                    // this pattern to update a line in-place.
+                    if (b == (byte)'\r')
+                    {
+                        if (lineBuf.Length > 0)
+                        {
+                            // Commit what we have as an in-place overwrite of the
+                            // last line, then reset for the next overwrite.
+                            string crRaw = Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length);
+                            crRaw = StripCursorSequences(crRaw);
+                            string crPrefix = ansiTracker.GetStatePrefix();
+                            string crLine = crPrefix.Length > 0 ? crPrefix + crRaw : crRaw;
+
+                            if (pendingCr)
+                                session.Buffer.ReplaceLast(crLine, kind, stageIndex);
+                            else
+                                session.Buffer.Append(crLine, kind, stageIndex);
+
+                            session.Buffer.PartialLine = null;
+                            pendingCr = true;
+                        }
+                        lineBuf.SetLength(0);
                         continue;
                     }
 
@@ -206,9 +244,15 @@ public static class BlackBoxIo
             if (lineBuf.Length > 0 && !owner.LiveRenderer.IsAltScreenActive)
             {
                 string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
+                rawLine = StripCursorSequences(rawLine);
                 string statePrefix = ansiTracker.GetStatePrefix();
                 string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
-                session.Buffer.Append(line, kind, stageIndex);
+
+                if (pendingCr)
+                    session.Buffer.ReplaceLast(line, kind, stageIndex);
+                else
+                    session.Buffer.Append(line, kind, stageIndex);
+
                 session.Buffer.PartialLine = null;
                 owner.LiveRenderer.Update(session, session.TerminalOut);
             }
@@ -226,6 +270,55 @@ public static class BlackBoxIo
         if (s.Length > 0 && s[s.Length - 1] == '\r')
             return s.Substring(0, s.Length - 1);
         return s;
+    }
+
+    /// <summary>
+    /// Strips cursor-movement and line-erase ANSI escape sequences from a
+    /// string before it is committed to the BlackBox buffer. The buffer is
+    /// strictly append-only and cannot honour cursor positioning, so these
+    /// sequences would appear as garbage in the rendered output if left in.
+    ///
+    /// Handled sequences:
+    ///   ESC[nA  Cursor Up             ESC[nB  Cursor Down
+    ///   ESC[nC  Cursor Forward        ESC[nD  Cursor Back
+    ///   ESC[nG  Cursor Horizontal Absolute
+    ///   ESC[n;mH / ESC[n;mf  Cursor Position
+    ///   ESC[nJ  Erase in Display      ESC[nK  Erase in Line
+    /// </summary>
+    private static string StripCursorSequences(string s)
+    {
+        if (string.IsNullOrEmpty(s) || s.IndexOf('\x1b') < 0)
+            return s;
+
+        var sb = new StringBuilder(s.Length);
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (s[i] == '\x1b' && i + 1 < s.Length && s[i + 1] == '[')
+            {
+                // Parse CSI: ESC [ <params> <final>
+                int j = i + 2;
+                // Consume parameter bytes (digits, semicolons, question marks)
+                while (j < s.Length && ((s[j] >= '0' && s[j] <= '9') || s[j] == ';' || s[j] == '?'))
+                    j++;
+
+                if (j < s.Length)
+                {
+                    char final = s[j];
+                    // Cursor movement and erase sequences to strip
+                    if (final == 'A' || final == 'B' || final == 'C' || final == 'D' ||
+                        final == 'G' || final == 'H' || final == 'f' ||
+                        final == 'J' || final == 'K')
+                    {
+                        i = j; // skip the entire sequence
+                        continue;
+                    }
+                }
+            }
+
+            sb.Append(s[i]);
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

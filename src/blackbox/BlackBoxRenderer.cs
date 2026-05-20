@@ -95,10 +95,25 @@ public sealed class BlackBoxRenderer
         {
             int contentWidth = System.Math.Max(1, outerWidth);
             string c = FormatBodyLine(line, contentWidth);
-            // Pad to keep the right edge clean when the renderer redraws.
+            
+            var sbCompact = new StringBuilder();
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sbCompact.Append(_config.BackgroundColor);
+                
+            sbCompact.Append(c);
+            
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sbCompact.Append(_config.BackgroundColor);
+                
             int vis = Ansi.VisibleLength(c);
             int padC = System.Math.Max(0, contentWidth - vis);
-            return padC > 0 ? c + new string(' ', padC) : c;
+            if (padC > 0)
+                sbCompact.Append(' ', padC);
+                
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sbCompact.Append(Ansi.Reset);
+                
+            return sbCompact.ToString();
         }
 
         int innerWidth = System.Math.Max(4, outerWidth - 2);
@@ -114,6 +129,9 @@ public sealed class BlackBoxRenderer
 
         string content = FormatBodyLine(line, innerWidth - 2);
         sb.Append(content);
+
+        if (!string.IsNullOrEmpty(_config.BackgroundColor))
+            sb.Append(_config.BackgroundColor);
 
         int visible = Ansi.VisibleLength(content);
         int pad = System.Math.Max(0, innerWidth - 2 - visible);
@@ -280,10 +298,22 @@ public sealed class BlackBoxRenderer
                 // streaming-append renderer's redraw clears the full row.
                 int contentWidth = System.Math.Max(1, innerWidth);
                 string c = FormatBodyLine(line, contentWidth);
+                
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(_config.BackgroundColor);
+                    
                 sb.Append(c);
+                
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(_config.BackgroundColor);
+                    
                 int vis = Ansi.VisibleLength(c);
                 int padC = System.Math.Max(0, contentWidth - vis);
                 if (padC > 0) sb.Append(' ', padC);
+                
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(Ansi.Reset);
+                    
                 sb.Append('\n');
                 rendered++;
                 continue;
@@ -300,6 +330,9 @@ public sealed class BlackBoxRenderer
 
             string content = FormatBodyLine(line, innerWidth - 2);
             sb.Append(content);
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(_config.BackgroundColor);
 
             int visible = Ansi.VisibleLength(content);
             int pad = System.Math.Max(0, innerWidth - 2 - visible);
@@ -341,7 +374,13 @@ public sealed class BlackBoxRenderer
             }
             else if (tier == LayoutTier.Compact)
             {
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(_config.BackgroundColor);
+                    
                 sb.Append(' ', System.Math.Max(0, innerWidth));
+                
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sb.Append(Ansi.Reset);
             }
             sb.Append('\n');
             rendered++;

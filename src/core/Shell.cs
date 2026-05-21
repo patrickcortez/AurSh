@@ -25,6 +25,7 @@ public class Shell
 
     public Shell()
     {
+        AurShell.Parser.Helper.EnsureConfigExists();
         _env = new ShellEnvironment();
         _env.ImportFromSystem();
 
@@ -63,6 +64,7 @@ public class Shell
 
     public Shell(ShellEnvironment env, string workingDirectory)
     {
+        AurShell.Parser.Helper.EnsureConfigExists();
         _env = env;
         _executor = new Executor(_env, workingDirectory);
         _history = new History(Utils.Platform.HistoryFilePath);
@@ -105,77 +107,85 @@ public class Shell
 
             while (_running)
             {
-                _interrupted = false;
-                _env.Set("PWD", _executor.WorkingDirectory);
-
-                NotifyFinishedJobs();
-
-                string promptText = _prompt.Render(_executor.WorkingDirectory, _env.LastExitCode);
-                Console.Write(Utils.Ansi.SetTitle($"Aursh: {Utils.Platform.ShortenPath(_executor.WorkingDirectory)}"));
-
-                string? line = _inputHandler.ReadLine(promptText);
-
-                if (_interrupted)
+                try
                 {
-                    _env.LastExitCode = 130;
-                    continue;
-                }
+                    _interrupted = false;
+                    _env.Set("PWD", _executor.WorkingDirectory);
 
-                if (line == null)
-                {
-                    Console.WriteLine("exit");
-                    break;
-                }
+                    NotifyFinishedJobs();
 
-                string trimmed = line.Trim();
-                if (string.IsNullOrEmpty(trimmed))
-                    continue;
+                    string promptText = _prompt.Render(_executor.WorkingDirectory, _env.LastExitCode);
+                    Console.Write(Utils.Ansi.SetTitle($"Aursh: {Utils.Platform.ShortenPath(_executor.WorkingDirectory)}"));
 
-                _history.Add(trimmed);
+                    string? line = _inputHandler.ReadLine(promptText);
 
-                if (ShouldBypassBox(trimmed))
-                {
+                    if (_interrupted)
+                    {
+                        _env.LastExitCode = 130;
+                        continue;
+                    }
+
+                    if (line == null)
+                    {
+                        Console.WriteLine("exit");
+                        break;
+                    }
+
+                    string trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed))
+                        continue;
+
+                    _history.Add(trimmed);
+
+                    if (ShouldBypassBox(trimmed))
+                    {
+                        try
+                        {
+                            int exitCode = _executor.Execute(trimmed);
+                            _env.LastExitCode = exitCode;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"aursh: error: {ex.Message}");
+                            _env.LastExitCode = 1;
+                        }
+                        continue;
+                    }
+
+                    bool passthrough = ShouldUsePassthroughBox(trimmed);
+                    BlackBoxSession session = _blackBox.Open(trimmed, null, _executor.WorkingDirectory);
+                    if (passthrough) session.MarkPassthrough();
+
+                    if (passthrough)
+                        _blackBox.LiveRenderer.StartPassthrough(session, session.TerminalOut);
+                    else
+                        _blackBox.LiveRenderer.Start(session, session.TerminalOut);
+
                     try
                     {
                         int exitCode = _executor.Execute(trimmed);
+                        session.SetExitCode(exitCode);
                         _env.LastExitCode = exitCode;
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"aursh: error: {ex.Message}");
+                        session.MarkAborted();
+                        session.TerminalOut.WriteLine($"aursh: error: {ex.Message}");
                         _env.LastExitCode = 1;
                     }
-                    continue;
+                    finally
+                    {
+                        if (passthrough)
+                            _blackBox.LiveRenderer.FinishPassthrough(session, session.TerminalOut);
+                        else
+                            _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
+                        session.Dispose();
+                    }
                 }
-
-                bool passthrough = ShouldUsePassthroughBox(trimmed);
-                BlackBoxSession session = _blackBox.Open(trimmed, null, _executor.WorkingDirectory);
-                if (passthrough) session.MarkPassthrough();
-
-                if (passthrough)
-                    _blackBox.LiveRenderer.StartPassthrough(session, session.TerminalOut);
-                else
-                    _blackBox.LiveRenderer.Start(session, session.TerminalOut);
-
-                try
+                catch (Exception loopEx)
                 {
-                    int exitCode = _executor.Execute(trimmed);
-                    session.SetExitCode(exitCode);
-                    _env.LastExitCode = exitCode;
-                }
-                catch (Exception ex)
-                {
-                    session.MarkAborted();
-                    session.TerminalOut.WriteLine($"aursh: error: {ex.Message}");
+                    Console.Error.WriteLine($"\naursh: critical error caught: {loopEx.Message}");
                     _env.LastExitCode = 1;
-                }
-                finally
-                {
-                    if (passthrough)
-                        _blackBox.LiveRenderer.FinishPassthrough(session, session.TerminalOut);
-                    else
-                        _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
-                    session.Dispose();
                 }
             }
         }

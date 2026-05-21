@@ -2,6 +2,25 @@
 
 AurShell is designed with a syntax that will feel familiar to users of `bash`, `zsh`, and other POSIX-compliant shells. It supports pipelines, redirections, variable expansions, control structures, and scripting capabilities.
 
+## Running Shell scripts
+
+When running `.aur` scripts make sure you invoke **AurSh** first or you can simply associate
+**AurSh** with the `.aur` file extension:
+
+```aursh
+
+# You can manually invoke AurSh:
+
+> aursh test.aur arg1 ...
+
+# You can also associate the .aur file extension with AurSh:
+
+> aursh-assoc .aur aursh
+
+> ./text.aur arg1 arg2 ...
+
+```
+
 ## Basic Commands and Execution
 Commands are parsed sequentially. You can chain commands using various operators:
 

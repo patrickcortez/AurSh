@@ -40,7 +40,7 @@ If you want to be a contributor feel free to contact me.
 
 Before opening a pull request, make sure:
 
-- Build Successfully
+- Builds Successfully
 - Does not break existing funcionality
 - Code is cross compatible and clean/easy to read.
 

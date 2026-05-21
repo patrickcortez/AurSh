@@ -1,0 +1,15 @@
+# Basic syntax check
+
+echo "Hello This is a text!"
+
+if [$1 == "Patrick"]; then
+
+echo "Welcome $1"
+
+else
+
+echo "Hello $1"
+
+fi
+
+echo "test concluded"

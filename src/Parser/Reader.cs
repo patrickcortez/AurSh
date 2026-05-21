@@ -30,12 +30,19 @@ public class Reader //instance based.
 
     private void ReadLines()
     {
-        using( StreamReader sr = new StreamReader(configfile)){
-            string? line;
-            while((line = sr.ReadLine()) != null)
-            {
-                LineBuffer.Add(line);
+        try
+        {
+            using( StreamReader sr = new StreamReader(configfile)){
+                string? line;
+                while((line = sr.ReadLine()) != null)
+                {
+                    LineBuffer.Add(line);
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: warning: failed to read config file {configfile}: {ex.Message}");
         }
 
         InterpretLines();

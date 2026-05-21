@@ -19,31 +19,99 @@ public class Prompt
         _env = env;
     }
 
+    private AurShell.Parser.Reader? _reader;
+    private string _segmentEdge = "\uE0B0";
+    private char _promptLineChar = ' ';
+    private bool _isVerbose = true;
+    private bool _isSparse = false;
+
+    private void ReloadConfig()
+    {
+        try
+        {
+            _reader = new AurShell.Parser.Reader();
+            string edge = _reader.GetAttribute("Config", "SegmentEdges")?.ToLowerInvariant() ?? "";
+            _segmentEdge = edge switch {
+                "arrow" => "\u276F",
+                "rounded" => "\uE0B4",
+                "angled" => "\uE0B0",
+                _ => "\uE0B0"
+            };
+
+            string pLine = _reader.GetAttribute("Config", "PromptLine")?.ToLowerInvariant() ?? "";
+            _promptLineChar = pLine switch {
+                "line" => '\u2500',
+                "dotted" => '\u00B7',
+                "none" => ' ',
+                _ => ' '
+            };
+
+            string verbose = _reader.GetAttribute("Config", "Verbose")?.ToLowerInvariant() ?? "";
+            _isVerbose = verbose != "false";
+
+            string spacing = _reader.GetAttribute("Config", "PromptSpacing")?.ToLowerInvariant() ?? "";
+            _isSparse = spacing == "sparse";
+        }
+        catch
+        {
+            // Fallback defaults on read error
+            _segmentEdge = "\uE0B0";
+            _promptLineChar = ' ';
+            _isVerbose = true;
+            _isSparse = false;
+        }
+    }
+
     public string Render(string workingDirectory, int lastExitCode)
     {
+        ReloadConfig();
         _gitInfo.Refresh(workingDirectory);
 
         int termWidth = Utils.Platform.TerminalWidth;
         var sb = new StringBuilder();
 
+        if (_isSparse)
+        {
+            sb.Append('\n');
+        }
+
         string line1Format = _env.Get("AURSH_PROMPT") ?? DefaultLine1Format;
         string line2Format = _env.Get("AURSH_PROMPT2") ?? DefaultLine2Format;
 
         string line1 = RenderLine(line1Format, workingDirectory, lastExitCode, termWidth, true);
-        string line2 = RenderLine(line2Format, workingDirectory, lastExitCode, termWidth, false);
-
         sb.Append(line1);
-        sb.Append('\n');
-        sb.Append(line2);
+
+        if (_isVerbose)
+        {
+            string line2 = RenderLine(line2Format, workingDirectory, lastExitCode, termWidth, false);
+            sb.Append('\n');
+            sb.Append(line2);
+        }
+        else
+        {
+            sb.Append(' ');
+        }
 
         return sb.ToString();
     }
 
     public int PromptVisibleLength(int lastExitCode)
     {
-        string line2Format = _env.Get("AURSH_PROMPT2") ?? DefaultLine2Format;
-        string line2 = RenderLine(line2Format, "", lastExitCode, 80, false);
-        return Utils.Ansi.VisibleLength(line2);
+        ReloadConfig();
+        if (_isVerbose)
+        {
+            string line2Format = _env.Get("AURSH_PROMPT2") ?? DefaultLine2Format;
+            string line2 = RenderLine(line2Format, "", lastExitCode, 80, false);
+            return Utils.Ansi.VisibleLength(line2);
+        }
+        else
+        {
+            // For 1-line prompt, the cursor is placed after the padded line 1, which means it wraps if it hits termWidth.
+            // But we actually append a space at the end of line 1.
+            // If the time segment is pushed to the right edge, the single space wraps the cursor to column 1 on the next line.
+            // So visible length on the LAST line (where the cursor actually is) is 1.
+            return 1;
+        }
     }
 
     private string RenderLine(string format, string workingDirectory, int lastExitCode, int termWidth, bool isLine1)
@@ -80,7 +148,7 @@ public class Prompt
             int gap = termWidth - leftVisible - timeVisible;
             if (gap > 0)
             {
-                sb.Append(new string(' ', gap));
+                sb.Append(new string(_promptLineChar, gap));
                 sb.Append(timeSegment);
             }
         }
@@ -189,7 +257,7 @@ public class Prompt
 
     private string BuildPowerlineTransition()
     {
-        return "";
+        return _segmentEdge;
     }
 
     private string BuildUserHostSegment()

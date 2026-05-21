@@ -913,7 +913,7 @@ public class InputHandler
         long elapsed = Environment.TickCount64 - _resizeChangeTick;
         if (elapsed >= 100)
         {
-            int cursorRowsFromTop = ComputeCursorPosition(currentWidth).Row;
+            int cursorRowsFromTop = _cursorRowOffset;
 
             _lastTermWidth = currentWidth;
             _lastTermHeight = currentHeight;

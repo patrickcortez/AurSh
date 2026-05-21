@@ -1,0 +1,2 @@
+echo "Should not see this" > nul
+echo "Should see this"

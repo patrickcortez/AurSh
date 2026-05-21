@@ -1,4 +1,5 @@
 using AurShell.Utils;
+using System.Linq;
 
 namespace AurShell.Core;
 
@@ -49,6 +50,11 @@ public class Executor
         }
 
         string trimmedInput = input.Trim();
+        if (TryParseArithmeticOrAssignment(trimmedInput))
+        {
+            return 0;
+        }
+
         if (IsAutoCdPath(trimmedInput))
         {
             string resolved = Utils.FileSystem.ResolvePath(trimmedInput, _workingDirectory);
@@ -291,5 +297,102 @@ public class Executor
             try { File.Delete(tempFile); } catch { }
             SyncWorkingDirectory();
         }
+    }
+
+    private bool TryParseArithmeticOrAssignment(string input)
+    {
+        var assignMatch = System.Text.RegularExpressions.Regex.Match(input, @"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$");
+        if (assignMatch.Success)
+        {
+            string varName = assignMatch.Groups[1].Value;
+            string value = assignMatch.Groups[2].Value;
+            
+            var lexer = new Lexer(value, _env);
+            var tokens = lexer.Tokenize();
+            string expandedValue = string.Join("", tokens.Where(t => t.Type == TokenType.Word).Select(t => t.Value));
+            
+            _env.Set(varName, expandedValue);
+            return true;
+        }
+
+        var arithMatch = System.Text.RegularExpressions.Regex.Match(input, @"^\$?([a-zA-Z_][a-zA-Z0-9_]*)\s*(\+=|-=|\*=|/=|)\s*(.+)$");
+        if (arithMatch.Success && !string.IsNullOrEmpty(arithMatch.Groups[2].Value))
+        {
+            string varName = arithMatch.Groups[1].Value;
+            string op = arithMatch.Groups[2].Value;
+            string rightSide = arithMatch.Groups[3].Value;
+
+            string currentValStr = _env.Get(varName) ?? "0";
+            if (!double.TryParse(currentValStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double currentVal)) currentVal = 0;
+
+            var rightLexer = new Lexer(rightSide, _env);
+            string rightExpanded = string.Join("", rightLexer.Tokenize().Where(t => t.Type == TokenType.Word).Select(t => t.Value));
+            
+            double rightVal = EvaluateMath(rightExpanded);
+
+            double result = currentVal;
+            switch (op)
+            {
+                case "+=": result += rightVal; break;
+                case "-=": result -= rightVal; break;
+                case "*=": result *= rightVal; break;
+                case "/=": if (rightVal != 0) result /= rightVal; break;
+            }
+
+            _env.Set(varName, result.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return true;
+        }
+
+        var assignArithMatch = System.Text.RegularExpressions.Regex.Match(input, @"^\$?([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$");
+        if (assignArithMatch.Success)
+        {
+            string varName = assignArithMatch.Groups[1].Value;
+            string rightSide = assignArithMatch.Groups[2].Value;
+            
+            var rightLexer = new Lexer(rightSide, _env);
+            string rightExpanded = string.Join("", rightLexer.Tokenize().Where(t => t.Type == TokenType.Word).Select(t => t.Value));
+            
+            if (System.Text.RegularExpressions.Regex.IsMatch(rightExpanded, @"[\+\-\*/]"))
+            {
+                double result = EvaluateMath(rightExpanded);
+                _env.Set(varName, result.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                _env.Set(varName, rightExpanded);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private double EvaluateMath(string expression)
+    {
+        expression = expression.Replace(" ", "");
+        var tokens = System.Text.RegularExpressions.Regex.Split(expression, @"([\+\-\*/])").Where(s => !string.IsNullOrEmpty(s)).ToList();
+        
+        if (tokens.Count > 1 && (tokens[0] == "-" || tokens[0] == "+"))
+        {
+            tokens[1] = tokens[0] + tokens[1];
+            tokens.RemoveAt(0);
+        }
+
+        if (tokens.Count == 0) return 0;
+        if (!double.TryParse(tokens[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double result)) return 0;
+
+        for (int i = 1; i < tokens.Count - 1; i += 2)
+        {
+            string op = tokens[i];
+            if (!double.TryParse(tokens[i + 1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double next)) next = 0;
+            switch (op)
+            {
+                case "+": result += next; break;
+                case "-": result -= next; break;
+                case "*": result *= next; break;
+                case "/": if (next != 0) result /= next; break;
+            }
+        }
+        return result;
     }
 }

@@ -56,7 +56,7 @@ public static class Pipeline
             {
                 foreach (var redir in cmd.Redirections)
                 {
-                    string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
+                    string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
                     switch (redir.Type)
                     {
                         case RedirectType.Out:
@@ -232,7 +232,7 @@ public static class Pipeline
 
         foreach (var redir in cmd.Redirections)
         {
-            string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
+            string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
             switch (redir.Type)
             {
                 case RedirectType.Out:
@@ -528,7 +528,7 @@ public static class Pipeline
                             {
                                 if (r.Type == RedirectType.Out || r.Type == RedirectType.Append)
                                 {
-                                    string target = Utils.FileSystem.ResolvePath(r.Target, workingDirectory);
+                                    string target = ResolveRedirectionTarget(r.Target, workingDirectory);
                                     stdoutFileStream = SafeOpenFileStream(target,
                                         r.Type == RedirectType.Out ? FileMode.Create : FileMode.Append,
                                         FileAccess.Write);
@@ -553,7 +553,7 @@ public static class Pipeline
                                     }
                                     else
                                     {
-                                        string target = Utils.FileSystem.ResolvePath(r.Target, workingDirectory);
+                                        string target = ResolveRedirectionTarget(r.Target, workingDirectory);
                                         stderrFileStream = SafeOpenFileStream(target,
                                             r.Type == RedirectType.Err ? FileMode.Create : FileMode.Append,
                                             FileAccess.Write);
@@ -911,23 +911,23 @@ public static class Pipeline
                 {
                     case RedirectType.Out:
                         fullSb.Append(" > ");
-                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
                         break;
                     case RedirectType.Append:
                         fullSb.Append(" >> ");
-                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
                         break;
                     case RedirectType.In:
                         fullSb.Append(" < ");
-                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
                         break;
                     case RedirectType.Err:
                         fullSb.Append(" 2> ");
-                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
                         break;
                     case RedirectType.ErrAppend:
                         fullSb.Append(" 2>> ");
-                        fullSb.Append(QuoteForShell(Utils.FileSystem.ResolvePath(redir.Target, workingDirectory)));
+                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
                         break;
                     case RedirectType.ErrToOut:
                         fullSb.Append(" 2>&1");
@@ -1015,7 +1015,7 @@ public static class Pipeline
 
         foreach (var redir in cmd.Redirections)
         {
-            string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
+            string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
             switch (redir.Type)
             {
                 case RedirectType.Out:
@@ -1149,7 +1149,7 @@ public static class Pipeline
 
         foreach (var redir in cmd.Redirections)
         {
-            string target = Utils.FileSystem.ResolvePath(redir.Target, workingDirectory);
+            string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
             switch (redir.Type)
             {
                 case RedirectType.Out:
@@ -1364,5 +1364,14 @@ public static class Pipeline
             }
         }
         return false;
+    }
+
+    private static string ResolveRedirectionTarget(string target, string workingDirectory)
+    {
+        if (target.Equals("nul", StringComparison.OrdinalIgnoreCase) || target.Equals("/dev/null", StringComparison.OrdinalIgnoreCase))
+        {
+            return Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows ? "nul" : "/dev/null";
+        }
+        return Utils.FileSystem.ResolvePath(target, workingDirectory);
     }
 }

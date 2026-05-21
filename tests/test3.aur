@@ -1,0 +1,10 @@
+VAR=1
+
+echo "test starting"
+
+while [ $VAR -lt 10 ]; do
+  echo "VAR = $VAR"
+  VAR += 1
+done
+
+echo "Test Concluded"

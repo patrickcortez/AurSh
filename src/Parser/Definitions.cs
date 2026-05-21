@@ -76,7 +76,7 @@ public struct Context
 
 internal static class Helper
 {
-    public static string configfile = Path.Combine(Platform.HomeDirectory,".aursh","Contexts.con");
+    public static string configfile = Path.Combine(Platform.HomeDirectory,".aursh","AurSh.config.con");
 
     public static void EnsureConfigExists()
     {
@@ -85,7 +85,13 @@ internal static class Helper
             return;
         }
 
-        File.Create(configfile).Dispose();
+        string dir = Path.GetDirectoryName(configfile);
+        if (dir != null && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        File.WriteAllText(configfile, "[Config]\nPromptSpacing=Compressed\nPromptLine=none\nSegmentEdges=angled\nVerbose=true\n");
     }
 
     public static int FindDelimiterIndex(string line)

@@ -9,3 +9,5 @@ src/aursh-update/obj/*
 src/aursh-update/bin/*
 concepts.txt
 .kiro
+implementations
+src/Auminal

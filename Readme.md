@@ -20,6 +20,8 @@ It also has file associations, so you can associate file extensions with their r
 The shell also has extensible auto-suggestions. Along with that is its own contexts which are disked back object like
 data structure that can hold multiple attributes that each contain a value that is envokable in the command line for structuring data.
 
+You can also configure the prompt UI of AurSh in its `.aursh/AurSh.config.con` file.
+
 Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to look the way it good.
 
 When using the shell, make sure you put any process/app that you have installed that takes over the terminal in the bypass list: `~/.aursh/bypass.txt`.

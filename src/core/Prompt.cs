@@ -9,7 +9,6 @@ public class Prompt
 
     private const string BoxTopLeft = "\u256D\u2500";
     private const string BoxBottomLeft = "\u2570\u2500";
-    private const string PowerlineSep = "\uE0B0";
 
     private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git}{status}";
     private const string DefaultLine2Format = "{box_bottom} {chevron} ";
@@ -32,9 +31,9 @@ public class Prompt
             _reader = new AurShell.Parser.Reader();
             string edge = _reader.GetAttribute("Config", "SegmentEdges")?.ToLowerInvariant() ?? "";
             _segmentEdge = edge switch {
-                "arrow" => "\u276F",
+                "arrow" => "\uE0B0",
                 "rounded" => "\uE0B4",
-                "angled" => "\uE0B0",
+                "angled" => "\uE0B8",
                 _ => "\uE0B0"
             };
 
@@ -257,7 +256,7 @@ public class Prompt
 
     private string BuildPowerlineTransition()
     {
-        return _segmentEdge;
+        return "";
     }
 
     private string BuildUserHostSegment()
@@ -267,7 +266,7 @@ public class Prompt
 
         sb.Append(Utils.Ansi.FgFromBg(osBg));
         sb.Append(Utils.Ansi.BgRgb(50, 50, 70));
-        sb.Append(PowerlineSep);
+        sb.Append(_segmentEdge);
 
         sb.Append(Utils.Ansi.BgRgb(50, 50, 70));
         sb.Append(Utils.Ansi.FgRgb(180, 210, 255));
@@ -290,7 +289,7 @@ public class Prompt
 
         sb.Append(Utils.Ansi.FgRgb(50, 50, 70));
         sb.Append(Utils.Ansi.BgRgb(40, 40, 55));
-        sb.Append(PowerlineSep);
+        sb.Append(_segmentEdge);
 
         sb.Append(Utils.Ansi.BgRgb(40, 40, 55));
         sb.Append(Utils.Ansi.FgRgb(120, 200, 255));
@@ -308,7 +307,7 @@ public class Prompt
         {
             var noGit = new StringBuilder();
             noGit.Append(Utils.Ansi.FgRgb(40, 40, 55));
-            noGit.Append(PowerlineSep);
+            noGit.Append(_segmentEdge);
             noGit.Append(Utils.Ansi.Reset);
             return noGit.ToString();
         }
@@ -319,7 +318,7 @@ public class Prompt
 
         sb.Append(Utils.Ansi.FgRgb(40, 40, 55));
         sb.Append(gitBg);
-        sb.Append(PowerlineSep);
+        sb.Append(_segmentEdge);
 
         sb.Append(gitBg);
         sb.Append(gitFg);
@@ -329,7 +328,7 @@ public class Prompt
         sb.Append(Utils.Ansi.Reset);
 
         sb.Append(Utils.Ansi.FgRgb(30, 30, 45));
-        sb.Append(PowerlineSep);
+        sb.Append(_segmentEdge);
         sb.Append(Utils.Ansi.Reset);
 
         return sb.ToString();

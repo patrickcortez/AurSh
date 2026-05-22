@@ -1,4 +1,3 @@
-C:\Users\Cortez\Repos\AurSh\bin\aursh.exe
 C:\Users\Cortez\Repos\AurSh\bin\aursh.deps.json
 C:\Users\Cortez\Repos\AurSh\bin\aursh.runtimeconfig.json
 C:\Users\Cortez\Repos\AurSh\bin\aursh.dll
@@ -13,3 +12,4 @@ C:\Users\Cortez\Repos\AurSh\src\obj\Release\refint\aursh.dll
 C:\Users\Cortez\Repos\AurSh\src\obj\Release\aursh.pdb
 C:\Users\Cortez\Repos\AurSh\src\obj\Release\AurShell.genruntimeconfig.cache
 C:\Users\Cortez\Repos\AurSh\src\obj\Release\ref\aursh.dll
+C:\Users\Cortez\Repos\AurSh\src\obj\Release\AurShell.csproj.Up2Date

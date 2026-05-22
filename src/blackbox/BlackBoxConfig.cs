@@ -3,6 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace AurShell.BlackBoxView;
 
+[JsonSourceGenerationOptions(
+    WriteIndented = true,
+    PropertyNameCaseInsensitive = true,
+    AllowTrailingCommas = true,
+    ReadCommentHandling = JsonCommentHandling.Skip)]
 [JsonSerializable(typeof(BlackBoxConfig.BlackBoxConfigFile))]
 internal partial class BlackBoxConfigJsonContext : JsonSerializerContext
 {
@@ -136,12 +141,7 @@ public sealed class BlackBoxConfig
                     Enabled = true,
                     BorderStyle = "Rounded"
                 };
-                var writeOptions = new JsonSerializerOptions 
-                { 
-                    WriteIndented = true,
-                    TypeInfoResolver = BlackBoxConfigJsonContext.Default
-                };
-                string defaultJson = JsonSerializer.Serialize(defaultData, writeOptions);
+                string defaultJson = JsonSerializer.Serialize(defaultData, BlackBoxConfigJsonContext.Default.BlackBoxConfigFile);
                 File.WriteAllText(configPath, defaultJson);
             }
 
@@ -151,14 +151,7 @@ public sealed class BlackBoxConfig
             json = System.Text.RegularExpressions.Regex.Replace(json, @":\s*True\b", ": true", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             json = System.Text.RegularExpressions.Regex.Replace(json, @":\s*False\b", ": false", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                AllowTrailingCommas = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                TypeInfoResolver = BlackBoxConfigJsonContext.Default
-            };
-            var fileConfig = JsonSerializer.Deserialize<BlackBoxConfigFile>(json, options);
+            var fileConfig = JsonSerializer.Deserialize(json, BlackBoxConfigJsonContext.Default.BlackBoxConfigFile);
 
             if (fileConfig == null) return;
 

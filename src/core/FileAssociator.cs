@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 
 namespace AurShell.Core;
 
+[JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 internal partial class FileAssociatorJsonContext : JsonSerializerContext
 {
@@ -38,11 +39,7 @@ public class FileAssociator
             try
             {
                 string json = File.ReadAllText(_configPath);
-                var options = new JsonSerializerOptions
-                {
-                    TypeInfoResolver = FileAssociatorJsonContext.Default
-                };
-                var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(json, options);
+                var loaded = JsonSerializer.Deserialize(json, FileAssociatorJsonContext.Default.DictionaryStringString);
                 if (loaded != null)
                 {
                     _associations = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
@@ -59,12 +56,7 @@ public class FileAssociator
     {
         try
         {
-            var options = new JsonSerializerOptions 
-            { 
-                WriteIndented = true,
-                TypeInfoResolver = FileAssociatorJsonContext.Default
-            };
-            string json = JsonSerializer.Serialize(_associations, options);
+            string json = JsonSerializer.Serialize(_associations, FileAssociatorJsonContext.Default.DictionaryStringString);
             File.WriteAllText(_configPath, json);
         }
         catch (Exception ex)

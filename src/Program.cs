@@ -17,9 +17,16 @@ public class Program
         Utils.TerminalSize.Start();
 
 
+        bool forceInteractive = false;
+        if (args.Length > 0 && (args[0] == "-i" || args[0] == "--interactive"))
+        {
+            forceInteractive = true;
+            args = args.Skip(1).ToArray();
+        }
+
         if (args.Length == 0)
         {
-            var shell = new Core.Shell();
+            var shell = new Core.Shell(forceInteractive);
             shell.Run();
             return 0;
         }
@@ -75,6 +82,7 @@ public class Program
         Console.WriteLine("Usage: aursh [options] [script [args...]]");
         Console.WriteLine();
         Console.WriteLine("Options:");
+        Console.WriteLine("  -i, --interactive Force interactive mode even if input is redirected");
         Console.WriteLine("  -c COMMAND    Execute COMMAND and exit");
         Console.WriteLine("  -v, --version Show version");
         Console.WriteLine("  -h, --help    Show this help");

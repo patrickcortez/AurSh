@@ -27,21 +27,23 @@ public class InputHandler
     private int _continuationPromptLen = 5;
 
     private int count;
+    private readonly bool _forceInteractive;
 
     private const string ContinuationBoxChar = "\u2570\u2500";
     private const string ContinuationChevron = "\u276F";
 
-    public InputHandler(History history, ShellEnvironment env, SuggestionProvider? suggestions = null)
+    public InputHandler(History history, ShellEnvironment env, SuggestionProvider? suggestions = null, bool forceInteractive = false)
     {
         _history = history;
         _env = env;
         _suggestions = suggestions;
+        _forceInteractive = forceInteractive;
         count = 0;
     }
 
     public string? ReadLine(string prompt) // AurSh Input hanndler
     {
-        if (Console.IsInputRedirected)
+        if (Console.IsInputRedirected && !_forceInteractive)
         {
             Console.Write(prompt);
             return Console.ReadLine();
@@ -78,6 +80,15 @@ public class InputHandler
             try
             {
                 key = Console.ReadKey(true); // Get input from the user,key by key
+            }
+            catch (InvalidOperationException)
+            {
+                if (_forceInteractive)
+                {
+                    Console.Write(prompt);
+                    return Console.ReadLine();
+                }
+                return null;
             }
             catch
             {

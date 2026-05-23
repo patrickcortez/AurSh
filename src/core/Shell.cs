@@ -23,7 +23,7 @@ public class Shell
     public BlackBox BlackBox => _blackBox;
     public string WorkingDirectory => _executor.WorkingDirectory;
 
-    public Shell()
+    public Shell(bool forceInteractive = false)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = new ShellEnvironment();
@@ -48,7 +48,7 @@ public class Shell
         suggestions.Load();
         _env.Suggestions = suggestions;
 
-        _inputHandler = new InputHandler(_history, _env, suggestions);
+        _inputHandler = new InputHandler(_history, _env, suggestions, forceInteractive);
         _pluginManager = new PluginManager(_env, _executor);
         _env.PluginManager = _pluginManager;
         _blackBox = new BlackBox();
@@ -62,7 +62,7 @@ public class Shell
         LoadPlugins();
     }
 
-    public Shell(ShellEnvironment env, string workingDirectory)
+    public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = env;
@@ -78,7 +78,7 @@ public class Shell
             _env.Suggestions = suggestions;
         }
 
-        _inputHandler = new InputHandler(_history, _env, suggestions);
+        _inputHandler = new InputHandler(_history, _env, suggestions, forceInteractive);
         _pluginManager = new PluginManager(_env, _executor);
         _env.PluginManager = _pluginManager;
         _blackBox = new BlackBox();

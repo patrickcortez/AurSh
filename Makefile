@@ -12,6 +12,7 @@ CONTEXT_APP_NAME := aursh-context
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 2.0.0
+ENSURE_DEPS := scripts/linux-termux-macos/ensure-deps.sh
 
 # ──────────────────────────────────────────────
 # OS and Architecture Detection
@@ -118,7 +119,7 @@ endif
 # Targets
 # ──────────────────────────────────────────────
 
-.PHONY: all build release publish install install-user uninstall clean run info help setfont
+.PHONY: all build release publish install install-user uninstall clean run info help setfont deps
 
 all: build
 
@@ -130,6 +131,7 @@ ifeq ($(WIN_ENV),native)
 	@cmd /c "echo."
 	@echo   make build          Debug build
 	@echo   make release        Release build
+	@echo   make deps           Check/install NativeAOT build dependencies
 	@echo   make publish        Self-contained single-file release
 	@echo   make install        Publish + install to system dir (needs admin)
 	@echo   make install-user   Publish + install to user dir (no admin)
@@ -150,6 +152,7 @@ else
 	@echo ""
 	@echo "  make build          Debug build (framework-dependent)"
 	@echo "  make release        Release build (framework-dependent)"
+	@echo "  make deps           Check/install NativeAOT build dependencies"
 	@echo "  make publish        Self-contained single-file release"
 	@echo "  make install        Publish + install to system directory (may need sudo)"
 	@echo "  make install-user   Publish + install to user directory (no sudo)"
@@ -213,6 +216,18 @@ else
 	@echo "[release] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
 endif
 
+# ──────────────────────────────────────────────
+# Dependency Check
+# ──────────────────────────────────────────────
+
+deps:
+ifeq ($(WIN_ENV),native)
+	@echo [deps] NativeAOT dependency check is not needed on Windows.
+else
+	@echo "[deps] Checking NativeAOT build dependencies..."
+	@sh $(ENSURE_DEPS) --auto-install
+endif
+
 publish:
 ifeq ($(WIN_ENV),native)
 	@echo [publish] Publishing self-contained $(RID) binary...
@@ -221,6 +236,8 @@ ifeq ($(WIN_ENV),native)
 	dotnet publish $(CONTEXT_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-contexts/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishAot=true -p:PublishTrimmed=true -o $(PUBLISH_DIR)
 	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)
 else
+	@echo "[publish] Checking NativeAOT build dependencies..."
+	@sh $(ENSURE_DEPS) --auto-install
 	@echo "[publish] Publishing self-contained $(RID) binaries..."
 	dotnet publish $(PROJECT) \
 		-c Release \

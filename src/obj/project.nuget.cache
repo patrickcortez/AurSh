@@ -1,19 +1,17 @@
 {
   "version": 2,
-  "dgSpecHash": "kAtDeauVdR8=",
+  "dgSpecHash": "swwoZg5VMM8=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj",
+  "projectFilePath": "/mnt/c/Users/Cortez/Repos/AurSh/src/AurShell.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.dotnet.ilcompiler\\8.0.24\\microsoft.dotnet.ilcompiler.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.24\\microsoft.net.illink.tasks.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\runtime.win-x64.microsoft.dotnet.ilcompiler\\8.0.24\\runtime.win-x64.microsoft.dotnet.ilcompiler.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.24\\microsoft.netcore.app.ref.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.24\\microsoft.netcore.app.runtime.win-x64.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.24\\microsoft.windowsdesktop.app.ref.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.24\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.24\\microsoft.aspnetcore.app.ref.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.24\\microsoft.aspnetcore.app.runtime.win-x64.8.0.24.nupkg.sha512",
-    "C:\\Users\\Cortez\\.nuget\\packages\\runtime.win-x64.microsoft.dotnet.ilcompiler\\8.0.24\\runtime.win-x64.microsoft.dotnet.ilcompiler.8.0.24.nupkg.sha512"
+    "/home/cortez/.nuget/packages/microsoft.dotnet.ilcompiler/8.0.26/microsoft.dotnet.ilcompiler.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/microsoft.net.illink.tasks/8.0.26/microsoft.net.illink.tasks.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/runtime.linux-x64.microsoft.dotnet.ilcompiler/8.0.26/runtime.linux-x64.microsoft.dotnet.ilcompiler.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/microsoft.netcore.app.ref/8.0.26/microsoft.netcore.app.ref.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/microsoft.netcore.app.runtime.linux-x64/8.0.26/microsoft.netcore.app.runtime.linux-x64.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.26/microsoft.aspnetcore.app.ref.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/microsoft.aspnetcore.app.runtime.linux-x64/8.0.26/microsoft.aspnetcore.app.runtime.linux-x64.8.0.26.nupkg.sha512",
+    "/home/cortez/.nuget/packages/runtime.linux-x64.microsoft.dotnet.ilcompiler/8.0.26/runtime.linux-x64.microsoft.dotnet.ilcompiler.8.0.26.nupkg.sha512"
   ],
   "logs": []
 }

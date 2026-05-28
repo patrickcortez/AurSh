@@ -210,7 +210,7 @@ check_compiler() {
 }
 
 check_zlib() {
-    if has_header "zlib.h" || has_lib "libz.so" || has_lib "libz.a"; then
+    if has_header "zlib.h"; then
         info "  zlib (dev) ......... found"
         return 0
     fi
@@ -219,7 +219,7 @@ check_zlib() {
 }
 
 check_openssl() {
-    if has_header "openssl/ssl.h" || has_lib "libssl.so" || has_lib "libssl.a"; then
+    if has_header "openssl/ssl.h"; then
         info "  OpenSSL (dev) ...... found"
         return 0
     fi
@@ -228,7 +228,7 @@ check_openssl() {
 }
 
 check_krb5() {
-    if has_header "krb5.h" || has_header "krb5/krb5.h" || has_lib "libkrb5.so" || has_lib "libgssapi_krb5.so"; then
+    if has_header "krb5.h" || has_header "krb5/krb5.h"; then
         info "  Kerberos (dev) ..... found"
         return 0
     fi
@@ -237,7 +237,7 @@ check_krb5() {
 }
 
 check_icu() {
-    if has_header "unicode/utypes.h" || has_lib "libicuuc.so" || has_lib "libicui18n.so"; then
+    if has_header "unicode/utypes.h"; then
         info "  ICU (dev) .......... found"
         return 0
     fi

@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "clear", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -55,6 +55,7 @@ public static class BuiltinCommands
             "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
             "aursh-update" => ExecuteUpdate(cmd),
             "aursh-context" => ExecuteContext(cmd),
+            "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
             _ => ExecuteFallback(cmd)
         };
     }

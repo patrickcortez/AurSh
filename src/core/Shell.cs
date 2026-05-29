@@ -60,6 +60,7 @@ public class Shell
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
         LoadPlugins();
+        AurshNetTransfer.StartReceiverDaemon();
     }
 
     public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false)
@@ -89,6 +90,7 @@ public class Shell
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
         LoadPlugins();
+        AurshNetTransfer.StartReceiverDaemon();
     }
 
 

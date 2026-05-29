@@ -1,30 +1,38 @@
 {
   "format": 1,
   "restore": {
-    "/mnt/c/Users/Cortez/Repos/AurSh/src/AurShell.csproj": {}
+    "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj": {}
   },
   "projects": {
-    "/mnt/c/Users/Cortez/Repos/AurSh/src/AurShell.csproj": {
+    "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj": {
       "version": "2.0.0",
       "restore": {
-        "projectUniqueName": "/mnt/c/Users/Cortez/Repos/AurSh/src/AurShell.csproj",
+        "projectUniqueName": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj",
         "projectName": "Aursh",
-        "projectPath": "/mnt/c/Users/Cortez/Repos/AurSh/src/AurShell.csproj",
-        "packagesPath": "/home/cortez/.nuget/packages/",
-        "outputPath": "/mnt/c/Users/Cortez/Repos/AurSh/src/obj/",
+        "projectPath": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj",
+        "packagesPath": "C:\\Users\\Cortez\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "/home/cortez/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\Cortez\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "/usr/lib/dotnet/library-packs": {},
+          "C:\\LocalNuGet": {},
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net8.0": {
+            "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {}
           }
@@ -39,22 +47,23 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "11.0.100"
       },
       "frameworks": {
         "net8.0": {
+          "framework": "net8.0",
           "targetAlias": "net8.0",
           "dependencies": {
             "Microsoft.DotNet.ILCompiler": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[8.0.26, )",
+              "version": "[8.0.24, )",
               "autoReferenced": true
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[8.0.26, )",
+              "version": "[8.0.24, )",
               "autoReferenced": true
             }
           },
@@ -72,23 +81,35 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.26, 8.0.26]"
+              "version": "[8.0.24, 8.0.24]"
             },
             {
-              "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
-              "version": "[8.0.26, 8.0.26]"
+              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "version": "[8.0.24, 8.0.24]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[8.0.24, 8.0.24]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.26, 8.0.26]"
+              "version": "[8.0.24, 8.0.24]"
             },
             {
-              "name": "Microsoft.NETCore.App.Runtime.linux-x64",
-              "version": "[8.0.26, 8.0.26]"
+              "name": "Microsoft.NETCore.App.Runtime.win-x64",
+              "version": "[8.0.24, 8.0.24]"
             },
             {
-              "name": "runtime.linux-x64.Microsoft.DotNet.ILCompiler",
-              "version": "[8.0.26, 8.0.26]"
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.24, 8.0.24]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+              "version": "[8.0.24, 8.0.24]"
+            },
+            {
+              "name": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
+              "version": "[8.0.24, 8.0.24]"
             }
           ],
           "frameworkReferences": {
@@ -96,11 +117,11 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/10.0.107/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\11.0.100-preview.2.26159.112/PortableRuntimeIdentifierGraph.json"
         }
       },
       "runtimes": {
-        "linux-x64": {
+        "win-x64": {
           "#import": []
         }
       }

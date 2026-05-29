@@ -1,7 +1,7 @@
 obj\Release\net8.0\win-x64\aursh-context.dll
 -o:obj\Release\net8.0\win-x64\native\aursh-context.obj
 -r:C:\Users\Cortez\.nuget\packages\microsoft.netcore.app.runtime.win-x64\8.0.24\runtimes\win-x64\lib\net8.0\WindowsBase.dll
--r:C:\Users\Cortez\Repos\AurSh\src\obj\publish-build-contexts\aursh.dll
+-r:C:\Users\Cortez\Documents\Projects\AurSh\src\obj\publish-build-contexts\aursh.dll
 -r:C:\Users\Cortez\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\8.0.24\sdk\System.Private.CoreLib.dll
 -r:C:\Users\Cortez\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\8.0.24\sdk\System.Private.DisabledReflection.dll
 -r:C:\Users\Cortez\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\8.0.24\sdk\System.Private.Reflection.Execution.dll

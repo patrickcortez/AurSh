@@ -596,11 +596,11 @@
   "project": {
     "version": "2.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\Contexts.csproj",
+      "projectUniqueName": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\Contexts\\Contexts.csproj",
       "projectName": "aursh-context",
-      "projectPath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\Contexts.csproj",
+      "projectPath": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\Contexts\\Contexts.csproj",
       "packagesPath": "C:\\Users\\Cortez\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\Contexts\\obj\\",
+      "outputPath": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\Contexts\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -624,8 +624,8 @@
           "framework": "net8.0",
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj": {
-              "projectPath": "C:\\Users\\Cortez\\Repos\\AurSh\\src\\AurShell.csproj"
+            "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj": {
+              "projectPath": "C:\\Users\\Cortez\\Documents\\Projects\\AurSh\\src\\AurShell.csproj"
             }
           }
         }

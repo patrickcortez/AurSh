@@ -10,7 +10,7 @@ public class Prompt
     private const string BoxTopLeft = "\u256D\u2500";
     private const string BoxBottomLeft = "\u2570\u2500";
 
-    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git} {network}{status}";
+    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git}{network}{status}";
     private const string DefaultLine2Format = "{box_bottom} {chevron} ";
 
     public Prompt(ShellEnvironment env)
@@ -306,11 +306,7 @@ public class Prompt
     {
         if (!_gitInfo.IsGitRepo)
         {
-            var noGit = new StringBuilder();
-            noGit.Append(Utils.Ansi.FgRgb(40, 40, 55));
-            noGit.Append(_segmentEdge);
-            noGit.Append(Utils.Ansi.Reset);
-            return noGit.ToString();
+            return "";
         }
 
         var sb = new StringBuilder();
@@ -328,10 +324,6 @@ public class Prompt
         sb.Append(' ');
         sb.Append(Utils.Ansi.Reset);
 
-        sb.Append(Utils.Ansi.FgRgb(30, 30, 45));
-        sb.Append(_segmentEdge);
-        sb.Append(Utils.Ansi.Reset);
-
         return sb.ToString();
     }
 
@@ -340,9 +332,19 @@ public class Prompt
         Utils.NetworkInfo.Refresh();
 
         var sb = new StringBuilder();
-        string netFg = Utils.NetworkInfo.IsConnected ? Utils.Ansi.FgRgb(130, 230, 150) : Utils.Ansi.FgRgb(255, 100, 100);
+        string netBg = Utils.Ansi.BgRgb(20, 60, 40); // Dark green background to match aesthetic
+        string netFg = Utils.NetworkInfo.IsConnected ? Utils.Ansi.FgRgb(150, 255, 150) : Utils.Ansi.FgRgb(255, 100, 100);
 
+        string prevFg = _gitInfo.IsGitRepo ? Utils.Ansi.FgRgb(30, 30, 45) : Utils.Ansi.FgRgb(40, 40, 55);
+
+        sb.Append(prevFg);
+        sb.Append(netBg);
+        sb.Append(_segmentEdge);
+
+        sb.Append(netBg);
         sb.Append(netFg);
+        sb.Append(" ");
+
         if (Utils.NetworkInfo.IsConnected)
         {
             sb.Append("\uF1EB ");
@@ -362,6 +364,11 @@ public class Prompt
         {
             sb.Append("\uF1EB Disconnected");
         }
+        sb.Append(" ");
+        sb.Append(Utils.Ansi.Reset);
+
+        sb.Append(Utils.Ansi.FgRgb(20, 60, 40));
+        sb.Append(_segmentEdge);
         sb.Append(Utils.Ansi.Reset);
 
         return sb.ToString();

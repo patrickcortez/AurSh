@@ -10,7 +10,7 @@ public class Prompt
     private const string BoxTopLeft = "\u256D\u2500";
     private const string BoxBottomLeft = "\u2570\u2500";
 
-    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git}{status}";
+    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git} {network}{status}";
     private const string DefaultLine2Format = "{box_bottom} {chevron} ";
 
     public Prompt(ShellEnvironment env)
@@ -166,6 +166,7 @@ public class Prompt
             "user_host" => BuildUserHostSegment(),
             "dir_badge" or "dir" => BuildDirSegment(workingDirectory),
             "git" => BuildGitSegment(),
+            "network" => BuildNetworkSegment(),
             "status" => BuildStatusIndicator(lastExitCode),
             "chevron" => BuildChevron(lastExitCode),
             "time" => BuildTimeSegment(DateTime.Now.ToString("HH:mm:ss")),
@@ -329,6 +330,38 @@ public class Prompt
 
         sb.Append(Utils.Ansi.FgRgb(30, 30, 45));
         sb.Append(_segmentEdge);
+        sb.Append(Utils.Ansi.Reset);
+
+        return sb.ToString();
+    }
+
+    private string BuildNetworkSegment()
+    {
+        Utils.NetworkInfo.Refresh();
+
+        var sb = new StringBuilder();
+        string netFg = Utils.NetworkInfo.IsConnected ? Utils.Ansi.FgRgb(130, 230, 150) : Utils.Ansi.FgRgb(255, 100, 100);
+
+        sb.Append(netFg);
+        if (Utils.NetworkInfo.IsConnected)
+        {
+            sb.Append("\uF1EB ");
+            char barChar = Utils.NetworkInfo.Bars switch
+            {
+                4 => '\u2588', // █
+                3 => '\u2586', // ▆
+                2 => '\u2584', // ▄
+                1 => '\u2582', // ▂
+                _ => '_'
+            };
+            sb.Append(barChar);
+            sb.Append(" ");
+            sb.Append(Utils.NetworkInfo.Ssid);
+        }
+        else
+        {
+            sb.Append("\uF1EB Disconnected");
+        }
         sb.Append(Utils.Ansi.Reset);
 
         return sb.ToString();

@@ -137,6 +137,13 @@ public class Shell
                     if (string.IsNullOrEmpty(trimmed))
                         continue;
 
+                    if (Utils.Platform.VerifyImportantConfigIntegrity())
+                    {
+                        Console.Error.WriteLine(Utils.Ansi.FgRed + "FATAL: Aursh configuration integrity compromised. Missing important config files have been restored." + Utils.Ansi.Reset);
+                        Console.Error.WriteLine(Utils.Ansi.FgRed + "The shell must now exit. Please restart Aursh." + Utils.Ansi.Reset);
+                        System.Environment.Exit(1);
+                    }
+
                     _history.Add(trimmed);
 
                     if (ShouldBypassBox(trimmed))
@@ -201,6 +208,13 @@ public class Shell
 
     public int ExecuteCommand(string input)
     {
+        if (Utils.Platform.VerifyImportantConfigIntegrity())
+        {
+            Console.Error.WriteLine(Utils.Ansi.FgRed + "FATAL: Aursh configuration integrity compromised. Missing important config files have been restored." + Utils.Ansi.Reset);
+            Console.Error.WriteLine(Utils.Ansi.FgRed + "The shell must now exit. Please restart Aursh." + Utils.Ansi.Reset);
+            System.Environment.Exit(1);
+        }
+
         int result = _executor.Execute(input);
         _env.LastExitCode = result;
         return result;
@@ -210,6 +224,14 @@ public class Shell
     {
         if (string.IsNullOrWhiteSpace(input)) return 0;
         string trimmed = input.Trim();
+
+        if (Utils.Platform.VerifyImportantConfigIntegrity())
+        {
+            Console.Error.WriteLine(Utils.Ansi.FgRed + "FATAL: Aursh configuration integrity compromised. Missing important config files have been restored." + Utils.Ansi.Reset);
+            Console.Error.WriteLine(Utils.Ansi.FgRed + "The shell must now exit. Please restart Aursh." + Utils.Ansi.Reset);
+            System.Environment.Exit(1);
+        }
+
         if (ShouldBypassBox(trimmed))
             return ExecuteCommand(trimmed);
 

@@ -11,7 +11,7 @@ public class Program
         Core.Watchdog.Start();
         Utils.Platform.ApplyAndroidWorkarounds();
         Utils.Platform.EnableAnsiOnWindows();
-        Utils.Platform.EnsureDirectoriesExist();
+        Utils.Platform.EnsureDirectoriesAndFilesExist();
         // Start the terminal-size cache + SIGWINCH/poll change detector
         // before any rendering happens. Renderers read TerminalSize.Width /
         // .Height (via Platform.TerminalWidth) which is now backed by this.

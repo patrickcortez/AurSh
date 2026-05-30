@@ -337,14 +337,89 @@ public static class Platform
         return 0;
     }
 
-    public static void EnsureDirectoriesExist()
+    public static void EnsureDirectoriesAndFilesExist()
     {
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
-        Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh"));
-        Directory.CreateDirectory(Path.Combine(HomeDirectory, ".aursh", "plugins"));
-        Directory.CreateDirectory(SuggestionsDirectory);
+        
+        string aurshDir = Path.Combine(HomeDirectory, ".aursh");
+        
+        // If the directory doesn't exist at all, this is a brand new fresh install.
+        // We will pre-generate everything so it doesn't instantly crash on the first command.
+        if (!Directory.Exists(aurshDir))
+        {
+            Directory.CreateDirectory(aurshDir);
+            Directory.CreateDirectory(Path.Combine(aurshDir, "plugins"));
+            Directory.CreateDirectory(SuggestionsDirectory);
+
+            // Run the integrity check once to generate all the files silently
+            VerifyImportantConfigIntegrity();
+        }
+    }
+
+    public static bool VerifyImportantConfigIntegrity()
+    {
+        string aurshDir = Path.Combine(HomeDirectory, ".aursh");
+        bool wasMissing = false;
+
+        string bypass = Path.Combine(aurshDir, "Bypass.txt");
+        if (!File.Exists(bypass))
+        {
+            File.WriteAllLines(bypass, new[] { "# List commands to bypass the blackbox (one per line)" });
+            wasMissing = true;
+        }
+
+        string allowedIp = Path.Combine(aurshDir, "AllowedIP.con");
+        if (!File.Exists(allowedIp))
+        {
+            File.WriteAllLines(allowedIp, new[] { "[Allowed]", "127.0.0.1" });
+            wasMissing = true;
+        }
+
+        string configfile = Path.Combine(aurshDir, "AurSh.config.con");
+        if (!File.Exists(configfile))
+        {
+            File.WriteAllText(configfile, "[Config]\nPromptSpacing=Compressed\nPromptLine=none\nSegmentEdges=angled\nVerbose=true\n");
+            wasMissing = true;
+        }
+
+        string blackconfig = Path.Combine(aurshDir, "blackconfig.json");
+        if (!File.Exists(blackconfig))
+        {
+            File.WriteAllText(blackconfig, "{\n  \"Blackbox Title\": \"BlackBox\",\n  \"Border-Color\": \"White\",\n  \"Background-Color\": \"Black\",\n  \"Show-Title\": true,\n  \"Enabled\": true,\n  \"Border-Style\": \"Rounded\"\n}");
+            wasMissing = true;
+        }
+
+        string associations = Path.Combine(aurshDir, "associations.json");
+        if (!File.Exists(associations))
+        {
+            File.WriteAllText(associations, "{\n}");
+            wasMissing = true;
+        }
+
+        string contexts = Path.Combine(aurshDir, "Contexts.con");
+        if (!File.Exists(contexts))
+        {
+            File.WriteAllText(contexts, "[Contexts]\n");
+            wasMissing = true;
+        }
+
+        string contextsJson = Path.Combine(aurshDir, ".aursh-contexts.json");
+        if (!File.Exists(contextsJson))
+        {
+            File.WriteAllText(contextsJson, "{\n}");
+            wasMissing = true;
+        }
+
+        string vscode = Path.Combine(aurshDir, ".vscode-configured");
+        if (!File.Exists(vscode))
+        {
+            File.WriteAllText(vscode, "");
+            wasMissing = true;
+        }
+
+        return wasMissing;
     }
 
     private static OperatingSystemType DetectOperatingSystem()

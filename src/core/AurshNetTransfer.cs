@@ -329,7 +329,19 @@ public static class AurshNetTransfer
                     writer.Flush(); // Flush so the receiver gets the metadata immediately
 
                     // Wait for the receiver to tell us what they already have
-                    long existingSize = reader.ReadInt64();
+                    long existingSize;
+                    try
+                    {
+                        existingSize = reader.ReadInt64();
+                    }
+                    catch (EndOfStreamException)
+                    {
+                        throw new Exception($"Transfer rejected by {ipAddress}. Ensure your IP is in their AllowedIP.con whitelist.");
+                    }
+                    catch (IOException)
+                    {
+                        throw new Exception($"Connection closed unexpectedly by {ipAddress}.");
+                    }
 
                     if (existingSize == fi.Length && fi.Length > 0)
                     {

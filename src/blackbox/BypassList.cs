@@ -13,7 +13,7 @@ namespace AurShell.BlackBoxView;
 ///     (env var BLACKBOX_BYPASS override). Contains well-known TUI
 ///     programs that can't function inside a box (vim, less, htop...).
 ///
-///  2. The user's persistent bypass file at ~/.aursh/bypass.txt — one
+///  2. The user's persistent bypass file at ~/.aursh/Bypass.txt — one
 ///     program name per line, '#' for comments, blank lines ignored.
 ///
 ///  3. System shells discovered at runtime:
@@ -50,7 +50,7 @@ public static class BypassList
                 return true;
         }
 
-        // 2. User's persistent bypass file (~/.aursh/bypass.txt)
+        // 2. User's persistent bypass file (~/.aursh/Bypass.txt)
         if (IsInUserBypassFile(name))
             return true;
 
@@ -94,7 +94,7 @@ public static class BypassList
     }
 
     /// <summary>
-    /// Returns all user-configured bypass entries from ~/.aursh/bypass.txt.
+    /// Returns all user-configured bypass entries from ~/.aursh/Bypass.txt.
     /// </summary>
     public static IReadOnlyCollection<string> GetUserBypassEntries()
     {
@@ -291,7 +291,7 @@ public static class BypassList
     }
 
     /// <summary>
-    /// Reads the user's persistent bypass file at ~/.aursh/bypass.txt.
+    /// Reads the user's persistent bypass file at ~/.aursh/Bypass.txt.
     /// Format: one program name per line, '#' for comments, blank lines
     /// ignored. Lines can be basenames (no extension) or full paths
     /// (the basename is extracted).
@@ -299,7 +299,7 @@ public static class BypassList
     private static HashSet<string> LoadUserBypassFile()
     {
         var entries = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
-        string filePath = Path.Combine(Platform.HomeDirectory, ".aursh", "bypass.txt");
+        string filePath = Path.Combine(Platform.HomeDirectory, ".aursh", "Bypass.txt");
 
         try
         {

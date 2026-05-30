@@ -36,9 +36,14 @@ else ifeq ($(UNAME_S),Windows)
 else ifeq ($(UNAME_S),Darwin)
     DETECTED_OS := macOS
 else ifeq ($(UNAME_S),Linux)
+    UNAME_O := $(shell uname -o 2>nul || echo Linux)
     ifneq ($(wildcard /data/data/com.termux),)
         DETECTED_OS := Termux
+    else ifneq ($(findstring com.termux,$(PREFIX)),)
+        DETECTED_OS := Termux
     else ifdef ANDROID_ROOT
+        DETECTED_OS := Termux
+    else ifeq ($(UNAME_O),Android)
         DETECTED_OS := Termux
     else
         DETECTED_OS := Linux

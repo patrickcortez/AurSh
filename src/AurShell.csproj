@@ -30,6 +30,11 @@
     <!-- Use LLD linker on Termux/arm64 to avoid GNU ld issues -->
     <LinkerFlavor>lld</LinkerFlavor>
   </PropertyGroup>
+  
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64' Or '$(RuntimeIdentifier)' == 'linux-bionic-arm64'">
+    <!-- Tell LLD to ignore undefined symbols in version scripts (fixes _init and _fini errors on Termux) -->
+    <LinkerArg Include="-Wl,--undefined-version" />
+  </ItemGroup>
 
   <!--
     aursh-update lives in its own project (src/aursh-update/AurShUpdate.csproj)

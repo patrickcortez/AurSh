@@ -11,7 +11,9 @@ public static class NetworkInfo
     public static int SignalStrength { get; private set; } = 0;
     public static int Bars { get; private set; } = 0;
 
-    // Wired connections get full bars and a different icon in the prompt
+    // Okay, so VMs and bridged networks exist and they pretend to be wired connections.
+    // It's super annoying, but we have to track them separately so the prompt doesn't look completely stupid
+    // by showing a Wi-Fi icon for an ethernet cable.
     public static bool IsWired { get; private set; } = false;
 
     private static DateTime _lastUpdate = DateTime.MinValue;
@@ -64,7 +66,7 @@ public static class NetworkInfo
 
     private static void RefreshWindows()
     {
-        // Try wireless first
+        // Let's pray to the Microsoft gods that this machine actually has a Wi-Fi card.
         string output = RunCommand("netsh", "wlan show interfaces");
         if (!string.IsNullOrWhiteSpace(output))
         {
@@ -108,8 +110,9 @@ public static class NetworkInfo
             }
         }
 
-        // No wireless found — check for wired/bridged Ethernet via ipconfig
-        // This catches VMs with bridged networking and physical ethernet connections
+        // Okay, the Wi-Fi scan completely failed. Either this poor user is on a desktop with an actual
+        // ethernet cable, or they are trapped in a Virtual Machine with a bridged network.
+        // It honestly drives me crazy how Windows hides this stuff, but ipconfig never lies to us.
         string ipOutput = RunCommand("ipconfig", "");
         if (string.IsNullOrWhiteSpace(ipOutput))
         {
@@ -123,14 +126,14 @@ public static class NetworkInfo
         {
             string trimLine = line.Trim();
 
-            // Adapter header lines aren't indented and end with ':'
+            // Oh boy, parsing command line output. Windows doesn't indent headers, they just throw a colon at the end.
             if (!line.StartsWith(" ") && !line.StartsWith("\t") && trimLine.EndsWith(":"))
             {
                 currentAdapter = trimLine.TrimEnd(':');
                 continue;
             }
 
-            // Look for an IPv4 address line — means this adapter is actually active
+            // If we see an IPv4 address, hallelujah! The adapter is actually plugged into something and alive.
             if (trimLine.StartsWith("IPv4 Address", StringComparison.OrdinalIgnoreCase) ||
                 trimLine.StartsWith("IPv4", StringComparison.OrdinalIgnoreCase))
             {
@@ -138,7 +141,8 @@ public static class NetworkInfo
                 if (colonIdx >= 0)
                 {
                     string ipAddr = trimLine.Substring(colonIdx + 1).Trim();
-                    // Skip loopback and APIPA addresses, they're not real connections
+                    // I refuse to count loopbacks or those weird 169.254 APIPA addresses.
+                    // If you don't have a real IP, don't talk to me.
                     if (!ipAddr.StartsWith("127.") && !ipAddr.StartsWith("169.254.") && !string.IsNullOrEmpty(ipAddr))
                     {
                         if (!foundActiveAdapter && !string.IsNullOrEmpty(currentAdapter))
@@ -158,21 +162,23 @@ public static class NetworkInfo
 
     private static void RefreshLinux()
     {
-        // Try nmcli wifi first — works on most desktop Linux with NetworkManager
+        // NetworkManager is pretty much the standard these days, so let's try the happy path first.
+        // It makes life so much easier when it just works.
         if (TryRefreshLinuxNmcliWifi())
         {
             return;
         }
 
-        // nmcli didn't find wireless — maybe we're in a VM or wired-only box
-        // Check for any active network connection via nmcli general
+        // Okay, nmcli gave us nothing. We are probably stuck inside a VM or some server without a Wi-Fi card.
+        // Let's ask nmcli about generic connections before we panic.
         if (TryRefreshLinuxNmcliGeneral())
         {
             return;
         }
 
-        // nmcli isn't available at all — fall back to sysfs
-        // This works everywhere, even minimal containers and VMs without NetworkManager
+        // Total nightmare scenario. nmcli is dead or missing.
+        // Time to roll up our sleeves and dig through the murky depths of sysfs.
+        // It's ugly, but it's the only way to survive in minimal containers.
         TryRefreshLinuxSysfs();
     }
 
@@ -207,8 +213,9 @@ public static class NetworkInfo
 
     private static bool TryRefreshLinuxNmcliGeneral()
     {
-        // nmcli -t -f type,state,connection dev — shows ALL devices, not just wifi
-        // Output looks like: ethernet:connected:Wired connection 1
+        // I literally just want to know if there's an ethernet cable plugged in,
+        // but nmcli insists on dumping every device on the planet, so we have to filter it out.
+        // The output usually looks like this mess: ethernet:connected:Wired connection 1
         string output = RunCommand("nmcli", "-t -f type,state,connection dev");
         if (string.IsNullOrWhiteSpace(output))
         {
@@ -224,7 +231,8 @@ public static class NetworkInfo
                 string devState = parts[1].Trim();
                 string connName = parts[2].Trim();
 
-                // We already tried wifi above, so focus on ethernet/bridge/veth
+                // I don't care about wifi right now (we already tried it and failed),
+                // and loopback is just the system talking to itself. We want the real juice!
                 if (devState.Equals("connected", StringComparison.OrdinalIgnoreCase) &&
                     !devType.Equals("wifi", StringComparison.OrdinalIgnoreCase) &&
                     !devType.Equals("loopback", StringComparison.OrdinalIgnoreCase) &&
@@ -244,8 +252,9 @@ public static class NetworkInfo
 
     private static bool TryRefreshLinuxSysfs()
     {
-        // Read /sys/class/net/ directly — the most portable Linux approach
-        // Every network interface shows up here, even in containers and VMs
+        // Welcome to the absolute bottom of the barrel. We are reading raw kernel files now.
+        // It feels so dirty but honestly, it's the most reliable thing on Linux.
+        // If there's an interface, it's living in /sys/class/net/.
         try
         {
             string netClassPath = "/sys/class/net";
@@ -258,7 +267,7 @@ public static class NetworkInfo
             {
                 string ifName = Path.GetFileName(interfaceDir);
 
-                // Skip loopback, it's always "up" but doesn't count as connected
+                // Skip the loopback interface! It always says it's "up" and gets my hopes up for nothing.
                 if (ifName == "lo")
                 {
                     continue;
@@ -273,13 +282,13 @@ public static class NetworkInfo
                 string operstate = File.ReadAllText(operstatePath).Trim();
                 if (operstate.Equals("up", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Check if this is a wireless or wired interface
-                    // Wireless interfaces have a "wireless" subdirectory in sysfs
+                    // Okay, it's up. But is it Wi-Fi or wired?
+                    // You can literally just check if it has a "wireless" folder. The kernel is crazy sometimes.
                     bool isWireless = Directory.Exists(Path.Combine(interfaceDir, "wireless"));
 
                     if (isWireless)
                     {
-                        // It's wireless but nmcli failed — try reading /proc/net/wireless
+                        // Ugh, it IS wireless, but nmcli let us down. I have to read the signal from /proc/net/wireless now.
                         Ssid = ifName;
                         IsConnected = true;
                         IsWired = false;
@@ -288,7 +297,7 @@ public static class NetworkInfo
                     }
                     else
                     {
-                        // Wired or virtual — this is what we're here for in VMs
+                        // YES! It's a wired connection! Or a VM bridge, who cares, it has internet!
                         Ssid = ifName;
                         IsConnected = true;
                         IsWired = true;
@@ -300,7 +309,8 @@ public static class NetworkInfo
         }
         catch
         {
-            // sysfs might not be available in some weird container setups
+            // You have got to be kidding me. sysfs isn't even here? We are definitely trapped in a docker container.
+            // Just give up.
         }
 
         return false;
@@ -308,9 +318,9 @@ public static class NetworkInfo
 
     private static int ReadWirelessSignalFromProc(string interfaceName)
     {
-        // /proc/net/wireless gives signal level for wireless interfaces
-        // Format: "Inter-| sta-|   Quality        |   Discarded packets..."
-        //         " wlan0: 0000   50.  -60.  -256  ..."
+        // Don't even get me started on this file. 
+        // /proc/net/wireless is so archaic, the header literally has misaligned columns.
+        // It looks something like: "Inter-| sta-|   Quality        |   Discarded packets..."
         try
         {
             string procWirelessPath = "/proc/net/wireless";
@@ -324,17 +334,17 @@ public static class NetworkInfo
                 string trimmed = line.Trim();
                 if (trimmed.StartsWith(interfaceName + ":", StringComparison.Ordinal))
                 {
-                    // Split by whitespace after the interface name
+                    // Oh joy, let's split by spaces because fixed-width parsing is too much to ask for.
                     string afterName = trimmed.Substring(trimmed.IndexOf(':') + 1).Trim();
                     string[] fields = afterName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
-                    // fields[1] is the link quality, fields[2] is the signal level (dBm)
+                    // Field 2 is the actual signal in dBm. It has a weird dot at the end sometimes. Who designed this?!
                     if (fields.Length >= 3)
                     {
                         string signalField = fields[2].TrimEnd('.');
                         if (int.TryParse(signalField, out int dbm))
                         {
-                            // Convert dBm to percentage (rough approximation)
+                            // Convert the negative dBm to a percentage. I'm just eyeballing the math here, but it works fine.
                             return Math.Max(0, Math.Min(100, 2 * (dbm + 100)));
                         }
                     }
@@ -343,7 +353,7 @@ public static class NetworkInfo
         }
         catch
         {
-            // /proc might not be mounted or readable
+            // I'm crying inside. /proc isn't even mounted. 
         }
 
         return 50;
@@ -400,7 +410,7 @@ public static class NetworkInfo
         string output = RunCommand("termux-wifi-connectioninfo", "");
         if (string.IsNullOrWhiteSpace(output)) return;
 
-        // Manual parsing to avoid using JSON parsing syntax or libraries as per user rule
+        // Okay, fine, I'll do it manually. Let's dig for the ssid label in this wall of text.
         string ssidLabel = "\"ssid\": \"";
         int ssidIdx = output.IndexOf(ssidLabel);
         if (ssidIdx >= 0)

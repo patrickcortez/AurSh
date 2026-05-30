@@ -92,7 +92,7 @@ public static class AurshNetCommand
 
     private static void GetWindowsNetworks(List<WifiNetwork> networks)
     {
-        // Try wireless scan first
+        // I really hope this isn't a VM, but let's try the Wi-Fi scan first.
         string output = RunCommand("netsh", "wlan show networks mode=bssid");
         if (!string.IsNullOrWhiteSpace(output))
         {
@@ -136,8 +136,9 @@ public static class AurshNetCommand
             }
         }
 
-        // If no wireless networks found, detect wired/bridged connections
-        // This is the critical path for VMs with bridged networking
+        // Ugh, the wireless scan turned up empty. 
+        // This is the absolute worst case: it's probably a VM pretending to have a bridged connection.
+        // Let's go digging for wired interfaces.
         if (networks.Count == 0)
         {
             GetWindowsWiredInterfaces(networks);
@@ -146,7 +147,7 @@ public static class AurshNetCommand
 
     private static void GetWindowsWiredInterfaces(List<WifiNetwork> networks)
     {
-        // Parse ipconfig to find active ethernet adapters
+        // Let's sift through the monstrosity that is ipconfig output.
         string ipOutput = RunCommand("ipconfig", "");
         if (string.IsNullOrWhiteSpace(ipOutput))
         {
@@ -159,14 +160,15 @@ public static class AurshNetCommand
         {
             string trimLine = line.Trim();
 
-            // Adapter header lines aren't indented and end with ':'
+            // Oh look, an un-indented line ending with a colon. That must be a new adapter!
+            // Who came up with this formatting?!
             if (!line.StartsWith(" ") && !line.StartsWith("\t") && trimLine.EndsWith(":"))
             {
                 currentAdapter = trimLine.TrimEnd(':');
                 continue;
             }
 
-            // An IPv4 address means this adapter is active
+            // YES! An IPv4 address! This adapter is actually doing something.
             if (trimLine.StartsWith("IPv4 Address", StringComparison.OrdinalIgnoreCase) ||
                 trimLine.StartsWith("IPv4", StringComparison.OrdinalIgnoreCase))
             {
@@ -174,7 +176,7 @@ public static class AurshNetCommand
                 if (colonIdx >= 0)
                 {
                     string ipAddr = trimLine.Substring(colonIdx + 1).Trim();
-                    // Skip loopback and APIPA — those aren't real connections
+                    // Don't you dare give me a loopback or APIPA address. Real connections only!
                     if (!ipAddr.StartsWith("127.") && !ipAddr.StartsWith("169.254.") && !string.IsNullOrEmpty(ipAddr))
                     {
                         if (!string.IsNullOrEmpty(currentAdapter))
@@ -195,7 +197,7 @@ public static class AurshNetCommand
 
     private static void GetLinuxNetworks(List<WifiNetwork> networks)
     {
-        // Try nmcli wifi scan first — the happy path for desktop Linux
+        // The happy path! nmcli usually just gives us what we want without a fight.
         string output = RunCommand("nmcli", "-t -f ssid,signal,security dev wifi list");
         if (!string.IsNullOrWhiteSpace(output))
         {
@@ -214,27 +216,25 @@ public static class AurshNetCommand
             }
         }
 
-        // If nmcli found wireless networks, we're done
+        // Thank god, we found some Wi-Fi networks. We can stop right here.
         if (networks.Count > 0)
         {
             return;
         }
 
-        // No wireless results — check for wired/bridged connections via nmcli
-        // This is the path that VMs with bridged networking will take
+        // Are you kidding me? No Wi-Fi? Fine, let's ask nmcli if we're in a VM or using an ethernet cord.
         if (TryGetLinuxWiredFromNmcli(networks))
         {
             return;
         }
 
-        // nmcli isn't available at all — go straight to sysfs
-        // This covers minimal installs, containers, and any Linux without NetworkManager
+        // Alright, nmcli is dead. We have no choice but to dive into sysfs. Pray for us.
         TryGetLinuxWiredFromSysfs(networks);
     }
 
     private static bool TryGetLinuxWiredFromNmcli(List<WifiNetwork> networks)
     {
-        // nmcli -t -f device,type,state,connection dev — shows ALL device types
+        // I hate that I have to query EVERY device just to find the wired ones.
         string output = RunCommand("nmcli", "-t -f device,type,state,connection dev");
         if (string.IsNullOrWhiteSpace(output))
         {
@@ -252,7 +252,8 @@ public static class AurshNetCommand
                 string devState = parts[2].Trim();
                 string connName = parts[3].Trim();
 
-                // Skip wifi (already tried), loopback, and disconnected devices
+                // I don't care about loopbacks or dead connections, and we ALREADY know Wi-Fi is dead.
+                // Give me the real, active ethernet connections!
                 if (devState.Equals("connected", StringComparison.OrdinalIgnoreCase) &&
                     !devType.Equals("wifi", StringComparison.OrdinalIgnoreCase) &&
                     !devType.Equals("loopback", StringComparison.OrdinalIgnoreCase))
@@ -275,7 +276,7 @@ public static class AurshNetCommand
 
     private static void TryGetLinuxWiredFromSysfs(List<WifiNetwork> networks)
     {
-        // Read /sys/class/net/ — works without any userspace tools installed
+        // Reading the kernel's mind directly. It's rough out here.
         try
         {
             string netClassPath = "/sys/class/net";
@@ -288,7 +289,7 @@ public static class AurshNetCommand
             {
                 string ifName = Path.GetFileName(interfaceDir);
 
-                // Skip loopback — it's always up but doesn't represent a real connection
+                // Ignore the loopback. It always says it's connected, and it always lies.
                 if (ifName == "lo")
                 {
                     continue;
@@ -317,7 +318,7 @@ public static class AurshNetCommand
         }
         catch
         {
-            // sysfs might not be available in extremely minimal environments
+            // It completely blew up. We must be in some insanely restrictive docker container. Oh well.
         }
     }
 
@@ -349,16 +350,16 @@ public static class AurshNetCommand
 
     private static void GetTermuxNetworks(List<WifiNetwork> networks)
     {
-        // termux-wifi-scanresults returns a list of nearby networks
-        // Each entry has "ssid", "bssid", "frequency", "level", "capabilities" fields
+        // Termux actually has a tool for this, thank goodness.
+        // It's going to dump a giant JSON string on us, though.
         string output = RunCommand("termux-wifi-scanresults", "");
         if (string.IsNullOrWhiteSpace(output))
         {
             return;
         }
 
-        // Parse the output line by line, looking for ssid and level fields
-        // We can't use JSON parsers (user rule), so we do string scanning
+        // I'm not allowed to use a real JSON parser here. So I'm string slicing like it's 2005.
+        // This is going to be messy.
         int searchStart = 0;
         while (searchStart < output.Length)
         {
@@ -378,7 +379,7 @@ public static class AurshNetCommand
 
             string ssid = output.Substring(ssidStart, ssidEnd - ssidStart);
 
-            // Find the level (signal strength in dBm) near this SSID entry
+            // Now let's try to dig out the signal strength.
             string levelLabel = "\"level\": ";
             int levelIdx = output.IndexOf(levelLabel, ssidEnd, StringComparison.Ordinal);
             string signal = "?%";
@@ -398,7 +399,7 @@ public static class AurshNetCommand
                 }
             }
 
-            // Find capabilities (security info) near this entry
+            // Last but not least, pry the security capabilities out of this text block.
             string capLabel = "\"capabilities\": \"";
             int capIdx = output.IndexOf(capLabel, ssidEnd, StringComparison.Ordinal);
             string security = "";

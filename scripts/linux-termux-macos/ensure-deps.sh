@@ -60,12 +60,19 @@ detect_os() {
             die "Unsupported OS: $_uname"
             ;;
     esac
+    # PRoot bleed-through check: if we have glibc, we are NOT in native Termux
+    _has_glibc=0
+    if ldd --version 2>/dev/null | grep -i -E "glibc|gnu libc" >/dev/null 2>&1; then
+        _has_glibc=1
+    fi
 
-    # Termux check
-    if [ -d "/data/data/com.termux" ] || [ -n "$ANDROID_ROOT" ]; then
-        DISTRO="Termux"
-        PKG_MANAGER="pkg"
-        return
+    # Termux check (only if no glibc detected)
+    if [ "$_has_glibc" -eq 0 ]; then
+        if [ -d "/data/data/com.termux" ] || [ -n "$ANDROID_ROOT" ]; then
+            DISTRO="Termux"
+            PKG_MANAGER="pkg"
+            return
+        fi
     fi
 
     # Standard Linux — read /etc/os-release

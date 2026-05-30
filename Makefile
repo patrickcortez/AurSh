@@ -36,8 +36,11 @@ else ifeq ($(UNAME_S),Windows)
 else ifeq ($(UNAME_S),Darwin)
     DETECTED_OS := macOS
 else ifeq ($(UNAME_S),Linux)
-    UNAME_O := $(shell uname -o 2>nul || echo Linux)
-    ifneq ($(wildcard /data/data/com.termux),)
+    UNAME_O := $(shell uname -o 2>/dev/null || echo Linux)
+    HAS_GLIBC := $(shell ldd --version 2>/dev/null | grep -i -E "glibc|gnu libc" >/dev/null 2>&1 && echo 1 || echo 0)
+    ifeq ($(HAS_GLIBC),1)
+        DETECTED_OS := Linux
+    else ifneq ($(wildcard /data/data/com.termux),)
         DETECTED_OS := Termux
     else ifneq ($(findstring com.termux,$(PREFIX)),)
         DETECTED_OS := Termux

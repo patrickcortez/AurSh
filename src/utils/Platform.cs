@@ -430,6 +430,8 @@ public static class Platform
             return OperatingSystemType.MacOS;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
+            if (File.Exists("/etc/os-release"))
+                return OperatingSystemType.Linux;
             if (Directory.Exists("/data/data/com.termux"))
                 return OperatingSystemType.Termux;
             string? androidRoot = System.Environment.GetEnvironmentVariable("ANDROID_ROOT");

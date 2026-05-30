@@ -767,6 +767,10 @@ public static class AurshNetCommand
         {
             Console.WriteLine($"{Ansi.FgBrightBlue}SSID:{Ansi.Reset}         {NetworkInfo.Ssid}");
             Console.WriteLine($"{Ansi.FgBrightBlue}Strength:{Ansi.Reset}     {NetworkInfo.SignalStrength}% ({new string('|', NetworkInfo.Bars)}{new string('.', 4 - NetworkInfo.Bars)})");
+            if (NetworkInfo.LinkSpeed > 0)
+            {
+                Console.WriteLine($"{Ansi.FgBrightBlue}Speed:{Ansi.Reset}        {NetworkInfo.LinkSpeed} Mbps");
+            }
         }
         Console.WriteLine($"{Ansi.FgBrightBlue}Local IP:{Ansi.Reset}     {localIp}");
         Console.WriteLine($"{Ansi.FgBrightBlue}Receiver:{Ansi.Reset}     Port 15333 {(NetworkInfo.IsConnected ? "Active" : "Waiting")}");

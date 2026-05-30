@@ -10,6 +10,7 @@ public static class NetworkInfo
     public static string Ssid { get; private set; } = string.Empty;
     public static int SignalStrength { get; private set; } = 0;
     public static int Bars { get; private set; } = 0;
+    public static int LinkSpeed { get; private set; } = 0;
 
     // Okay, so VMs and bridged networks exist and they pretend to be wired connections.
     // It's super annoying, but we have to track them separately so the prompt doesn't look completely stupid
@@ -31,6 +32,7 @@ public static class NetworkInfo
         Ssid = string.Empty;
         SignalStrength = 0;
         Bars = 0;
+        LinkSpeed = 0;
 
         try
         {
@@ -56,12 +58,64 @@ public static class NetworkInfo
             IsConnected = false;
         }
 
+        // Final universal fallback: If we still think we are disconnected, try a quick ping.
+        // This handles weird VMs, minimal Docker containers, and PRoot instances where
+        // all network management tools are missing, but raw internet access is routed.
+        if (!IsConnected)
+        {
+            if (TryPingFallback())
+            {
+                IsConnected = true;
+                IsWired = true; // Assume wired/bridged since we have no WiFi data
+                SignalStrength = 100;
+                Ssid = "Connected (Ping)";
+                LinkSpeed = 0;
+            }
+        }
+
         if (IsConnected)
         {
             Bars = CalculateBars(SignalStrength);
         }
 
         _lastUpdate = DateTime.Now;
+    }
+
+    private static bool TryPingFallback()
+    {
+        try
+        {
+            // C#'s built-in Ping is usually the fastest, but it can throw PlatformNotSupportedException
+            // on Android/Termux due to raw socket restrictions for unprivileged apps.
+            try 
+            {
+                using var ping = new System.Net.NetworkInformation.Ping();
+                // 300ms timeout to prevent blocking the prompt for too long if completely offline
+                var reply = ping.Send("8.8.8.8", 300);
+                if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // Fallback to shell ping if C# Ping fails (common on Android PRoot)
+            }
+
+            if (Platform.CurrentOS != OperatingSystemType.Windows)
+            {
+                // -c 1 (1 packet), -W 1 (1 second timeout on Linux/Termux), MacOS uses -t 1 for timeout
+                string args = Platform.CurrentOS == OperatingSystemType.MacOS ? "-c 1 -t 1 8.8.8.8" : "-c 1 -W 1 8.8.8.8";
+                string output = RunCommand("ping", args);
+                return output.Contains("1 received") || output.Contains("1 packets received");
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void RefreshWindows()
@@ -98,6 +152,18 @@ public static class NetworkInfo
                         if (int.TryParse(signalStr, out int sig))
                         {
                             SignalStrength = sig;
+                        }
+                    }
+                }
+                else if (trimLine.StartsWith("Receive rate", StringComparison.OrdinalIgnoreCase))
+                {
+                    int colonIndex = trimLine.IndexOf(':');
+                    if (colonIndex >= 0 && colonIndex + 1 < trimLine.Length)
+                    {
+                        string speedStr = trimLine.Substring(colonIndex + 1).Trim();
+                        if (double.TryParse(speedStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double speed))
+                        {
+                            LinkSpeed = (int)speed;
                         }
                     }
                 }
@@ -184,7 +250,7 @@ public static class NetworkInfo
 
     private static bool TryRefreshLinuxNmcliWifi()
     {
-        string output = RunCommand("nmcli", "-t -f active,ssid,signal dev wifi");
+        string output = RunCommand("nmcli", "-t -f active,ssid,signal,rate dev wifi");
         if (string.IsNullOrWhiteSpace(output))
         {
             return false;
@@ -201,10 +267,18 @@ public static class NetworkInfo
                     if (int.TryParse(parts[2].Trim(), out int sig))
                     {
                         SignalStrength = sig;
+                        IsConnected = true;
                     }
-                    IsConnected = true;
-                    return true;
                 }
+                if (parts.Length >= 4)
+                {
+                    string rateStr = parts[3].Replace("Mbit/s", "").Trim();
+                    if (int.TryParse(rateStr, out int rate))
+                    {
+                        LinkSpeed = rate;
+                    }
+                }
+                return true;
             }
         }
 
@@ -395,6 +469,17 @@ public static class NetworkInfo
                     }
                 }
             }
+            else if (trimLine.StartsWith("lastTxRate:"))
+            {
+                int colonIndex = trimLine.IndexOf(':');
+                if (colonIndex >= 0 && colonIndex + 1 < trimLine.Length)
+                {
+                    if (int.TryParse(trimLine.Substring(colonIndex + 1).Trim(), out int rate))
+                    {
+                        LinkSpeed = rate;
+                    }
+                }
+            }
         }
 
         if (isUp && !string.IsNullOrEmpty(Ssid))
@@ -408,40 +493,112 @@ public static class NetworkInfo
     private static void RefreshTermux()
     {
         string output = RunCommand("termux-wifi-connectioninfo", "");
-        if (string.IsNullOrWhiteSpace(output)) return;
-
-        // Okay, fine, I'll do it manually. Let's dig for the ssid label in this wall of text.
-        string ssidLabel = "\"ssid\": \"";
-        int ssidIdx = output.IndexOf(ssidLabel);
-        if (ssidIdx >= 0)
+        if (!string.IsNullOrWhiteSpace(output))
         {
-            int ssidStart = ssidIdx + ssidLabel.Length;
-            int ssidEnd = output.IndexOf("\"", ssidStart);
-            if (ssidEnd >= 0)
+            // Parse SSID
+            string ssidLabel = "\"ssid\": \"";
+            int ssidIdx = output.IndexOf(ssidLabel);
+            if (ssidIdx >= 0)
             {
-                string parsedSsid = output.Substring(ssidStart, ssidEnd - ssidStart);
-                if (parsedSsid != "<unknown ssid>" && !string.IsNullOrEmpty(parsedSsid))
+                int ssidStart = ssidIdx + ssidLabel.Length;
+                int ssidEnd = output.IndexOf("\"", ssidStart);
+                if (ssidEnd >= 0)
                 {
-                    Ssid = parsedSsid;
-                    IsConnected = true;
+                    string parsedSsid = output.Substring(ssidStart, ssidEnd - ssidStart);
+                    if (parsedSsid != "<unknown ssid>" && !string.IsNullOrEmpty(parsedSsid))
+                    {
+                        Ssid = parsedSsid;
+                        IsConnected = true;
+                    }
                 }
+            }
+
+            // Parse RSSI
+            string rssiLabel = "\"rssi\": ";
+            int rssiIdx = output.IndexOf(rssiLabel);
+            if (rssiIdx >= 0)
+            {
+                int rssiStart = rssiIdx + rssiLabel.Length;
+                int rssiEnd = output.IndexOf(",", rssiStart);
+                if (rssiEnd < 0) rssiEnd = output.IndexOf("\n", rssiStart);
+                if (rssiEnd >= 0)
+                {
+                    if (int.TryParse(output.Substring(rssiStart, rssiEnd - rssiStart).Trim(), out int rssi))
+                    {
+                        SignalStrength = Math.Max(0, Math.Min(100, 2 * (rssi + 100)));
+                    }
+                }
+            }
+
+            // Parse Link Speed
+            string speedLabel = "\"link_speed_mbps\": ";
+            int speedIdx = output.IndexOf(speedLabel);
+            if (speedIdx >= 0)
+            {
+                int speedStart = speedIdx + speedLabel.Length;
+                int speedEnd = output.IndexOf(",", speedStart);
+                if (speedEnd < 0) speedEnd = output.IndexOf("\n", speedStart);
+                if (speedEnd >= 0)
+                {
+                    if (int.TryParse(output.Substring(speedStart, speedEnd - speedStart).Trim(), out int speed))
+                    {
+                        LinkSpeed = speed;
+                    }
+                }
+            }
+
+            if (IsConnected)
+            {
+                return;
             }
         }
 
-        string rssiLabel = "\"rssi\": ";
-        int rssiIdx = output.IndexOf(rssiLabel);
-        if (rssiIdx >= 0)
+        // Fallback 1: dumpsys wifi (requires root or adb)
+        string dumpsysOutput = RunCommand("su", "-c \"dumpsys wifi\"");
+        if (!string.IsNullOrWhiteSpace(dumpsysOutput))
         {
-            int rssiStart = rssiIdx + rssiLabel.Length;
-            int rssiEnd = output.IndexOf(",", rssiStart);
-            if (rssiEnd < 0) rssiEnd = output.IndexOf("\n", rssiStart);
-            if (rssiEnd >= 0)
+            foreach (string line in dumpsysOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                if (int.TryParse(output.Substring(rssiStart, rssiEnd - rssiStart).Trim(), out int rssi))
+                string trimLine = line.Trim();
+                if (trimLine.StartsWith("SSID: ", StringComparison.OrdinalIgnoreCase))
                 {
-                    SignalStrength = Math.Max(0, Math.Min(100, 2 * (rssi + 100)));
+                    string parsedSsid = trimLine.Substring(6).Trim().Trim('"');
+                    if (parsedSsid != "<unknown ssid>" && !string.IsNullOrEmpty(parsedSsid))
+                    {
+                        Ssid = parsedSsid;
+                        IsConnected = true;
+                    }
+                }
+                else if (trimLine.StartsWith("RSSI: ", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (int.TryParse(trimLine.Substring(6).Trim(), out int rssi))
+                    {
+                        SignalStrength = Math.Max(0, Math.Min(100, 2 * (rssi + 100)));
+                    }
+                }
+                else if (trimLine.StartsWith("Link speed: ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string speedStr = trimLine.Substring(12).Replace("Mbps", "").Trim();
+                    if (int.TryParse(speedStr, out int speed))
+                    {
+                        LinkSpeed = speed;
+                    }
                 }
             }
+
+            if (IsConnected)
+            {
+                return;
+            }
+        }
+
+        // Fallback 2: ip addr show wlan0 (just to know we have an IP)
+        string ipOutput = RunCommand("ip", "addr show wlan0");
+        if (!string.IsNullOrWhiteSpace(ipOutput) && ipOutput.Contains("inet "))
+        {
+            IsConnected = true;
+            Ssid = "wlan0";
+            SignalStrength = 100;
         }
     }
 

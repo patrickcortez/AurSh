@@ -600,7 +600,6 @@ public static class BuiltinCommands
                             {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}
                             {Ansi.FgBrightBlue}Current Architecture: {Ansi.FgBrightMagenta}{GetArch().ToString()}
                             {Ansi.FgBrightBlue}Current Version: {Ansi.FgBrightMagenta}{version}
-                            {Ansi.FgBrightBlue}Flavor: {Ansi.FgBrightMagenta} BlackBox
 
                             {Ansi.FgBrightBlue}AurSh has some native commands that you can invoke/use:
                                 - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.
@@ -612,6 +611,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-cat <options: -e> <file> : {Ansi.FgBrightBlue}Pipable file reader and vim-like TUI text editor.
                                 - {Ansi.FgBrightCyan}aursh-update : {Ansi.FgBrightBlue}Updates the shell from the remote repository.
                                 - {Ansi.FgBrightCyan}aursh-context : {Ansi.FgBrightBlue}Create, Modify or Delete Contexts.
+                                - {Ansi.FgBrightCyan}aursh-net : {Ansi.FgBrightBlue}A network tool for connecting,disconnecting and recieving/sending data through the command-line.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

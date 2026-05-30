@@ -43,6 +43,8 @@ Has:
 round edges.
 - `Updater`: A tool to update the shell from the remote repository.
 - `Contexts`: A disk backed object like that can hold multiple attributes to structurize and organize variables.
+- A built in Network Helper tool for connecting,disconnecting and recieving/sending data through
+the command-line.
 
 ---
 
@@ -57,6 +59,7 @@ round edges.
 - `aursh-cat <options: -e> <file>` : A pipable file reader and a *vim-like* TUI text editor ( with `-e` flag ).
 - `aursh-update` : updates the shell from the remote repository then exits the shell to apply changes.
 - `aursh-context` : A disk backed object like that can hold multiple attributes to structurize and organize variables. `aursh-context <new,del,list,insert,remove,update> <args...>`
+- `aursh-net` : A network tool for connecting,disconnecting and recieving/sending data through the command-line.
 
 ---
 

@@ -58,17 +58,18 @@ public static class NetworkInfo
             IsConnected = false;
         }
 
-        // Final universal fallback: If we still think we are disconnected, try a quick ping.
+        // Final universal fallback: If we still think we are disconnected, try a quick TCP socket connection.
         // This handles weird VMs, minimal Docker containers, and PRoot instances where
-        // all network management tools are missing, but raw internet access is routed.
+        // all network management tools are missing and ICMP raw sockets are restricted,
+        // but raw internet access is routed.
         if (!IsConnected)
         {
-            if (TryPingFallback())
+            if (TryTcpFallback())
             {
                 IsConnected = true;
                 IsWired = true; // Assume wired/bridged since we have no WiFi data
                 SignalStrength = 100;
-                Ssid = "Connected (Ping)";
+                Ssid = "Connected";
                 LinkSpeed = 0;
             }
         }
@@ -81,36 +82,24 @@ public static class NetworkInfo
         _lastUpdate = DateTime.Now;
     }
 
-    private static bool TryPingFallback()
+    private static bool TryTcpFallback()
     {
         try
         {
-            // C#'s built-in Ping is usually the fastest, but it can throw PlatformNotSupportedException
-            // on Android/Termux due to raw socket restrictions for unprivileged apps.
-            try 
+            // Using TCP port 53 (DNS) instead of ICMP Ping.
+
+            using var client = new System.Net.Sockets.TcpClient();
+            var result = client.BeginConnect("8.8.8.8", 53, null, null);
+            
+            // 300ms strict timeout to prevent blocking the shell prompt when actually offline
+            bool success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(300));
+            if (!success)
             {
-                using var ping = new System.Net.NetworkInformation.Ping();
-                // 300ms timeout to prevent blocking the prompt for too long if completely offline
-                var reply = ping.Send("8.8.8.8", 300);
-                if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                // Fallback to shell ping if C# Ping fails (common on Android PRoot)
+                return false;
             }
 
-            if (Platform.CurrentOS != OperatingSystemType.Windows)
-            {
-                // -c 1 (1 packet), -W 1 (1 second timeout on Linux/Termux), MacOS uses -t 1 for timeout
-                string args = Platform.CurrentOS == OperatingSystemType.MacOS ? "-c 1 -t 1 8.8.8.8" : "-c 1 -W 1 8.8.8.8";
-                string output = RunCommand("ping", args);
-                return output.Contains("1 received") || output.Contains("1 packets received");
-            }
-
-            return false;
+            client.EndConnect(result);
+            return true;
         }
         catch
         {

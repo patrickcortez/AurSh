@@ -419,6 +419,27 @@ end)
 The callback receives a 1-indexed table of string arguments and should
 return an integer exit code (0 for success).
 
+### `aursh.register_prompt(token_name, callback)`
+
+**What it does**
+Registers a custom prompt segment that can be injected into the terminal prompt. 
+The callback receives no arguments and must return a `string` or a `number`.
+
+**Example Usage**
+```lua
+aursh.register_prompt("my_time", function()
+    -- Returning standard prompt formatting like {fg:green} is supported.
+    return "{fg:yellow}[" .. aursh.get_cwd() .. "]{reset}"
+end)
+```
+After registering, you can use `{my_time}` in your `AURSH_PROMPT` variable.
+
+**How it works internally**
+1. The terminal renders your `AURSH_PROMPT` configuration.
+2. If it encounters a `{token_name}`, it checks if a plugin registered it.
+3. If a match is found, your Lua `callback` function is executed.
+4. The returned string is inserted directly into the shell prompt.
+
 ### `aursh.print(text, ...)`
 
 Prints text to the terminal (through the BlackBox viewport if active).

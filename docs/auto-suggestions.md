@@ -1,63 +1,33 @@
-# AutoSuggest
+# Auto-Suggestions
 
-**AurSh's** *Auto-Suggest* is very much extensible using json files.
-You can simply drop a *json* file of the app,package or tool you want to make auto suggestions,
-in the folder: `.aursh/suggestions`. It's structure is relatively simple, as seen in the example
-down below:
+**What it does**
+AurSh provides "ghost text" auto-suggestions as you type, helping you autocomplete commands, subcommands, and flags quickly. It is highly extensible, allowing you to add custom completions for any app or tool by simply creating a JSON file.
+
+**Example Usage**
+To add auto-suggestions for a tool, create a `.json` file inside the `.aursh/suggestions/` directory.
+
+Here is an example for the `git` command:
 
 ```json
-
 {
   "command": "git",
   "subcommands": [
     "add",
-    "bisect",
-    "blame",
-    "branch",
-    "checkout",
-    "cherry-pick",
-    "clean",
-    "clone",
     "commit",
-    "config",
-    "describe",
-    "diff",
-    "fetch",
-    "format-patch",
-    "gc",
-    "grep",
-    "init",
-    "log",
-    "merge",
-    "mv",
-    "notes",
-    "pull",
     "push",
-    "rebase",
-    "reflog",
-    "remote",
-    "reset",
-    "restore",
-    "revert",
-    "rm",
-    "shortlog",
-    "show",
-    "stash",
-    "status",
-    "submodule",
-    "switch",
-    "tag",
-    "worktree"
+    "pull",
+    "status"
   ],
   "flags": [
     "--help",
     "--version",
-    "--verbose",
-    "--quiet",
-    "--no-pager",
-    "--git-dir",
-    "--work-tree"
+    "--verbose"
   ]
 }
-
 ```
+
+**How it works internally**
+1. When AurSh starts, it scans the `.aursh/suggestions/` folder and loads all the JSON configuration files into memory.
+2. As you type a command in the terminal, AurSh's input handler looks at the first word (the command) and checks if there is a matching configuration.
+3. If it finds a match, it cross-references what you are typing against the available `subcommands` and `flags`.
+4. The closest match is rendered on your screen as dimmed "ghost text" ahead of your cursor, which you can accept by pressing the right arrow key or Tab.

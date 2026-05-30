@@ -171,6 +171,29 @@ public class PluginManager
         }
     }
 
+    public string? EvaluatePromptSegment(string token)
+    {
+        foreach (var plugin in _plugins)
+        {
+            if (plugin.RegisteredPromptSegments.TryGetValue(token, out var callback))
+            {
+                try
+                {
+                    var result = callback.Call(Array.Empty<LuaValue>());
+                    if (result.Length > 0 && result[0].Type == LuaType.String)
+                        return result[0].StrVal;
+                    if (result.Length > 0 && result[0].Type == LuaType.Number)
+                        return result[0].NumVal.ToString();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: plugin '{plugin.Manifest.Name}' prompt error: {ex.Message}");
+                }
+            }
+        }
+        return null;
+    }
+
     /// <summary>
     /// If <paramref name="name"/> is an F# plugin, returns a list of
     /// arguments for <c>dotnet fsi "entry.fsx" -- "arg1" "arg2"</c>.
@@ -598,6 +621,15 @@ aursh.print(""[plugin] {name} loaded"")
             return Array.Empty<LuaValue>();
         })));
 
+        aursh.SetField("register_prompt", LuaValue.FromFunc(new LuaCSharpFunc(args =>
+        {
+            if (args.Length < 2 || args[0].Type != LuaType.String || args[1].Type != LuaType.Function)
+                throw new LuaError("aursh.register_prompt(name, func) requires a string and function");
+            plugin.RegisteredPromptSegments[args[0].StrVal!] = args[1].FuncVal!;
+            return Array.Empty<LuaValue>();
+        })));
+
+
         aursh.SetField("print", LuaValue.FromFunc(new LuaCSharpFunc(args =>
         {
             Console.WriteLine(string.Join("\t", args.Select(a => a.AsString())));
@@ -728,6 +760,7 @@ public class LoadedPlugin
     public PluginManifest Manifest { get; }
     public LuaInterpreter? Interpreter { get; }
     public Dictionary<string, LuaCallable> RegisteredCommands { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, LuaCallable> RegisteredPromptSegments { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public LoadedPlugin(PluginManifest manifest, LuaInterpreter? interpreter)
     {

@@ -1,32 +1,30 @@
 # AurSh Net Module
 
-`aursh-net` is a native, cross-platform networking utility built directly into AurSh. It allows you to manage Wi-Fi connections with an aesthetically pleasing Terminal User Interface (TUI) and send/receive files seamlessly across your local network without any third-party dependencies.
+**What it does**
+`aursh-net` is a built-in networking utility for AurSh. It lets you scan for and connect to Wi-Fi networks using a sleek, interactive terminal menu. It also lets you seamlessly send and receive files or entire folders to other devices on your local network without needing any third-party tools.
 
-## Features
+**Example Usage**
+To open the interactive Wi-Fi scanner and select a network:
+```bash
+aursh-net list
+```
 
-- **Wi-Fi Scanner**: List and select Wi-Fi networks around you using an interactive arrow-key menu.
-- **Cross-Platform**: Works out-of-the-box on Windows (`netsh`), Linux (`nmcli`), and macOS (`airport`/`networksetup`).
-- **Peer-to-Peer File Transfer**: Send and receive folders seamlessly via a background daemon.
+To manually connect to a specific Wi-Fi network:
+```bash
+aursh-net connect "MyHomeWiFi" "MyPassword123"
+```
 
-## Commands
+To send a folder to another computer running AurSh:
+```bash
+aursh-net send ./my_project 192.168.1.50
+```
 
-### `aursh-net`
-Opens a general dashboard displaying current network status, signal strength, local IP address, and available commands.
+To view your current connection status and IP address:
+```bash
+aursh-net info
+```
 
-### `aursh-net list`
-Scans the surrounding area for Wi-Fi networks and launches an interactive TUI. Use the **Up/Down** arrow keys to navigate and **Enter** to select a network. You will be prompted to input a password if required.
-
-### `aursh-net connect <ssid> [password]`
-Manually connects to the given `ssid`. If the network requires a password, supply it as the second argument.
-
-### `aursh-net disconnect`
-Disconnects from the currently active Wi-Fi network.
-
-### `aursh-net send <path-to-file/folder> <ip>`
-Transfers a file or an entire directory recursively to the target IP address. The target machine must be running AurSh, as it relies on the built-in receiver daemon listening on port `15333`.
-
-### `aursh-net info`
-Displays colored information regarding your current connection status, including SSID, Signal Strength (Percentage and Bars), Local IP Address, and Receiver Daemon status.
-
-## File Transfer Details
-Whenever you start `aursh`, a background daemon is automatically spun up on port `15333`. If you receive a file via `aursh-net send`, the daemon will seamlessly unpack it into `~/Downloads/AurshNet/` while maintaining the directory structure.
+**How it works internally**
+1. **Wi-Fi Management**: `aursh-net` acts as a cross-platform wrapper. When you run a command, it detects your operating system and runs the appropriate native tool in the background (e.g. `netsh` on Windows, `nmcli` on Linux, or `networksetup` on macOS).
+2. **File Transfer Daemon**: Every time you launch AurSh, it automatically starts a background listener (daemon) on port `15333`. 
+3. **Receiving Files**: When someone uses `aursh-net send` to your IP address, this background daemon catches the incoming data and safely unpacks it into the `~/Downloads/AurshNet/` directory.

@@ -1,22 +1,27 @@
-# Configuration
+# AurSh Configuration
 
-You can configure AurSh to your liking. Whether you want your prompt 
-to be a verbose 2 line prompt or just a simple 1 line.
+**What it does**
+AurSh allows you to customize the visual appearance of your terminal prompt. You can change the spacing, line styles, segment edge shapes, and whether the prompt uses a verbose two-line layout or a compact one-line layout.
 
-You can configure by editing a file in `.aursh/AurSh.config.con`.
+**Example Usage**
+You can configure these settings by editing the `.aursh/AurSh.config.con` file in your home directory:
 
-```AurSh.config.con
-
+```ini
 [Config]
-
-PromptSpacing=<Sparse (1 space in between prompts: prompt-space-output-space-prompt) or Compressed(no space: meaining prompt-output-prompt), default=Compressed> : space in between prompts
-
-PromptLine=<dotted,line,none, default=none> : changes the line that connects the time segment to the main segment in the prompt.
-
-SegmentEdges=<angled,arrow,rounded, default=arrow> : change the segment edges in the prompt UI.
-
-PromptTheme=<custom themes> : Changes the Color theme of the prompt (light,dark and bright)
-Verbose=<true/false, default=true> : Changes if the prompt is 2 or just 1 line.
-
+PromptSpacing=Compressed
+PromptLine=none
+SegmentEdges=arrow
+PromptTheme=dark
+Verbose=true
 ```
 
+- `PromptSpacing`: Choose `Sparse` (adds space between commands) or `Compressed` (no extra spaces).
+- `PromptLine`: Choose `dotted`, `line`, or `none` to connect the time segment to the main prompt.
+- `SegmentEdges`: Choose `angled`, `arrow`, or `rounded` for the prompt's UI edges.
+- `PromptTheme`: Sets the color theme (e.g. light, dark, bright).
+- `Verbose`: Choose `true` for a 2-line prompt, or `false` for a 1-line prompt.
+
+**How it works internally**
+1. When AurSh starts, it locates and parses the `AurSh.config.con` file.
+2. The configuration reader extracts the visual preferences under the `[Config]` section.
+3. Every time you press Enter, the internal `Prompt.cs` renderer uses these settings to construct and colorize the prompt text before displaying it on the screen.

@@ -187,8 +187,21 @@ public class Prompt
             "arrow" => "\u276F",
             "lambda" => "\u03BB",
             "branch" => _gitInfo.IsGitRepo ? _gitInfo.FormatStatus() : "",
-            _ => ExpandColorToken(token)
+            _ => ExpandCustomToken(token)
         };
+    }
+
+    private string ExpandCustomToken(string token)
+    {
+        if (_env.PluginManager != null)
+        {
+            string? pluginSegment = _env.PluginManager.EvaluatePromptSegment(token);
+            if (pluginSegment != null)
+            {
+                return pluginSegment;
+            }
+        }
+        return ExpandColorToken(token);
     }
 
     private string ExpandColorToken(string token)

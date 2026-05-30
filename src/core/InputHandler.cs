@@ -791,7 +791,9 @@ public class InputHandler
         }
 
         sb.Append(Utils.Ansi.ClearScreenFromCursor);
+        sb.Append("\x1b]133;A\x07");
         sb.Append(_currentPrompt);
+        sb.Append("\x1b]133;B\x07");
 
         string fullText = _buffer.ToString();
         string highlightedFull = SyntaxHighlight(fullText);

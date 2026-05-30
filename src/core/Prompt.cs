@@ -144,7 +144,7 @@ public class Prompt
             string timeSegment = BuildTimeSegment(DateTime.Now.ToString("HH:mm:ss"));
             int timeVisible = Utils.Ansi.VisibleLength(timeSegment);
 
-            int gap = termWidth - leftVisible - timeVisible;
+            int gap = termWidth - leftVisible - timeVisible - 1; // Prevent hitting the exact right edge to avoid double-wrap on \n
             if (gap > 0)
             {
                 sb.Append(new string(_promptLineChar, gap));

@@ -32,6 +32,12 @@ public static class AurshNetCommand
                 return SendFile(subArgs, workingDirectory);
             case "info":
                 return ShowInfo();
+            case "allow":
+                return AllowIp(subArgs);
+            case "disallow":
+                return DisallowIp(subArgs);
+            case "allowed":
+                return ListAllowedIps();
             default:
                 Console.Error.WriteLine($"aursh-net: Unknown command '{subCmd}'");
                 return 1;
@@ -623,14 +629,86 @@ public static class AurshNetCommand
 
     private static int SendFile(List<string> args, string workingDirectory)
     {
-        if (args.Count < 2)
+        if (args.Count < 1)
         {
-            Console.Error.WriteLine("Usage: aursh-net send <path-to-file/folder> <ip>");
+            Console.Error.WriteLine("Usage: aursh-net send <path-to-file/folder> [ip]");
             return 1;
         }
 
         string targetPath = FileSystem.ResolvePath(args[0], workingDirectory);
-        string ip = args[1];
+        string ip = string.Empty;
+
+        if (args.Count >= 2)
+        {
+            ip = args[1];
+        }
+        else
+        {
+            Console.WriteLine(Ansi.FgBrightYellow + "Scanning local network for Aursh peers (2 seconds)..." + Ansi.Reset);
+            var peers = AurshNetTransfer.DiscoverPeers();
+
+            if (peers.Count == 0)
+            {
+                Console.Error.WriteLine(Ansi.FgRed + "No peers found on the local network. Make sure Aursh is running on the target device." + Ansi.Reset);
+                return 1;
+            }
+
+            int selectedIndex = 0;
+            bool running = true;
+
+            Console.Write("\x1b[?1049h\x1b[?25l"); // Enter alt screen, hide cursor
+
+            try
+            {
+                while (running)
+                {
+                    Console.Write("\x1b[H\x1b[2J"); // Clear screen
+                    Console.WriteLine(Ansi.FgBrightCyan + "--- Select Target Device ---" + Ansi.Reset);
+                    Console.WriteLine("Use Up/Down arrows to select, Enter to confirm, Esc to cancel.\n");
+
+                    for (int i = 0; i < peers.Count; i++)
+                    {
+                        if (i == selectedIndex)
+                        {
+                            Console.WriteLine(Ansi.BgRgb(50, 60, 100) + Ansi.FgBrightWhite + $" > {peers[i].Hostname} ({peers[i].IPAddress})" + Ansi.Reset);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"   {peers[i].Hostname} ({peers[i].IPAddress})");
+                        }
+                    }
+
+                    var key = Console.ReadKey(true);
+                    if (key.Key == ConsoleKey.UpArrow && selectedIndex > 0)
+                    {
+                        selectedIndex--;
+                    }
+                    else if (key.Key == ConsoleKey.DownArrow && selectedIndex < peers.Count - 1)
+                    {
+                        selectedIndex++;
+                    }
+                    else if (key.Key == ConsoleKey.Escape)
+                    {
+                        running = false;
+                        return 0; // Cancelled
+                    }
+                    else if (key.Key == ConsoleKey.Enter)
+                    {
+                        running = false;
+                        ip = peers[selectedIndex].IPAddress;
+                    }
+                }
+            }
+            finally
+            {
+                Console.Write("\x1b[?1049l\x1b[?25h"); // Exit alt screen, show cursor
+            }
+            
+            if (string.IsNullOrEmpty(ip))
+            {
+                return 1; // Safety fallback
+            }
+        }
 
         Console.WriteLine(Ansi.FgBrightCyan + $"Sending to {ip}..." + Ansi.Reset);
         
@@ -719,6 +797,107 @@ public static class AurshNetCommand
         catch
         {
             return string.Empty;
+        }
+    }
+
+    private static int AllowIp(List<string> args)
+    {
+        if (args.Count == 0)
+        {
+            Console.Error.WriteLine("Usage: aursh-net allow <ip-address>");
+            return 1;
+        }
+
+        string ip = args[0];
+        string file = AurshNetTransfer.EnsureAllowedIpFileExists();
+
+        try
+        {
+            List<string> ips = File.ReadAllLines(file).ToList();
+
+            if (ips.Contains(ip))
+            {
+                // Let's be conversational about it
+                Console.WriteLine($"IP {ip} is already on the allowed list. No changes made.");
+                return 0;
+            }
+
+            ips.Add(ip);
+            File.WriteAllLines(file, ips);
+            Console.WriteLine(Ansi.FgBrightGreen + $"Successfully added {ip} to the allowed list." + Ansi.Reset);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(Ansi.FgRed + $"Failed to update whitelist: {ex.Message}" + Ansi.Reset);
+            return 1;
+        }
+    }
+
+    private static int DisallowIp(List<string> args)
+    {
+        if (args.Count == 0)
+        {
+            Console.Error.WriteLine("Usage: aursh-net disallow <ip-address>");
+            return 1;
+        }
+
+        string ip = args[0];
+        string file = AurshNetTransfer.EnsureAllowedIpFileExists();
+
+        try
+        {
+            List<string> ips = File.ReadAllLines(file).ToList();
+            if (ips.Remove(ip))
+            {
+                File.WriteAllLines(file, ips);
+                Console.WriteLine(Ansi.FgBrightYellow + $"Removed {ip} from the allowed list." + Ansi.Reset);
+            }
+            else
+            {
+                Console.WriteLine($"IP {ip} was not found in the allowed list.");
+            }
+            
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(Ansi.FgRed + $"Failed to update whitelist: {ex.Message}" + Ansi.Reset);
+            return 1;
+        }
+    }
+
+    private static int ListAllowedIps()
+    {
+        string file = AurshNetTransfer.EnsureAllowedIpFileExists();
+
+        try
+        {
+            string[] lines = File.ReadAllLines(file);
+            bool hasIps = false;
+
+            Console.WriteLine(Ansi.FgBrightCyan + "--- Allowed Incoming File Transfer IPs ---" + Ansi.Reset);
+            foreach (string line in lines)
+            {
+                string cleanLine = line.Trim();
+                if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("["))
+                {
+                    Console.WriteLine("  " + cleanLine);
+                    hasIps = true;
+                }
+            }
+
+            if (!hasIps)
+            {
+                Console.WriteLine(Ansi.FgBrightYellow + "The allowed list is empty. ALL incoming file transfers will be blocked." + Ansi.Reset);
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(Ansi.FgRed + $"Failed to read whitelist: {ex.Message}" + Ansi.Reset);
+            return 1;
         }
     }
 }

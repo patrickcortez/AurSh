@@ -95,7 +95,7 @@ else ifeq ($(DETECTED_OS),macOS)
     PUBLISH_DIR := publish/$(RID)
     PATHSEP := :
 else ifeq ($(DETECTED_OS),Termux)
-    RID := linux-$(ARCH)
+    RID := linux-bionic-$(ARCH)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)

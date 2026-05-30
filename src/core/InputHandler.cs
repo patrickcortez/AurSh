@@ -903,71 +903,100 @@ public class InputHandler
 
     private void CheckTerminalResize()
     {
-        int currentWidth = Utils.Platform.TerminalWidth;
-        int currentHeight = Utils.Platform.TerminalHeight;
-
-        if (currentWidth == _lastTermWidth && currentHeight == _lastTermHeight)
+        try
         {
-            _pendingResizeWidth = 0;
-            _pendingResizeHeight = 0;
-            return;
+            int currentWidth = Utils.Platform.TerminalWidth;
+            int currentHeight = Utils.Platform.TerminalHeight;
+
+            if (currentWidth == _lastTermWidth && currentHeight == _lastTermHeight)
+            {
+                _pendingResizeWidth = 0;
+                _pendingResizeHeight = 0;
+                return;
+            }
+
+            if (currentWidth != _pendingResizeWidth || currentHeight != _pendingResizeHeight)
+            {
+                _pendingResizeWidth = currentWidth;
+                _pendingResizeHeight = currentHeight;
+                _resizeChangeTick = Environment.TickCount64;
+                return;
+            }
+
+            long elapsed = Environment.TickCount64 - _resizeChangeTick;
+            if (elapsed >= 100)
+            {
+                // Calculate cursor rows from top using the new width to match terminal reflow.
+                var newPos = ComputeCursorPosition(currentWidth);
+                int cursorRowsFromTop = newPos.Row;
+
+                _lastTermWidth = currentWidth;
+                _lastTermHeight = currentHeight;
+                _pendingResizeWidth = 0;
+                _pendingResizeHeight = 0;
+                FullRedraw(clearPrevious: true, cursorRowsFromTop: cursorRowsFromTop);
+            }
         }
-
-        if (currentWidth != _pendingResizeWidth || currentHeight != _pendingResizeHeight)
+        catch (Exception)
         {
-            _pendingResizeWidth = currentWidth;
-            _pendingResizeHeight = currentHeight;
-            _resizeChangeTick = Environment.TickCount64;
-            return;
-        }
-
-        long elapsed = Environment.TickCount64 - _resizeChangeTick;
-        if (elapsed >= 100)
-        {
-            int cursorRowsFromTop = _cursorRowOffset;
-
-            _lastTermWidth = currentWidth;
-            _lastTermHeight = currentHeight;
-            _pendingResizeWidth = 0;
-            _pendingResizeHeight = 0;
-            FullRedraw(clearPrevious: true, cursorRowsFromTop: cursorRowsFromTop);
+            // Ignore resize exceptions to prevent shell crashes.
         }
     }
 
     private (int Row, int Col) ComputeCursorPosition(int width)
     {
-        if (width <= 0) return (0, 0);
-
-        string[] promptLines = _currentPrompt.Split('\n');
-        int rows = 0;
-
-        for (int i = 0; i < promptLines.Length - 1; i++)
+        if (width <= 0)
         {
-            int vis = Utils.Ansi.VisibleLength(promptLines[i]);
-            rows += Math.Max(1, (vis + width - 1) / width);
+            return (0, 0);
         }
 
-        int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
-
-        string bufferText = _buffer.ToString();
-        string textBeforeCursor = bufferText.Substring(0, _cursorPos);
-        string[] linesBeforeCursor = textBeforeCursor.Split('\n');
-        
-        for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
+        try
         {
-            int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
-            int textVis = Utils.Ansi.VisibleLength(linesBeforeCursor[i]);
-            rows += Math.Max(1, (prefixVis + textVis + width - 1) / width);
+            string[] promptLines = _currentPrompt.Split('\n');
+            int rows = 0;
+
+            for (int i = 0; i < promptLines.Length - 1; i++)
+            {
+                int vis = Utils.Ansi.VisibleLength(promptLines[i]);
+                rows += Math.Max(1, (vis + width - 1) / width);
+            }
+
+            int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
+
+            string bufferText = _buffer.ToString();
+            string textBeforeCursor = bufferText.Substring(0, _cursorPos);
+            string[] linesBeforeCursor = textBeforeCursor.Split('\n');
+            
+            for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
+            {
+                int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
+                int textVis = Utils.Ansi.VisibleLength(linesBeforeCursor[i]);
+                rows += Math.Max(1, (prefixVis + textVis + width - 1) / width);
+            }
+            
+            int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? lastPromptVis : _continuationPromptLen;
+            int lastLineTextVis = Utils.Ansi.VisibleLength(linesBeforeCursor[^1]);
+            int totalVisOnLastLine = lastLinePrefixVis + lastLineTextVis;
+            
+            int rowInLine = totalVisOnLastLine / width;
+            int col = totalVisOnLastLine % width;
+            
+            if (col == 0 && totalVisOnLastLine > 0 && rowInLine > 0)
+            {
+                // Keep cursor on the current logical row at the end of the width boundary.
+                rowInLine--;
+                col = width;
+            }
+            
+            rows += rowInLine;
+            
+            return (rows, col);
         }
-        
-        int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? lastPromptVis : _continuationPromptLen;
-        int lastLineTextVis = Utils.Ansi.VisibleLength(linesBeforeCursor[^1]);
-        int totalVisOnLastLine = lastLinePrefixVis + lastLineTextVis;
-        
-        rows += totalVisOnLastLine / width;
-        int col = totalVisOnLastLine % width;
-        
-        return (rows, col);
+        catch (Exception)
+        {
+            // Fallback for any math errors during cursor calculation.
+            return (0, 0);
+        }
     }
 
     private void FullRedraw(bool clearPrevious = false, int cursorRowsFromTop = -1)

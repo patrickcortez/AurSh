@@ -50,7 +50,19 @@ public class InputHandler
         }
 
         _currentPrompt = prompt;
-        Console.Write(prompt);
+        try
+        {
+            // Adding OSC 133 tags to let modern terminals know where the prompt and command input are!
+            // This is exactly what zsh and powerlevel10k do under the hood. So professional!
+            Console.Write("\x1b]133;A\x07");
+            Console.Write(prompt);
+            Console.Write("\x1b]133;B\x07");
+        }
+        catch (Exception)
+        {
+            // fallback if writing invisible characters fails somehow.
+            Console.Write(prompt);
+        }
         _promptVisibleLen = ComputeLastLineVisibleLength(prompt);
         _lastTermWidth = Utils.Platform.TerminalWidth;
         _lastTermHeight = Utils.Platform.TerminalHeight;
@@ -136,6 +148,12 @@ public class InputHandler
                     if (!IsInputIncomplete(pasted))
                     {
                         Console.WriteLine();
+                        try
+                        {
+                            // Output phase started!
+                            Console.Write("\x1b]133;C\x07");
+                        }
+                        catch (Exception) { }
                         _multilineActive = false;
                         return pasted;
                     }
@@ -155,6 +173,12 @@ public class InputHandler
                 _ghostText = "";
                 RedrawLine(); // Ensure ghost text is cleared visually before confirming
                 Console.WriteLine();
+                try
+                {
+                    // Output phase started for single-line input!
+                    Console.Write("\x1b]133;C\x07");
+                }
+                catch (Exception) { }
                 _multilineActive = false;
                 return currentInput;
             }

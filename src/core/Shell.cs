@@ -114,6 +114,21 @@ public class Shell
                     _interrupted = false;
                     _env.Set("PWD", _executor.WorkingDirectory);
 
+                    try
+                    {
+                        // I really hope this CursorLeft check doesn't crash on some weird terminal...
+                        // If the previous command didn't output a newline (like echo -n), we must print a % and drop to the next line!
+                        // This prevents the prompt from floating awkwardly in the middle of the screen.
+                        if (Console.CursorLeft > 0)
+                        {
+                            Console.WriteLine(Utils.Ansi.FgBlack + Utils.Ansi.BgWhite + "%" + Utils.Ansi.Reset);
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Some terminals might not support CursorLeft. We just ignore and move on.
+                    }
+
                     NotifyFinishedJobs();
 
                     string promptText = _prompt.Render(_executor.WorkingDirectory, _env.LastExitCode);
@@ -158,6 +173,10 @@ public class Shell
                             Console.Error.WriteLine($"aursh: error: {ex.Message}");
                             _env.LastExitCode = 1;
                         }
+                        finally
+                        {
+                            try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception) { }
+                        }
                         continue;
                     }
 
@@ -189,6 +208,8 @@ public class Shell
                         else
                             _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
                         session.Dispose();
+
+                        try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception) { }
                     }
                 }
                 catch (Exception loopEx)

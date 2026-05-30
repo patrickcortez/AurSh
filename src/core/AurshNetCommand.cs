@@ -60,6 +60,7 @@ public static class AurshNetCommand
         public string Ssid { get; set; } = "";
         public string Signal { get; set; } = "";
         public string Security { get; set; } = "";
+        public bool IsWired { get; set; } = false;
     }
 
     private static List<WifiNetwork> GetNetworks()
@@ -69,80 +70,360 @@ public static class AurshNetCommand
         {
             if (Platform.CurrentOS == OperatingSystemType.Windows)
             {
-                string output = RunCommand("netsh", "wlan show networks mode=bssid");
-                WifiNetwork? current = null;
-                foreach (string line in output.Split('\n'))
-                {
-                    string t = line.Trim();
-                    if (t.StartsWith("SSID "))
-                    {
-                        if (current != null && !string.IsNullOrEmpty(current.Ssid))
-                        {
-                            networks.Add(current);
-                        }
-                        current = new WifiNetwork();
-                        int idx = t.IndexOf(':');
-                        if (idx >= 0) current.Ssid = t.Substring(idx + 1).Trim();
-                    }
-                    else if (t.StartsWith("Authentication") && current != null)
-                    {
-                        int idx = t.IndexOf(':');
-                        if (idx >= 0) current.Security = t.Substring(idx + 1).Trim();
-                    }
-                    else if (t.StartsWith("Signal") && current != null)
-                    {
-                        int idx = t.IndexOf(':');
-                        if (idx >= 0) current.Signal = t.Substring(idx + 1).Trim();
-                    }
-                }
-                if (current != null && !string.IsNullOrEmpty(current.Ssid))
-                {
-                    networks.Add(current);
-                }
+                GetWindowsNetworks(networks);
             }
             else if (Platform.CurrentOS == OperatingSystemType.Linux)
             {
-                string output = RunCommand("nmcli", "-t -f ssid,signal,security dev wifi list");
-                foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    string[] parts = line.Split(':');
-                    if (parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
-                    {
-                        networks.Add(new WifiNetwork
-                        {
-                            Ssid = parts[0].Trim(),
-                            Signal = parts[1].Trim() + "%",
-                            Security = parts[2].Trim()
-                        });
-                    }
-                }
+                GetLinuxNetworks(networks);
             }
             else if (Platform.CurrentOS == OperatingSystemType.MacOS)
             {
-                string output = RunCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s");
-                bool headerPassed = false;
-                foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (!headerPassed)
-                    {
-                        if (line.Contains("SSID") && line.Contains("BSSID")) headerPassed = true;
-                        continue;
-                    }
-                    if (line.Length > 32)
-                    {
-                        networks.Add(new WifiNetwork
-                        {
-                            Ssid = line.Substring(0, 32).Trim(),
-                            Signal = line.Substring(33, 10).Trim(),
-                            Security = line.Substring(50).Trim()
-                        });
-                    }
-                }
+                GetMacOSNetworks(networks);
+            }
+            else if (Platform.CurrentOS == OperatingSystemType.Termux)
+            {
+                GetTermuxNetworks(networks);
             }
         }
         catch { }
         
         return networks.GroupBy(n => n.Ssid).Select(g => g.First()).ToList();
+    }
+
+    private static void GetWindowsNetworks(List<WifiNetwork> networks)
+    {
+        // Try wireless scan first
+        string output = RunCommand("netsh", "wlan show networks mode=bssid");
+        if (!string.IsNullOrWhiteSpace(output))
+        {
+            WifiNetwork? current = null;
+            foreach (string line in output.Split('\n'))
+            {
+                string t = line.Trim();
+                if (t.StartsWith("SSID "))
+                {
+                    if (current != null && !string.IsNullOrEmpty(current.Ssid))
+                    {
+                        networks.Add(current);
+                    }
+                    current = new WifiNetwork();
+                    int idx = t.IndexOf(':');
+                    if (idx >= 0)
+                    {
+                        current.Ssid = t.Substring(idx + 1).Trim();
+                    }
+                }
+                else if (t.StartsWith("Authentication") && current != null)
+                {
+                    int idx = t.IndexOf(':');
+                    if (idx >= 0)
+                    {
+                        current.Security = t.Substring(idx + 1).Trim();
+                    }
+                }
+                else if (t.StartsWith("Signal") && current != null)
+                {
+                    int idx = t.IndexOf(':');
+                    if (idx >= 0)
+                    {
+                        current.Signal = t.Substring(idx + 1).Trim();
+                    }
+                }
+            }
+            if (current != null && !string.IsNullOrEmpty(current.Ssid))
+            {
+                networks.Add(current);
+            }
+        }
+
+        // If no wireless networks found, detect wired/bridged connections
+        // This is the critical path for VMs with bridged networking
+        if (networks.Count == 0)
+        {
+            GetWindowsWiredInterfaces(networks);
+        }
+    }
+
+    private static void GetWindowsWiredInterfaces(List<WifiNetwork> networks)
+    {
+        // Parse ipconfig to find active ethernet adapters
+        string ipOutput = RunCommand("ipconfig", "");
+        if (string.IsNullOrWhiteSpace(ipOutput))
+        {
+            return;
+        }
+
+        string currentAdapter = string.Empty;
+
+        foreach (string line in ipOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string trimLine = line.Trim();
+
+            // Adapter header lines aren't indented and end with ':'
+            if (!line.StartsWith(" ") && !line.StartsWith("\t") && trimLine.EndsWith(":"))
+            {
+                currentAdapter = trimLine.TrimEnd(':');
+                continue;
+            }
+
+            // An IPv4 address means this adapter is active
+            if (trimLine.StartsWith("IPv4 Address", StringComparison.OrdinalIgnoreCase) ||
+                trimLine.StartsWith("IPv4", StringComparison.OrdinalIgnoreCase))
+            {
+                int colonIdx = trimLine.IndexOf(':');
+                if (colonIdx >= 0)
+                {
+                    string ipAddr = trimLine.Substring(colonIdx + 1).Trim();
+                    // Skip loopback and APIPA — those aren't real connections
+                    if (!ipAddr.StartsWith("127.") && !ipAddr.StartsWith("169.254.") && !string.IsNullOrEmpty(ipAddr))
+                    {
+                        if (!string.IsNullOrEmpty(currentAdapter))
+                        {
+                            networks.Add(new WifiNetwork
+                            {
+                                Ssid = currentAdapter,
+                                Signal = "100%",
+                                Security = "Wired",
+                                IsWired = true
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void GetLinuxNetworks(List<WifiNetwork> networks)
+    {
+        // Try nmcli wifi scan first — the happy path for desktop Linux
+        string output = RunCommand("nmcli", "-t -f ssid,signal,security dev wifi list");
+        if (!string.IsNullOrWhiteSpace(output))
+        {
+            foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] parts = line.Split(':');
+                if (parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
+                {
+                    networks.Add(new WifiNetwork
+                    {
+                        Ssid = parts[0].Trim(),
+                        Signal = parts[1].Trim() + "%",
+                        Security = parts[2].Trim()
+                    });
+                }
+            }
+        }
+
+        // If nmcli found wireless networks, we're done
+        if (networks.Count > 0)
+        {
+            return;
+        }
+
+        // No wireless results — check for wired/bridged connections via nmcli
+        // This is the path that VMs with bridged networking will take
+        if (TryGetLinuxWiredFromNmcli(networks))
+        {
+            return;
+        }
+
+        // nmcli isn't available at all — go straight to sysfs
+        // This covers minimal installs, containers, and any Linux without NetworkManager
+        TryGetLinuxWiredFromSysfs(networks);
+    }
+
+    private static bool TryGetLinuxWiredFromNmcli(List<WifiNetwork> networks)
+    {
+        // nmcli -t -f device,type,state,connection dev — shows ALL device types
+        string output = RunCommand("nmcli", "-t -f device,type,state,connection dev");
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return false;
+        }
+
+        bool foundAny = false;
+        foreach (string line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] parts = line.Split(':');
+            if (parts.Length >= 4)
+            {
+                string devName = parts[0].Trim();
+                string devType = parts[1].Trim();
+                string devState = parts[2].Trim();
+                string connName = parts[3].Trim();
+
+                // Skip wifi (already tried), loopback, and disconnected devices
+                if (devState.Equals("connected", StringComparison.OrdinalIgnoreCase) &&
+                    !devType.Equals("wifi", StringComparison.OrdinalIgnoreCase) &&
+                    !devType.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+                {
+                    string displayName = !string.IsNullOrEmpty(connName) ? connName : devName;
+                    networks.Add(new WifiNetwork
+                    {
+                        Ssid = displayName,
+                        Signal = "100%",
+                        Security = "Wired",
+                        IsWired = true
+                    });
+                    foundAny = true;
+                }
+            }
+        }
+
+        return foundAny;
+    }
+
+    private static void TryGetLinuxWiredFromSysfs(List<WifiNetwork> networks)
+    {
+        // Read /sys/class/net/ — works without any userspace tools installed
+        try
+        {
+            string netClassPath = "/sys/class/net";
+            if (!Directory.Exists(netClassPath))
+            {
+                return;
+            }
+
+            foreach (string interfaceDir in Directory.GetDirectories(netClassPath))
+            {
+                string ifName = Path.GetFileName(interfaceDir);
+
+                // Skip loopback — it's always up but doesn't represent a real connection
+                if (ifName == "lo")
+                {
+                    continue;
+                }
+
+                string operstatePath = Path.Combine(interfaceDir, "operstate");
+                if (!File.Exists(operstatePath))
+                {
+                    continue;
+                }
+
+                string operstate = File.ReadAllText(operstatePath).Trim();
+                if (operstate.Equals("up", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool isWireless = Directory.Exists(Path.Combine(interfaceDir, "wireless"));
+
+                    networks.Add(new WifiNetwork
+                    {
+                        Ssid = ifName,
+                        Signal = isWireless ? "?%" : "100%",
+                        Security = isWireless ? "Wireless" : "Wired",
+                        IsWired = !isWireless
+                    });
+                }
+            }
+        }
+        catch
+        {
+            // sysfs might not be available in extremely minimal environments
+        }
+    }
+
+    private static void GetMacOSNetworks(List<WifiNetwork> networks)
+    {
+        string output = RunCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s");
+        bool headerPassed = false;
+        foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!headerPassed)
+            {
+                if (line.Contains("SSID") && line.Contains("BSSID"))
+                {
+                    headerPassed = true;
+                }
+                continue;
+            }
+            if (line.Length > 32)
+            {
+                networks.Add(new WifiNetwork
+                {
+                    Ssid = line.Substring(0, 32).Trim(),
+                    Signal = line.Substring(33, 10).Trim(),
+                    Security = line.Substring(50).Trim()
+                });
+            }
+        }
+    }
+
+    private static void GetTermuxNetworks(List<WifiNetwork> networks)
+    {
+        // termux-wifi-scanresults returns a list of nearby networks
+        // Each entry has "ssid", "bssid", "frequency", "level", "capabilities" fields
+        string output = RunCommand("termux-wifi-scanresults", "");
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return;
+        }
+
+        // Parse the output line by line, looking for ssid and level fields
+        // We can't use JSON parsers (user rule), so we do string scanning
+        int searchStart = 0;
+        while (searchStart < output.Length)
+        {
+            string ssidLabel = "\"ssid\": \"";
+            int ssidIdx = output.IndexOf(ssidLabel, searchStart, StringComparison.Ordinal);
+            if (ssidIdx < 0)
+            {
+                break;
+            }
+
+            int ssidStart = ssidIdx + ssidLabel.Length;
+            int ssidEnd = output.IndexOf("\"", ssidStart, StringComparison.Ordinal);
+            if (ssidEnd < 0)
+            {
+                break;
+            }
+
+            string ssid = output.Substring(ssidStart, ssidEnd - ssidStart);
+
+            // Find the level (signal strength in dBm) near this SSID entry
+            string levelLabel = "\"level\": ";
+            int levelIdx = output.IndexOf(levelLabel, ssidEnd, StringComparison.Ordinal);
+            string signal = "?%";
+            if (levelIdx >= 0)
+            {
+                int levelStart = levelIdx + levelLabel.Length;
+                int levelEnd = levelStart;
+                while (levelEnd < output.Length && (char.IsDigit(output[levelEnd]) || output[levelEnd] == '-'))
+                {
+                    levelEnd++;
+                }
+                string levelStr = output.Substring(levelStart, levelEnd - levelStart);
+                if (int.TryParse(levelStr, out int dbm))
+                {
+                    int percent = Math.Max(0, Math.Min(100, 2 * (dbm + 100)));
+                    signal = percent + "%";
+                }
+            }
+
+            // Find capabilities (security info) near this entry
+            string capLabel = "\"capabilities\": \"";
+            int capIdx = output.IndexOf(capLabel, ssidEnd, StringComparison.Ordinal);
+            string security = "";
+            if (capIdx >= 0)
+            {
+                int capStart = capIdx + capLabel.Length;
+                int capEnd = output.IndexOf("\"", capStart, StringComparison.Ordinal);
+                if (capEnd >= 0)
+                {
+                    security = output.Substring(capStart, capEnd - capStart);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(ssid) && ssid != "<unknown ssid>")
+            {
+                networks.Add(new WifiNetwork
+                {
+                    Ssid = ssid,
+                    Signal = signal,
+                    Security = security
+                });
+            }
+
+            searchStart = ssidEnd + 1;
+        }
     }
 
     private static int RunListTui()
@@ -183,18 +464,25 @@ public static class AurshNetCommand
                     if (netIdx < networks.Count)
                     {
                         var net = networks[netIdx];
+                        // Show a wired icon for wired interfaces, wifi icon for wireless
+                        string typeIcon = net.IsWired ? "\uF6FF" : "\uF1EB";
                         if (netIdx == selectedIndex)
                         {
-                            Console.Write(Ansi.FgBrightGreen + $"  > {net.Ssid,-25} [{net.Signal}] {net.Security}" + Ansi.Reset);
+                            Console.Write(Ansi.FgBrightGreen + $"  > {typeIcon} {net.Ssid,-25} [{net.Signal}] {net.Security}" + Ansi.Reset);
                         }
                         else
                         {
-                            Console.Write(Ansi.FgWhite + $"    {net.Ssid,-25} [{net.Signal}] {net.Security}" + Ansi.Reset);
+                            Console.Write(Ansi.FgWhite + $"    {typeIcon} {net.Ssid,-25} [{net.Signal}] {net.Security}" + Ansi.Reset);
                         }
                     }
                 }
 
-                Console.Write($"\x1b[{height};1H" + Ansi.ClearLine + Ansi.FgBrightBlack + "  [UP/DOWN] Navigate  [ENTER] Connect  [ESC] Exit" + Ansi.Reset);
+                // Adjust help text based on whether wired entries exist
+                bool hasWireless = networks.Exists(n => !n.IsWired);
+                string helpText = hasWireless
+                    ? "  [UP/DOWN] Navigate  [ENTER] Connect  [ESC] Exit"
+                    : "  [UP/DOWN] Navigate  [ENTER] View Info  [ESC] Exit";
+                Console.Write($"\x1b[{height};1H" + Ansi.ClearLine + Ansi.FgBrightBlack + helpText + Ansi.Reset);
 
                 var key = Console.ReadKey(true);
                 if (key.Key == ConsoleKey.UpArrow && selectedIndex > 0)
@@ -214,14 +502,27 @@ public static class AurshNetCommand
                     running = false;
                     Console.Write("\x1b[?1049l\x1b[?25h");
                     
-                    Console.Write($"Enter password for '{networks[selectedIndex].Ssid}' (leave blank if none): ");
-                    string? pwd = Console.ReadLine();
-                    List<string> connArgs = new List<string> { networks[selectedIndex].Ssid };
-                    if (!string.IsNullOrWhiteSpace(pwd))
+                    WifiNetwork selected = networks[selectedIndex];
+
+                    if (selected.IsWired)
                     {
-                        connArgs.Add(pwd);
+                        // Wired connections don't need passwords — just show info
+                        Console.WriteLine(Ansi.FgBrightGreen + $"Active wired connection: {selected.Ssid}" + Ansi.Reset);
+                        exitCode = ShowInfo();
                     }
-                    exitCode = Connect(connArgs);
+                    else
+                    {
+                        // Wireless — ask for password and try connecting
+                        Console.Write($"Enter password for '{selected.Ssid}' (leave blank if none): ");
+                        string? pwd = Console.ReadLine();
+                        List<string> connArgs = new List<string> { selected.Ssid };
+                        if (!string.IsNullOrWhiteSpace(pwd))
+                        {
+                            connArgs.Add(pwd);
+                        }
+                        exitCode = Connect(connArgs);
+                    }
+
                     return exitCode;
                 }
             }

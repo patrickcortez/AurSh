@@ -11,13 +11,15 @@ public struct Context
 
     public Context(string NewContextName,Dictionary<string,string> NewAttributes)
     {
+        // Always initialize — NativeAOT's trimmer will scream if these are left hanging
+        ContextName = string.Empty;
+        Attributes = new Dictionary<string,string>();
+
         if (!string.IsNullOrWhiteSpace(NewContextName))
         {
             ContextName = new(NewContextName);
             Attributes = new(NewAttributes);
         }
-
-        
     }
 
     //Context Operations
@@ -85,7 +87,7 @@ internal static class Helper
             return;
         }
 
-        string dir = Path.GetDirectoryName(configfile);
+        string? dir = Path.GetDirectoryName(configfile);
         if (dir != null && !Directory.Exists(dir))
         {
             Directory.CreateDirectory(dir);

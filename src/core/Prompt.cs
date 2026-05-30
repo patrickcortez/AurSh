@@ -347,17 +347,22 @@ public class Prompt
 
         if (Utils.NetworkInfo.IsConnected)
         {
-            sb.Append("\uF1EB ");
-            char barChar = Utils.NetworkInfo.Bars switch
+            string icon = Utils.NetworkInfo.IsWired ? "\uF6FF" : "\uF1EB";
+            sb.Append(icon + " ");
+            
+            if (!Utils.NetworkInfo.IsWired)
             {
-                4 => '\u2588', // █
-                3 => '\u2586', // ▆
-                2 => '\u2584', // ▄
-                1 => '\u2582', // ▂
-                _ => '_'
-            };
-            sb.Append(barChar);
-            sb.Append(" ");
+                char barChar = Utils.NetworkInfo.Bars switch
+                {
+                    4 => '\u2588', // █
+                    3 => '\u2586', // ▆
+                    2 => '\u2584', // ▄
+                    1 => '\u2582', // ▂
+                    _ => '_'
+                };
+                sb.Append(barChar);
+                sb.Append(" ");
+            }
             sb.Append(Utils.NetworkInfo.Ssid);
         }
         else

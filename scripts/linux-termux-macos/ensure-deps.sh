@@ -245,6 +245,24 @@ check_icu() {
     return 1
 }
 
+check_libunwind() {
+    if has_header "libunwind.h" || has_lib "libunwind"; then
+        info "  libunwind .......... found"
+        return 0
+    fi
+    info "  libunwind .......... MISSING"
+    return 1
+}
+
+check_lld() {
+    if has_command lld || has_command ld.lld; then
+        info "  lld (linker) ....... found"
+        return 0
+    fi
+    info "  lld (linker) ....... MISSING"
+    return 1
+}
+
 # ── Package name mapping ─────────────────────────────────────────
 # Returns the correct package name for each distro family.
 
@@ -316,6 +334,34 @@ pkg_icu() {
         gentoo)  echo "dev-libs/icu" ;;
         Termux)  echo "libicu" ;;
         *)       echo "icu-dev" ;;
+    esac
+}
+
+pkg_libunwind() {
+    case "$DISTRO" in
+        debian)  echo "libunwind-dev" ;;
+        fedora)  echo "libunwind-devel" ;;
+        arch)    echo "libunwind" ;;
+        alpine)  echo "libunwind-dev" ;;
+        suse)    echo "libunwind-devel" ;;
+        void)    echo "libunwind-devel" ;;
+        gentoo)  echo "sys-libs/libunwind" ;;
+        Termux)  echo "libunwind" ;;
+        *)       echo "libunwind-dev" ;;
+    esac
+}
+
+pkg_lld() {
+    case "$DISTRO" in
+        debian)  echo "lld" ;;
+        fedora)  echo "lld" ;;
+        arch)    echo "lld" ;;
+        alpine)  echo "lld" ;;
+        suse)    echo "lld" ;;
+        void)    echo "lld" ;;
+        gentoo)  echo "sys-devel/lld" ;;
+        Termux)  echo "lld" ;;
+        *)       echo "lld" ;;
     esac
 }
 
@@ -495,6 +541,24 @@ fi
 if ! check_icu; then
     _any_missing=1
     _pkg=$(pkg_icu)
+    if [ -n "$_pkg" ]; then
+        MISSING_PKGS="$MISSING_PKGS $_pkg"
+    fi
+fi
+
+# -- libunwind (NativeAOT needs it for exception handling and stack walking) --
+if ! check_libunwind; then
+    _any_missing=1
+    _pkg=$(pkg_libunwind)
+    if [ -n "$_pkg" ]; then
+        MISSING_PKGS="$MISSING_PKGS $_pkg"
+    fi
+fi
+
+# -- lld (preferred linker for NativeAOT, much better on arm64 than GNU ld) --
+if ! check_lld; then
+    _any_missing=1
+    _pkg=$(pkg_lld)
     if [ -n "$_pkg" ]; then
         MISSING_PKGS="$MISSING_PKGS $_pkg"
     fi

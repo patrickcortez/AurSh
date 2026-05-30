@@ -23,6 +23,14 @@
     <PackageId>Aursh</PackageId>
   </PropertyGroup>
 
+  <!-- Termux/Linux-arm64 NativeAOT specific linker settings -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-arm64' Or '$(RuntimeIdentifier)' == 'linux-bionic-arm64'">
+    <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Use LLD linker on Termux/arm64 to avoid GNU ld issues -->
+    <LinkerFlavor>lld</LinkerFlavor>
+  </PropertyGroup>
+
   <!--
     aursh-update lives in its own project (src/aursh-update/AurShUpdate.csproj)
     so that it can be sudo'd independently. Exclude its source files from this

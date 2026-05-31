@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyDescriptionAttribute(("AurShell Contexts is a disk backed object like that can hold multiple attributes " +
     "to structurize and organize variables."))]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("2.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("2.0.0+03cec0e97524aa7c63cdc3e19172c9bbd6d3896f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("2.0.0+29ef57c2b7d77f73c09d4735cf15fff2e3b86d5f")]
 [assembly: System.Reflection.AssemblyProductAttribute("AurShell Contexts")]
 [assembly: System.Reflection.AssemblyTitleAttribute("aursh-context")]
 [assembly: System.Reflection.AssemblyVersionAttribute("2.0.0.0")]

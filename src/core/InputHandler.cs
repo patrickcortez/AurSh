@@ -841,6 +841,33 @@ public class InputHandler
 
     private void UpdateGhostText()
     {
+        UpdateGhostTextInternal();
+
+        if (!string.IsNullOrEmpty(_ghostText))
+        {
+            int width = Utils.Platform.TerminalWidth;
+            if (width <= 0) width = 80;
+
+            var endPos = ComputeCursorPosition(width);
+            int available = width - endPos.Col - 1;
+            if (available < 0) available = 0;
+
+            int nlIdx = _ghostText.IndexOf('\n');
+            if (nlIdx >= 0)
+                _ghostText = _ghostText.Substring(0, nlIdx);
+
+            if (_ghostText.Length > available)
+            {
+                if (available > 3)
+                    _ghostText = _ghostText.Substring(0, available - 3) + "...";
+                else
+                    _ghostText = _ghostText.Substring(0, available);
+            }
+        }
+    }
+
+    private void UpdateGhostTextInternal()
+    {
         string current = _buffer.ToString();
         if (_cursorPos != _buffer.Length || string.IsNullOrEmpty(current))
         {

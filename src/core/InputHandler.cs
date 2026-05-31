@@ -16,15 +16,9 @@ public class InputHandler
     private bool _inReverseSearch;
     private string _searchQuery = "";
     private int _searchIndex = -1;
-    private int _lastTermWidth;
-    private int _lastTermHeight;
     private string _currentPrompt = "";
     private string _staticPrompt = "";
     private string _dynamicPrompt = "";
-    private int _promptStartRow = -1;
-    private int _pendingResizeWidth;
-    private int _pendingResizeHeight;
-    private long _resizeChangeTick;
     private bool _multilineActive;
     private int _continuationPromptLen = 5;
 
@@ -80,11 +74,7 @@ public class InputHandler
             }
         }
         
-        try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
-        
         _promptVisibleLen = Utils.Ansi.VisibleLength(_dynamicPrompt);
-        _lastTermWidth = Utils.Platform.TerminalWidth;
-        _lastTermHeight = Utils.Platform.TerminalHeight;
 
         _buffer.Clear();
         _cursorPos = 0;
@@ -101,7 +91,6 @@ public class InputHandler
         {
             if (Console.KeyAvailable == false)
             {
-                CheckTerminalResize();
                 System.Threading.Thread.Sleep(10);
                 if (!Console.KeyAvailable)
                     continue;
@@ -800,39 +789,16 @@ public class InputHandler
         int width = Utils.Platform.TerminalWidth;
         if (width <= 0) width = 80;
 
-        if (_promptStartRow < 0) {
-            try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
-        }
-
-        int totalRows = ComputeDisplayLinesAtWidth(width);
-
-        try 
-        {
-            int maxPossibleRow = _promptStartRow + (totalRows - 1);
-            int bufferHeight = Console.BufferHeight;
-            if (maxPossibleRow >= bufferHeight)
-            {
-                int over = maxPossibleRow - bufferHeight + 1;
-                int currentLeft = Console.CursorLeft;
-                int currentTop = Console.CursorTop;
-                Console.SetCursorPosition(width - 1, bufferHeight - 1);
-                for(int i = 0; i < over; i++) {
-                    Console.Write("\n");
-                }
-                _promptStartRow = Math.Max(0, _promptStartRow - over);
-                Console.SetCursorPosition(currentLeft, Math.Max(0, currentTop - over));
-            }
-        } 
-        catch { }
-
-        try 
-        {
-            Console.SetCursorPosition(0, _promptStartRow);
-        }
-        catch { }
-
+        var currentCursorPos = ComputeCursorPosition(width);
+        
         var sb = new StringBuilder();
         sb.Append(Utils.Ansi.CursorHide);
+        
+        if (currentCursorPos.Row > 0)
+        {
+            sb.Append(Utils.Ansi.MoveCursorUp(currentCursorPos.Row));
+        }
+        sb.Append('\r');
         sb.Append(Utils.Ansi.ClearScreenFromCursor);
         
         sb.Append("\x1b]133;A\x07");
@@ -858,12 +824,16 @@ public class InputHandler
 
         Console.Write(sb.ToString());
 
-        var cursorPos = ComputeCursorPosition(width);
+        var endPos = ComputeCursorPositionForText(width, _buffer.ToString() + _ghostText);
         
         try 
         {
-            int targetRow = _promptStartRow + cursorPos.Row;
-            Console.SetCursorPosition(cursorPos.Col, targetRow);
+            int rowsUp = endPos.Row - currentCursorPos.Row;
+            if (rowsUp > 0)
+            {
+                Console.Write(Utils.Ansi.MoveCursorUp(rowsUp));
+            }
+            Console.Write($"\x1b[{currentCursorPos.Col + 1}G");
         }
         catch { }
         
@@ -972,56 +942,17 @@ public class InputHandler
         _ghostText = "";
     }
 
-    private void CheckTerminalResize()
-    {
-        try
-        {
-            int currentWidth = Utils.Platform.TerminalWidth;
-            int currentHeight = Utils.Platform.TerminalHeight;
-
-            if (currentWidth == _lastTermWidth && currentHeight == _lastTermHeight)
-            {
-                _pendingResizeWidth = 0;
-                _pendingResizeHeight = 0;
-                return;
-            }
-
-            if (currentWidth != _pendingResizeWidth || currentHeight != _pendingResizeHeight)
-            {
-                _pendingResizeWidth = currentWidth;
-                _pendingResizeHeight = currentHeight;
-                _resizeChangeTick = Environment.TickCount64;
-                return;
-            }
-
-            long elapsed = Environment.TickCount64 - _resizeChangeTick;
-            if (elapsed >= 100)
-            {
-                _lastTermWidth = currentWidth;
-                _lastTermHeight = currentHeight;
-                _pendingResizeWidth = 0;
-                _pendingResizeHeight = 0;
-                
-                try 
-                { 
-                    // Let the terminal natively reflow text, and back-calculate our prompt start row
-                    // from the new physical cursor position and the new width's geometry
-                    int newCursorRow = ComputeCursorPosition(currentWidth).Row;
-                    _promptStartRow = Math.Max(0, Console.CursorTop - newCursorRow);
-                } 
-                catch { }
-
-                RedrawLine();
-            }
-        }
-        catch (Exception)
-        {
-            // Ignore resize exceptions to prevent shell crashes.
-        }
-    }
 
     private (int Row, int Col) ComputeCursorPosition(int width)
     {
+        return ComputeCursorPositionForText(width, _buffer.ToString().Substring(0, _cursorPos));
+    }
+
+    private (int Row, int Col) ComputeCursorPositionForText(int width, string textBeforeCursor)
+    {
+        // Honestly, math is the bane of my existence, but if we don't calculate these wrap rows 
+        // perfectly, everything goes boom and tears the terminal apart! 
+        // Fingers crossed this keeps the cursor from jumping into the void!
         if (width <= 0)
         {
             return (0, 0);
@@ -1031,8 +962,6 @@ public class InputHandler
         {
             int rows = 0;
 
-            string bufferText = _buffer.ToString();
-            string textBeforeCursor = bufferText.Substring(0, _cursorPos);
             string[] linesBeforeCursor = textBeforeCursor.Split('\n');
             
             for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
@@ -1091,7 +1020,6 @@ public class InputHandler
                 Console.Write("\x1b]133;A\x07");
                 Console.Write(_staticPrompt);
             }
-            try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
         }
 
         RedrawLine();

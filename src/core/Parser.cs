@@ -25,7 +25,9 @@ public class Redirection
 public class CommandNode
 {
     public string Name { get; set; } = "";
+    public string RawExpandedName { get; set; } = "";
     public List<string> Args { get; } = new();
+    public List<string> RawExpandedArgs { get; } = new();
     public List<Redirection> Redirections { get; } = new();
 
     public string[] AllArgs
@@ -168,11 +170,13 @@ public class Parser
             if (!hasContent)
             {
                 cmd.Name = Current.Value;
+                cmd.RawExpandedName = Current.RawExpandedValue;
                 hasContent = true;
             }
             else
             {
                 cmd.Args.Add(Current.Value);
+                cmd.RawExpandedArgs.Add(Current.RawExpandedValue);
             }
             Advance();
 

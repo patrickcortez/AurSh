@@ -591,8 +591,14 @@ public static class Pipeline
                     if (i + 1 < count)
                     {
                         var nextCmd = commands[i + 1];
+                        bool isNextBuiltin = BuiltinCommands.IsBuiltin(nextCmd.Name);
                         string? nextExe = ResolveCommand(nextCmd.Name, workingDirectory);
-                        if (nextExe == null)
+                        
+                        if (!isNextBuiltin && nextExe == null && !TryGetAssociationShellCommand(nextCmd, env, workingDirectory, out _))
+                        {
+                            // Let the next iteration handle the shell command parsing, we don't abort.
+                        }
+                        else if (nextExe == null && !isNextBuiltin)
                         {
                             Console.Error.WriteLine($"aursh: {nextCmd.Name}: command not found");
                             clientStream?.Dispose();
@@ -600,7 +606,7 @@ public static class Pipeline
                             return 127;
                         }
 
-                        var nextPsi = CreateProcessStartInfo(nextExe, nextCmd, env, workingDirectory);
+                        var nextPsi = CreateProcessStartInfo(nextExe ?? Utils.Platform.DefaultShell, nextCmd, env, workingDirectory);
                         nextPsi.RedirectStandardInput = true;
                         
                         if (i + 1 != count - 1)
@@ -889,20 +895,11 @@ public static class Pipeline
             if (i > 0)
                 fullSb.Append(" | ");
 
-            fullSb.Append(cmd.Name);
-            foreach (string arg in cmd.Args)
+            fullSb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
+            foreach (string rawArg in cmd.RawExpandedArgs)
             {
                 fullSb.Append(' ');
-                if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
-                {
-                    fullSb.Append('"');
-                    fullSb.Append(arg.Replace("\"", "\\\""));
-                    fullSb.Append('"');
-                }
-                else
-                {
-                    fullSb.Append(arg);
-                }
+                fullSb.Append(rawArg);
             }
 
             foreach (var redir in cmd.Redirections)
@@ -1108,20 +1105,11 @@ public static class Pipeline
     private static int ExecuteViaShell(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append(cmd.Name);
-        foreach (string arg in cmd.Args)
+        sb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
+        foreach (string rawArg in cmd.RawExpandedArgs)
         {
             sb.Append(' ');
-            if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
-            {
-                sb.Append('"');
-                sb.Append(arg.Replace("\"", "\\\""));
-                sb.Append('"');
-            }
-            else
-            {
-                sb.Append(arg);
-            }
+            sb.Append(rawArg);
         }
 
         string fullCommand = sb.ToString();
@@ -1293,20 +1281,11 @@ public static class Pipeline
         CommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append(cmd.Name);
-        foreach (string arg in cmd.Args)
+        sb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
+        foreach (string rawArg in cmd.RawExpandedArgs)
         {
             sb.Append(' ');
-            if (arg.Contains(' ') || arg.Contains('"') || arg.Contains('\''))
-            {
-                sb.Append('"');
-                sb.Append(arg.Replace("\"", "\\\""));
-                sb.Append('"');
-            }
-            else
-            {
-                sb.Append(arg);
-            }
+            sb.Append(rawArg);
         }
 
         var psi = new ProcessStartInfo
@@ -1356,7 +1335,7 @@ public static class Pipeline
                             template += " \"{0}\" {1}";
                         }
                         
-                        string newArgsStr = string.Join(" ", cmd.Args);
+                        string newArgsStr = string.Join(" ", cmd.RawExpandedArgs);
                         shellCommand = template.Replace("{0}", fullPath).Replace("{1}", newArgsStr).Trim();
                         return true;
                     }

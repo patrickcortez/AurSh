@@ -41,7 +41,8 @@ public sealed class BlackBoxConfig
         "less", "more", "man",
         "top", "htop", "btop",
         "fzf", "tmux", "screen", "ssh",
-        "aursh-cat","aursh-ls","aursh-history show"
+        "aursh-cat", "aursh-ls", "aursh-history show",
+        "clear", "cls"
     };
 
     // Blackbox config from Env variables handler

@@ -159,8 +159,8 @@ public static class Platform
                 psi.ArgumentList.Add("-NoProfile");
                 psi.ArgumentList.Add("-ExecutionPolicy");
                 psi.ArgumentList.Add("Bypass");
-                psi.ArgumentList.Add("-Command");
-                psi.ArgumentList.Add(command);
+                psi.ArgumentList.Add("-EncodedCommand");
+                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(command)));
                 return;
             }
 
@@ -168,8 +168,8 @@ public static class Platform
                 shellName.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
             {
                 psi.ArgumentList.Add("-NoProfile");
-                psi.ArgumentList.Add("-Command");
-                psi.ArgumentList.Add(command);
+                psi.ArgumentList.Add("-EncodedCommand");
+                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(command)));
                 return;
             }
         }

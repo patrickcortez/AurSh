@@ -13,7 +13,7 @@ public static class BuiltinCommands
     private readonly static string version = "2.0";
     private static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
     {
-        "cd", "export", "unset", "exit", "history", "clear", "echo",
+        "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
         "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net"
@@ -30,7 +30,6 @@ public static class BuiltinCommands
             "unset" => ExecuteUnset(cmd, env),
             "exit" => ExecuteExit(cmd),
             "history" or "aursh-history" => ExecuteHistory(cmd, env, workingDirectory),
-            "clear" => ExecuteClear(),
             "echo" => ExecuteEcho(cmd),
             "pwd" => ExecutePwd(workingDirectory),
             "type" => ExecuteType(cmd, env, workingDirectory),
@@ -1221,13 +1220,6 @@ public static class BuiltinCommands
             if (unit == 0) return $"{bytes}".PadLeft(6);
             return $"{size:0.0}{units[unit]}".PadLeft(6);
         }
-    }
-
-    private static int ExecuteClear()
-    {
-        Console.Write("\x1b[2J\x1b[3J\x1b[H");
-        Console.Out.Flush();
-        return 0;
     }
 
     private static int ExecuteEcho(CommandNode cmd)

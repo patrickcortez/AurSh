@@ -256,6 +256,7 @@ public static class Ansi
 
         var sb = new StringBuilder(maxVisible + 32);
         int taken = 0;
+        int charsAdded = 0;
         string activeFormatting = "";
         
         try
@@ -282,6 +283,7 @@ public static class Ansi
                             activeFormatting += seq;
                         }
                             
+                        charsAdded += seq.Length;
                         i = m.Index + m.Length - 1;
                         continue;
                     }
@@ -289,6 +291,7 @@ public static class Ansi
 
                 sb.Append(c);
                 taken++;
+                charsAdded++;
 
                 if (taken >= maxVisible)
                 {
@@ -299,11 +302,12 @@ public static class Ansi
                     sb.Clear();
                     // Carry over the formatting to the next chunk!
                     sb.Append(activeFormatting);
+                    charsAdded = activeFormatting.Length;
                     taken = 0;
                 }
             }
 
-            if (taken > 0 || sb.Length > activeFormatting.Length)
+            if (charsAdded > 0)
             {
                 sb.Append(Reset);
                 list.Add(sb.ToString());

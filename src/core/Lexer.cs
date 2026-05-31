@@ -26,13 +26,15 @@ public class Token
     public string Value { get; }
     public bool WasQuoted { get; }
     public bool WasSingleQuoted { get; }
+    public string RawExpandedValue { get; }
 
-    public Token(TokenType type, string value, bool wasQuoted = false, bool wasSingleQuoted = false)
+    public Token(TokenType type, string value, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
     {
         Type = type;
         Value = value;
         WasQuoted = wasQuoted;
         WasSingleQuoted = wasSingleQuoted;
+        RawExpandedValue = rawExpandedValue ?? value;
     }
 
     public override string ToString() => $"[{Type}: {Value}]";
@@ -173,6 +175,7 @@ public class Lexer
     private Token ReadWord()
     {
         var sb = new StringBuilder();
+        var rawSb = new StringBuilder();
         bool wasQuoted = false;
         bool wasSingleQuoted = false;
 
@@ -200,6 +203,7 @@ public class Lexer
                 if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
                 {
                     sb.Append(c);
+                    rawSb.Append(c);
                     _pos++;
                     wasSingleQuoted = false;
                     continue;
@@ -207,6 +211,8 @@ public class Lexer
                 _pos++;
                 char escaped = _input[_pos];
                 sb.Append(MapEscapeChar(escaped));
+                rawSb.Append('\\');
+                rawSb.Append(escaped);
                 _pos++;
                 wasSingleQuoted = false;
                 continue;
@@ -216,7 +222,11 @@ public class Lexer
             {
                 if (sb.Length == 0)
                     wasSingleQuoted = true;
-                sb.Append(ReadSingleQuoted());
+                string inside = ReadSingleQuoted();
+                sb.Append(inside);
+                rawSb.Append('\'');
+                rawSb.Append(inside);
+                rawSb.Append('\'');
                 wasQuoted = true;
                 continue;
             }
@@ -224,7 +234,11 @@ public class Lexer
             if (c == '"')
             {
                 wasSingleQuoted = false;
-                sb.Append(ReadDoubleQuoted());
+                string inside = ReadDoubleQuoted();
+                sb.Append(inside);
+                rawSb.Append('"');
+                rawSb.Append(inside);
+                rawSb.Append('"');
                 wasQuoted = true;
                 continue;
             }
@@ -233,14 +247,17 @@ public class Lexer
             {
                 if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
-                    sb.Append(ReadSubCommand());
+                    string sub = ReadSubCommand();
+                    sb.Append(sub);
+                    rawSb.Append(sub);
                     wasSingleQuoted = false;
                     continue;
                 }
 
                 
-
-                sb.Append(ExpandInline());
+                string expanded = ExpandInline();
+                sb.Append(expanded);
+                rawSb.Append(expanded);
                 wasSingleQuoted = false;
                 continue;
             }
@@ -249,7 +266,9 @@ public class Lexer
             {
                 if (_pos + 1 >= _input.Length || _input[_pos + 1] == '/' || _input[_pos + 1] == '\\' || char.IsWhiteSpace(_input[_pos + 1]))
                 {
-                    sb.Append(Utils.Platform.HomeDirectory);
+                    string home = Utils.Platform.HomeDirectory;
+                    sb.Append(home);
+                    rawSb.Append(home);
                     _pos++;
                     wasSingleQuoted = false;
                     continue;
@@ -259,17 +278,19 @@ public class Lexer
             if (c == '*' || c == '?')
             {
                 sb.Append(c);
+                rawSb.Append(c);
                 _pos++;
                 wasSingleQuoted = false;
                 continue;
             }
 
             sb.Append(c);
+            rawSb.Append(c);
             _pos++;
             wasSingleQuoted = false;
         }
 
-        return new Token(TokenType.Word, sb.ToString(), wasQuoted, wasSingleQuoted);
+        return new Token(TokenType.Word, sb.ToString(), wasQuoted, wasSingleQuoted, rawSb.ToString());
     }
 
     private string ReadSubCommand()

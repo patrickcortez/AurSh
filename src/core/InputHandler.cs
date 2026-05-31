@@ -21,7 +21,7 @@ public class InputHandler
     private string _currentPrompt = "";
     private string _staticPrompt = "";
     private string _dynamicPrompt = "";
-    private int _cursorRowOffset;
+    private int _promptStartRow = -1;
     private int _pendingResizeWidth;
     private int _pendingResizeHeight;
     private long _resizeChangeTick;
@@ -79,6 +79,9 @@ public class InputHandler
                 Console.Write(_staticPrompt);
             }
         }
+        
+        try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
+        
         _promptVisibleLen = Utils.Ansi.VisibleLength(_dynamicPrompt);
         _lastTermWidth = Utils.Platform.TerminalWidth;
         _lastTermHeight = Utils.Platform.TerminalHeight;
@@ -92,7 +95,7 @@ public class InputHandler
         _history.ResetNavigation();
 
         UpdateGhostText();
-        _cursorRowOffset = ComputeCursorPosition(_lastTermWidth).Row;
+        RedrawLine();
 
         while (true)
         {
@@ -797,18 +800,41 @@ public class InputHandler
         int width = Utils.Platform.TerminalWidth;
         if (width <= 0) width = 80;
 
-        var sb = new StringBuilder();
-        sb.Append(Utils.Ansi.CursorHide);
-        sb.Append('\r');
-
-        if (_cursorRowOffset > 0)
-        {
-            sb.Append(Utils.Ansi.MoveCursorUp(_cursorRowOffset));
+        if (_promptStartRow < 0) {
+            try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
         }
 
+        int totalRows = ComputeDisplayLinesAtWidth(width);
+
+        try 
+        {
+            int maxPossibleRow = _promptStartRow + (totalRows - 1);
+            int windowHeight = Console.WindowHeight;
+            if (maxPossibleRow >= windowHeight)
+            {
+                int over = maxPossibleRow - windowHeight + 1;
+                int currentLeft = Console.CursorLeft;
+                int currentTop = Console.CursorTop;
+                Console.SetCursorPosition(width - 1, windowHeight - 1);
+                for(int i = 0; i < over; i++) {
+                    Console.Write("\n");
+                }
+                _promptStartRow = Math.Max(0, _promptStartRow - over);
+                Console.SetCursorPosition(currentLeft, Math.Max(0, currentTop - over));
+            }
+        } 
+        catch { }
+
+        try 
+        {
+            Console.SetCursorPosition(0, _promptStartRow);
+        }
+        catch { }
+
+        var sb = new StringBuilder();
+        sb.Append(Utils.Ansi.CursorHide);
         sb.Append(Utils.Ansi.ClearScreenFromCursor);
-        // _staticPrompt was already printed in ReadLine and left for terminal to native reflow.
-        // We only redraw the _dynamicPrompt (the active line).
+        
         sb.Append("\x1b]133;A\x07");
         sb.Append(_dynamicPrompt);
         sb.Append("\x1b]133;B\x07");
@@ -830,22 +856,18 @@ public class InputHandler
             sb.Append(ghostReset);
         }
 
-        int totalRows = ComputeDisplayLinesAtWidth(width);
+        Console.Write(sb.ToString());
 
         var cursorPos = ComputeCursorPosition(width);
-
-        int rowsToMoveUp = (totalRows - 1) - cursorPos.Row;
-        if (rowsToMoveUp > 0)
+        
+        try 
         {
-            sb.Append(Utils.Ansi.MoveCursorUp(rowsToMoveUp));
+            int targetRow = _promptStartRow + cursorPos.Row;
+            Console.SetCursorPosition(cursorPos.Col, targetRow);
         }
-
-        sb.Append(Utils.Ansi.SetCursorColumn(cursorPos.Col + 1));
-        sb.Append(Utils.Ansi.CursorShow);
-
-        _cursorRowOffset = cursorPos.Row;
-
-        Console.Write(sb.ToString());
+        catch { }
+        
+        Console.Write(Utils.Ansi.CursorShow);
     }
 
     private void ClearGhostText()
@@ -860,28 +882,6 @@ public class InputHandler
     private void UpdateGhostText()
     {
         UpdateGhostTextInternal();
-
-        if (!string.IsNullOrEmpty(_ghostText))
-        {
-            int width = Utils.Platform.TerminalWidth;
-            if (width <= 0) width = 80;
-
-            var endPos = ComputeCursorPosition(width);
-            int available = width - endPos.Col - 1;
-            if (available < 0) available = 0;
-
-            int nlIdx = _ghostText.IndexOf('\n');
-            if (nlIdx >= 0)
-                _ghostText = _ghostText.Substring(0, nlIdx);
-
-            if (_ghostText.Length > available)
-            {
-                if (available > 3)
-                    _ghostText = _ghostText.Substring(0, available - 3) + "...";
-                else
-                    _ghostText = _ghostText.Substring(0, available);
-            }
-        }
     }
 
     private void UpdateGhostTextInternal()
@@ -997,15 +997,16 @@ public class InputHandler
             long elapsed = Environment.TickCount64 - _resizeChangeTick;
             if (elapsed >= 100)
             {
-                // Calculate cursor rows from top using the new width to match terminal reflow.
-                var newPos = ComputeCursorPosition(currentWidth);
-                int cursorRowsFromTop = newPos.Row;
-
                 _lastTermWidth = currentWidth;
                 _lastTermHeight = currentHeight;
                 _pendingResizeWidth = 0;
                 _pendingResizeHeight = 0;
-                FullRedraw(clearPrevious: true, cursorRowsFromTop: cursorRowsFromTop);
+                
+                // For a true resize, terminal might have reflowed lines above us.
+                // We should assume _promptStartRow is invalid and fetch a new one,
+                // or just FullRedraw and let it clear the screen below cursor.
+                try { _promptStartRow = Console.CursorTop; } catch { }
+                FullRedraw(clearPrevious: true);
             }
         }
         catch (Exception)
@@ -1052,13 +1053,6 @@ public class InputHandler
             int rowInLine = totalVisOnLastLine / width;
             int col = totalVisOnLastLine % width;
             
-            if (col == 0 && totalVisOnLastLine > 0 && rowInLine > 0)
-            {
-                // Keep cursor on the current logical row at the end of the width boundary.
-                rowInLine--;
-                col = width;
-            }
-            
             rows += rowInLine;
             
             return (rows, col);
@@ -1070,7 +1064,7 @@ public class InputHandler
         }
     }
 
-    private void FullRedraw(bool clearPrevious = false, int cursorRowsFromTop = -1)
+    private void FullRedraw(bool clearPrevious = false)
     {
         var promptObj = new Prompt(_env);
         string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
@@ -1093,20 +1087,15 @@ public class InputHandler
 
         if (clearPrevious)
         {
-            int moveUp = cursorRowsFromTop >= 0 ? cursorRowsFromTop : _cursorRowOffset;
-            if (moveUp > 0)
-                Console.Write("\r" + Utils.Ansi.MoveCursorUp(moveUp) + Utils.Ansi.ClearScreenFromCursor);
-            else
-                Console.Write("\r" + Utils.Ansi.ClearScreenFromCursor);
+            Console.Write("\r" + Utils.Ansi.ClearScreenFromCursor);
             
-            _cursorRowOffset = 0;
-            
-            // Re-print static prompt since we cleared the whole screen
+            // Re-print static prompt since we cleared the whole screen from our cursor
             if (!string.IsNullOrEmpty(_staticPrompt))
             {
                 Console.Write("\x1b]133;A\x07");
                 Console.Write(_staticPrompt);
             }
+            try { _promptStartRow = Console.CursorTop; } catch { _promptStartRow = 0; }
         }
 
         RedrawLine();

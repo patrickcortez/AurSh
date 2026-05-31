@@ -809,13 +809,13 @@ public class InputHandler
         try 
         {
             int maxPossibleRow = _promptStartRow + (totalRows - 1);
-            int windowHeight = Console.WindowHeight;
-            if (maxPossibleRow >= windowHeight)
+            int bufferHeight = Console.BufferHeight;
+            if (maxPossibleRow >= bufferHeight)
             {
-                int over = maxPossibleRow - windowHeight + 1;
+                int over = maxPossibleRow - bufferHeight + 1;
                 int currentLeft = Console.CursorLeft;
                 int currentTop = Console.CursorTop;
-                Console.SetCursorPosition(width - 1, windowHeight - 1);
+                Console.SetCursorPosition(width - 1, bufferHeight - 1);
                 for(int i = 0; i < over; i++) {
                     Console.Write("\n");
                 }
@@ -1002,11 +1002,16 @@ public class InputHandler
                 _pendingResizeWidth = 0;
                 _pendingResizeHeight = 0;
                 
-                // For a true resize, terminal might have reflowed lines above us.
-                // We should assume _promptStartRow is invalid and fetch a new one,
-                // or just FullRedraw and let it clear the screen below cursor.
-                try { _promptStartRow = Console.CursorTop; } catch { }
-                FullRedraw(clearPrevious: true);
+                try 
+                { 
+                    // Let the terminal natively reflow text, and back-calculate our prompt start row
+                    // from the new physical cursor position and the new width's geometry
+                    int newCursorRow = ComputeCursorPosition(currentWidth).Row;
+                    _promptStartRow = Math.Max(0, Console.CursorTop - newCursorRow);
+                } 
+                catch { }
+
+                RedrawLine();
             }
         }
         catch (Exception)
@@ -1024,16 +1029,7 @@ public class InputHandler
 
         try
         {
-            string[] promptLines = _dynamicPrompt.Split('\n');
             int rows = 0;
-
-            for (int i = 0; i < promptLines.Length - 1; i++)
-            {
-                int vis = Utils.Ansi.VisibleLength(promptLines[i]);
-                rows += Math.Max(1, (vis + width - 1) / width);
-            }
-
-            int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
 
             string bufferText = _buffer.ToString();
             string textBeforeCursor = bufferText.Substring(0, _cursorPos);
@@ -1041,12 +1037,12 @@ public class InputHandler
             
             for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
             {
-                int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
+                int prefixVis = (i == 0) ? _promptVisibleLen : _continuationPromptLen;
                 int textVis = Utils.Ansi.VisibleLength(linesBeforeCursor[i]);
-                rows += Math.Max(1, (prefixVis + textVis + width - 1) / width);
+                rows += ((prefixVis + textVis) / width) + 1;
             }
             
-            int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? lastPromptVis : _continuationPromptLen;
+            int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? _promptVisibleLen : _continuationPromptLen;
             int lastLineTextVis = Utils.Ansi.VisibleLength(linesBeforeCursor[^1]);
             int totalVisOnLastLine = lastLinePrefixVis + lastLineTextVis;
             
@@ -1437,25 +1433,16 @@ public class InputHandler
     {
         if (width <= 0) return 2;
 
-        string[] promptLines = _currentPrompt.Split('\n');
         int totalLines = 0;
-
-        for (int i = 0; i < promptLines.Length - 1; i++)
-        {
-            int vis = Utils.Ansi.VisibleLength(promptLines[i]);
-            totalLines += Math.Max(1, (vis + width - 1) / width);
-        }
-
-        int lastPromptVis = promptLines.Length > 0 ? Utils.Ansi.VisibleLength(promptLines[^1]) : _promptVisibleLen;
         
         string fullContent = _buffer.ToString() + _ghostText;
         string[] contentLines = fullContent.Split('\n');
         
         for (int i = 0; i < contentLines.Length; i++)
         {
-            int prefixVis = (i == 0) ? lastPromptVis : _continuationPromptLen;
+            int prefixVis = (i == 0) ? _promptVisibleLen : _continuationPromptLen;
             int lineVis = prefixVis + Utils.Ansi.VisibleLength(contentLines[i]);
-            totalLines += Math.Max(1, (lineVis + width - 1) / width);
+            totalLines += (lineVis / width) + 1;
         }
 
         return totalLines;

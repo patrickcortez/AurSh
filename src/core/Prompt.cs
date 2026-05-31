@@ -308,7 +308,8 @@ public class Prompt
 
         sb.Append(Utils.Ansi.BgRgb(40, 40, 55));
         sb.Append(Utils.Ansi.FgRgb(120, 200, 255));
-        sb.Append(" \uF115 ");
+        string dirIcon = _gitInfo.IsGitRepo ? "\uE5FB" : "\uF115";
+        sb.Append(" " + dirIcon + " ");
         sb.Append(dir);
         sb.Append(' ');
         sb.Append(Utils.Ansi.Reset);
@@ -369,8 +370,20 @@ public class Prompt
         sb.Append(battBg);
         sb.Append(battFg);
         sb.Append(" ");
-        
-        string icon = Utils.BatteryInfo.IsCharging ? "\u26A1" : "\uD83D\uDD0B";
+        string icon;
+        if (Utils.BatteryInfo.IsCharging) icon = "\udb80\udc84";
+        else if (Utils.BatteryInfo.Percent >= 95) icon = "\uF240";
+        else if (Utils.BatteryInfo.Percent >= 90) icon = "\udb80\udc82";
+        else if (Utils.BatteryInfo.Percent >= 80) icon = "\udb80\udc81";
+        else if (Utils.BatteryInfo.Percent >= 70) icon = "\udb80\udc80";
+        else if (Utils.BatteryInfo.Percent >= 60) icon = "\udb80\udc7f";
+        else if (Utils.BatteryInfo.Percent >= 50) icon = "\udb80\udc7e";
+        else if (Utils.BatteryInfo.Percent >= 40) icon = "\udb80\udc7d";
+        else if (Utils.BatteryInfo.Percent >= 30) icon = "\udb80\udc7c";
+        else if (Utils.BatteryInfo.Percent >= 20) icon = "\udb80\udc7b";
+        else if (Utils.BatteryInfo.Percent >= 10) icon = "\udb80\udc7a";
+        else icon = "\udb80\udc83";
+
         sb.Append(icon);
         sb.Append(" ");
         sb.Append(Utils.BatteryInfo.Percent);
@@ -403,27 +416,28 @@ public class Prompt
 
         if (Utils.NetworkInfo.IsConnected)
         {
-            string icon = Utils.NetworkInfo.IsWired ? "\uF6FF" : "\uF1EB";
-            sb.Append(icon + " ");
-            
-            if (!Utils.NetworkInfo.IsWired)
+            if (Utils.NetworkInfo.IsWired)
             {
-                char barChar = Utils.NetworkInfo.Bars switch
+                sb.Append("\uF6FF ");
+            }
+            else
+            {
+                string icon = Utils.NetworkInfo.Bars switch
                 {
-                    4 => '\u2588', // █
-                    3 => '\u2586', // ▆
-                    2 => '\u2584', // ▄
-                    1 => '\u2582', // ▂
-                    _ => '_'
+                    4 => "\udb82\udcfa",
+                    3 => "\udb82\udcf8",
+                    2 => "\udb82\udcf6",
+                    1 => "\udb82\udcf4",
+                    _ => "\udb82\udcfc"
                 };
-                sb.Append(barChar);
+                sb.Append(icon);
                 sb.Append(" ");
             }
             sb.Append(Utils.NetworkInfo.Ssid);
         }
         else
         {
-            sb.Append("\uF1EB Disconnected");
+            sb.Append("\udb82\udcfc Disconnected");
         }
         sb.Append(" ");
         sb.Append(Utils.Ansi.Reset);

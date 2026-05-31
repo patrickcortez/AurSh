@@ -10,7 +10,7 @@ public class Prompt
     private const string BoxTopLeft = "\u256D\u2500";
     private const string BoxBottomLeft = "\u2570\u2500";
 
-    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git}{network}{status}";
+    private const string DefaultLine1Format = "{box_top} {os_badge}{powerline}{user_host}{powerline}{dir_badge}{git}{battery}{network}{status}";
     private const string DefaultLine2Format = "{box_bottom} {chevron} ";
 
     public Prompt(ShellEnvironment env)
@@ -166,6 +166,7 @@ public class Prompt
             "user_host" => BuildUserHostSegment(),
             "dir_badge" or "dir" => BuildDirSegment(workingDirectory),
             "git" => BuildGitSegment(),
+            "battery" or "power" => BuildBatterySegment(),
             "network" => BuildNetworkSegment(),
             "status" => BuildStatusIndicator(lastExitCode),
             "chevron" => BuildChevron(lastExitCode),
@@ -340,6 +341,45 @@ public class Prompt
         return sb.ToString();
     }
 
+    private string BuildBatterySegment()
+    {
+        Utils.BatteryInfo.Refresh();
+        if (!Utils.BatteryInfo.HasBattery)
+        {
+            return "";
+        }
+
+        var sb = new StringBuilder();
+        string battBg = Utils.Ansi.BgRgb(45, 45, 55);
+        string battFg;
+
+        if (Utils.BatteryInfo.IsCharging || Utils.BatteryInfo.Percent > 60)
+            battFg = Utils.Ansi.FgRgb(150, 255, 150);
+        else if (Utils.BatteryInfo.Percent > 20)
+            battFg = Utils.Ansi.FgRgb(255, 255, 100);
+        else
+            battFg = Utils.Ansi.FgRgb(255, 100, 100);
+
+        string prevFg = _gitInfo.IsGitRepo ? Utils.Ansi.FgRgb(30, 30, 45) : Utils.Ansi.FgRgb(40, 40, 55);
+
+        sb.Append(prevFg);
+        sb.Append(battBg);
+        sb.Append(_segmentEdge);
+
+        sb.Append(battBg);
+        sb.Append(battFg);
+        sb.Append(" ");
+        
+        string icon = Utils.BatteryInfo.IsCharging ? "\u26A1" : "\uD83D\uDD0B";
+        sb.Append(icon);
+        sb.Append(" ");
+        sb.Append(Utils.BatteryInfo.Percent);
+        sb.Append("% ");
+        sb.Append(Utils.Ansi.Reset);
+
+        return sb.ToString();
+    }
+
     private string BuildNetworkSegment()
     {
         Utils.NetworkInfo.Refresh();
@@ -348,7 +388,10 @@ public class Prompt
         string netBg = Utils.Ansi.BgRgb(20, 60, 40); // Dark green background to match aesthetic
         string netFg = Utils.NetworkInfo.IsConnected ? Utils.Ansi.FgRgb(150, 255, 150) : Utils.Ansi.FgRgb(255, 100, 100);
 
-        string prevFg = _gitInfo.IsGitRepo ? Utils.Ansi.FgRgb(30, 30, 45) : Utils.Ansi.FgRgb(40, 40, 55);
+        string prevFg;
+        if (Utils.BatteryInfo.HasBattery) prevFg = Utils.Ansi.FgRgb(45, 45, 55);
+        else if (_gitInfo.IsGitRepo) prevFg = Utils.Ansi.FgRgb(30, 30, 45);
+        else prevFg = Utils.Ansi.FgRgb(40, 40, 55);
 
         sb.Append(prevFg);
         sb.Append(netBg);

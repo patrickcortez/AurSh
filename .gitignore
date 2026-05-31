@@ -9,3 +9,6 @@ src/aursh-update/obj/*
 src/aursh-update/bin/*
 concepts.txt
 .kiro
+src/Contexts/obj/*
+src/Contexts/bin/*
+*.aur

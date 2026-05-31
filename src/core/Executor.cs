@@ -96,19 +96,30 @@ public class Executor
         {
             if (tokens[i].Type == TokenType.Word && !tokens[i].WasSingleQuoted)
             {
-                string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
-                if (ContextReader.isContext(resolved))
+                try
                 {
-                    int colonIdx = resolved.IndexOf(':');
-                    if (colonIdx > 0)
+                    string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
+                    string resolvedRaw = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].RawExpandedValue);
+                    
+                    if (ContextReader.isContext(resolved))
                     {
-                        string contextName = resolved.Substring(0, colonIdx);
-                        string attributeName = resolved.Substring(colonIdx + 1);
-                        ContextReader contextReader = new ContextReader();
-                        resolved = contextReader.GetAttributeValue(contextName, attributeName);
+                        int colonIdx = resolved.IndexOf(':');
+                        if (colonIdx > 0)
+                        {
+                            string contextName = resolved.Substring(0, colonIdx);
+                            string attributeName = resolved.Substring(colonIdx + 1);
+                            ContextReader contextReader = new ContextReader();
+                            resolved = contextReader.GetAttributeValue(contextName, attributeName);
+                            resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
+                        }
                     }
+                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                 }
-                tokens[i] = new Token(TokenType.Word, resolved, tokens[i].WasQuoted, tokens[i].WasSingleQuoted);
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: subcommand resolution error: {ex.Message}");
+                    return 1;
+                }
             }
         }
 

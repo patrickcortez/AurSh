@@ -950,9 +950,6 @@ public class InputHandler
 
     private (int Row, int Col) ComputeCursorPositionForText(int width, string textBeforeCursor)
     {
-        // Honestly, math is the bane of my existence, but if we don't calculate these wrap rows 
-        // perfectly, everything goes boom and tears the terminal apart! 
-        // Fingers crossed this keeps the cursor from jumping into the void!
         if (width <= 0)
         {
             return (0, 0);

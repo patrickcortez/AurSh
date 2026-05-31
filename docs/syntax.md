@@ -45,9 +45,13 @@ aursh-assoc .aur aursh
 You can chain multiple commands together using standard operators.
 
 **Example Usage**
-*   **Pipes (`|`)**: Passes the output of one command as input to the next.
+*   **Pipes (`|`)**: Passes the output of one command as input to the next. For Windows users running PowerShell commands, object pipelines are perfectly preserved natively without the need to double-escape strings!
     ```bash
+    # Standard byte-stream piping
     cat file.txt | grep "search"
+    
+    # Native PowerShell object piping (Double wrap your strings)
+    Get-ChildItem | Where-Object {$_.Extension -eq "'.txt'"}
     ```
 *   **Logical AND (`&&`)**: Executes the second command only if the first succeeds.
     ```bash

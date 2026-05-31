@@ -23,6 +23,7 @@ public sealed class BlackBoxLiveRenderer
     private readonly BlackBoxRenderer _renderer;
     private readonly object _lock = new();
     private int _emittedBodyRows;
+    private int _lastEmittedPhysicalRows;
     private bool _footerEmitted;
     private int _lastTransientRows;
     private int _lastCursorRowOffset;
@@ -279,7 +280,7 @@ public sealed class BlackBoxLiveRenderer
         if (dirtyLast && _emittedBodyRows > 0 && _emittedBodyRows >= bufCount)
         {
             _emittedBodyRows--;
-            extraUp = 1;
+            extraUp = _lastEmittedPhysicalRows > 0 ? _lastEmittedPhysicalRows : 1;
             session.Buffer.LastLineDirty = false;
         }
         else if (dirtyLast)
@@ -314,8 +315,16 @@ public sealed class BlackBoxLiveRenderer
         for (int i = _emittedBodyRows; i < bufCount; i++)
         {
             BufferLine line = session.Buffer[i];
-            sb.Append(_renderer.RenderBodyRowToString(line));
-            sb.Append('\n');
+            List<string> physicalRows = _renderer.RenderBodyRows(line);
+            foreach (string r in physicalRows)
+            {
+                sb.Append(r);
+                sb.Append('\n');
+            }
+            if (i == bufCount - 1)
+            {
+                _lastEmittedPhysicalRows = physicalRows.Count;
+            }
         }
         _emittedBodyRows = bufCount;
 
@@ -334,16 +343,19 @@ public sealed class BlackBoxLiveRenderer
             // Calculate physical cursor position based on visible length of the partial line
             int cursorPhysicalIndex = Ansi.VisibleLength(partialText) + inputCursor;
 
-            var chunks = SplitIntoChunks(fullText, contentWidth);
+            var chunks = Ansi.SplitVisible(fullText, contentWidth);
             if (chunks.Count == 0) chunks.Add("");
 
             for (int i = 0; i < chunks.Count; i++)
             {
                 var kind = partialLine?.Kind ?? LineKind.Stdout;
-                string renderedRow = _renderer.RenderBodyRowToString(new BufferLine(chunks[i], kind, partialLine?.StageIndex));
-                sb.Append(renderedRow);
-                sb.Append('\n');
-                transientRows++;
+                var renderedRows = _renderer.RenderBodyRows(new BufferLine(chunks[i], kind, partialLine?.StageIndex));
+                foreach (string renderedRow in renderedRows)
+                {
+                    sb.Append(renderedRow);
+                    sb.Append('\n');
+                    transientRows++;
+                }
             }
 
             int cursorChunk = cursorPhysicalIndex / contentWidth;
@@ -383,23 +395,14 @@ public sealed class BlackBoxLiveRenderer
         }
     }
 
-    private List<string> SplitIntoChunks(string text, int chunkLength)
-    {
-        var list = new List<string>();
-        if (string.IsNullOrEmpty(text)) return list;
-        for (int i = 0; i < text.Length; i += chunkLength)
-        {
-            int len = System.Math.Min(chunkLength, text.Length - i);
-            list.Add(text.Substring(i, len));
-        }
-        return list;
-    }
+
 
     private void ResetState()
     {
         _completed = false;
         _started = false;
         _emittedBodyRows = 0;
+        _lastEmittedPhysicalRows = 0;
         _footerEmitted = false;
         _lastTransientRows = 0;
         _lastCursorRowOffset = 0;

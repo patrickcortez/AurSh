@@ -234,6 +234,90 @@ public static class Ansi
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Splits a string into multiple chunks of at most <paramref name="maxVisible"/>
+    /// visible columns, preserving and carrying over any active ANSI escape sequences
+    /// so that colours bleed over to the next chunk correctly when a line wraps.
+    /// Oh man, keeping track of ANSI state is like wrestling a hyperactive octopus, 
+    /// but I hope this holds it together for the reader!
+    /// </summary>
+    public static List<string> SplitVisible(string text, int maxVisible)
+    {
+        var list = new List<string>();
+        
+        if (string.IsNullOrEmpty(text) || maxVisible <= 0)
+        {
+            if (maxVisible > 0)
+            {
+                list.Add(text ?? "");
+            }
+            return list;
+        }
+
+        var sb = new StringBuilder(maxVisible + 32);
+        int taken = 0;
+        string activeFormatting = "";
+        
+        try
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+
+                if (c == '\x1b')
+                {
+                    var m = AnsiPattern.Match(text, i);
+                    if (m.Success && m.Index == i)
+                    {
+                        string seq = text.Substring(m.Index, m.Length);
+                        sb.Append(seq);
+                        
+                        // Just accumulate formatting. If it's a reset, wipe the slate clean.
+                        if (seq == Reset)
+                        {
+                            activeFormatting = "";
+                        }
+                        else
+                        {
+                            activeFormatting += seq;
+                        }
+                            
+                        i = m.Index + m.Length - 1;
+                        continue;
+                    }
+                }
+
+                sb.Append(c);
+                taken++;
+
+                if (taken >= maxVisible)
+                {
+                    // Defensive reset for this chunk so we don't bleed into the box borders
+                    sb.Append(Reset);
+                    list.Add(sb.ToString());
+                    
+                    sb.Clear();
+                    // Carry over the formatting to the next chunk!
+                    sb.Append(activeFormatting);
+                    taken = 0;
+                }
+            }
+
+            if (taken > 0 || sb.Length > activeFormatting.Length)
+            {
+                sb.Append(Reset);
+                list.Add(sb.ToString());
+            }
+        }
+        catch 
+        { 
+            // Better safe than sorry, just dump whatever we have if it panics
+            if (sb.Length > 0) list.Add(sb.ToString());
+        }
+
+        return list;
+    }
+
     public static string Colorize(string text, string fg) => $"{fg}{text}{Reset}";
 
     public static string Colorize(string text, string fg, string bg) => $"{fg}{bg}{text}{Reset}";

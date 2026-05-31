@@ -70,16 +70,7 @@ public sealed class BlackBoxRenderer
         writer.Flush();
     }
 
-    /// <summary>
-    /// Return a single rendered body row as a string (without trailing \n).
-    /// Used by the streaming-append live renderer to emit rows one at a time
-    /// instead of re-painting the entire box on every update.
-    ///
-    /// In Full tier this draws '│ content │'. In Compact tier the side
-    /// borders are dropped (body text fills the entire width). In Bar tier
-    /// the line is rendered raw with no decoration.
-    /// </summary>
-    public string RenderBodyRowToString(BufferLine line)
+    public List<string> RenderBodyRows(BufferLine line)
     {
         var glyphs = BoxChars.From(_config.Border);
         var tier = ResolveTier();
@@ -87,65 +78,78 @@ public sealed class BlackBoxRenderer
 
         if (tier == LayoutTier.Bar)
         {
-            // No decoration. Just truncate to width.
-            return FormatBodyLine(line, System.Math.Max(1, outerWidth));
+            // No decoration. Just wrap to width.
+            return FormatBodyLines(line, System.Math.Max(1, outerWidth));
         }
 
         if (tier == LayoutTier.Compact)
         {
             int contentWidth = System.Math.Max(1, outerWidth);
-            string c = FormatBodyLine(line, contentWidth);
+            List<string> compactLines = FormatBodyLines(line, contentWidth);
+            var results = new List<string>(compactLines.Count);
             
-            var sbCompact = new StringBuilder();
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sbCompact.Append(_config.BackgroundColor);
+            foreach (string c in compactLines)
+            {
+                var sbCompact = new StringBuilder();
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sbCompact.Append(_config.BackgroundColor);
+                    
+                sbCompact.Append(c);
                 
-            sbCompact.Append(c);
-            
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sbCompact.Append(_config.BackgroundColor);
-                
-            int vis = Ansi.VisibleLength(c);
-            int padC = System.Math.Max(0, contentWidth - vis);
-            if (padC > 0)
-                sbCompact.Append(' ', padC);
-                
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sbCompact.Append(Ansi.Reset);
-                
-            return sbCompact.ToString();
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sbCompact.Append(_config.BackgroundColor);
+                    
+                int vis = Ansi.VisibleLength(c);
+                int padC = System.Math.Max(0, contentWidth - vis);
+                if (padC > 0)
+                    sbCompact.Append(' ', padC);
+                    
+                if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                    sbCompact.Append(Ansi.Reset);
+                    
+                results.Add(sbCompact.ToString());
+            }
+            return results;
         }
 
         int innerWidth = System.Math.Max(4, outerWidth - 2);
-        var sb = new StringBuilder();
-        sb.Append(_config.BorderColor);
-        sb.Append(glyphs.Vertical);
-        sb.Append(Ansi.Reset);
-
-        if (!string.IsNullOrEmpty(_config.BackgroundColor))
-            sb.Append(_config.BackgroundColor);
-
-        sb.Append(' ');
-
-        string content = FormatBodyLine(line, innerWidth - 2);
-        sb.Append(content);
-
-        if (!string.IsNullOrEmpty(_config.BackgroundColor))
-            sb.Append(_config.BackgroundColor);
-
-        int visible = Ansi.VisibleLength(content);
-        int pad = System.Math.Max(0, innerWidth - 2 - visible);
-        if (pad > 0)
-            sb.Append(' ', pad);
-
-        sb.Append(' ');
-
-        if (!string.IsNullOrEmpty(_config.BackgroundColor))
+        List<string> lines = FormatBodyLines(line, innerWidth - 2);
+        var res = new List<string>(lines.Count);
+        
+        foreach (string content in lines)
+        {
+            var sb = new StringBuilder();
+            sb.Append(_config.BorderColor);
+            sb.Append(glyphs.Vertical);
             sb.Append(Ansi.Reset);
-        sb.Append(_config.BorderColor);
-        sb.Append(glyphs.Vertical);
-        sb.Append(Ansi.Reset);
-        return sb.ToString();
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(_config.BackgroundColor);
+
+            sb.Append(' ');
+
+            sb.Append(content);
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(_config.BackgroundColor);
+
+            int visible = Ansi.VisibleLength(content);
+            int pad = System.Math.Max(0, innerWidth - 2 - visible);
+            if (pad > 0)
+                sb.Append(' ', pad);
+
+            sb.Append(' ');
+
+            if (!string.IsNullOrEmpty(_config.BackgroundColor))
+                sb.Append(Ansi.Reset);
+            sb.Append(_config.BorderColor);
+            sb.Append(glyphs.Vertical);
+            sb.Append(Ansi.Reset);
+            
+            res.Add(sb.ToString());
+        }
+        
+        return res;
     }
 
     /// <summary>
@@ -283,73 +287,14 @@ public sealed class BlackBoxRenderer
         int rendered = 0;
         foreach (var line in buffer.Window(top, rows))
         {
-            if (tier == LayoutTier.Bar)
+            foreach (string renderedRow in RenderBodyRows(line))
             {
-                // Raw content, no decoration.
-                sb.Append(FormatBodyLine(line, System.Math.Max(1, innerWidth)));
+                sb.Append(renderedRow);
                 sb.Append('\n');
                 rendered++;
-                continue;
+                if (rendered >= rows) break;
             }
-
-            if (tier == LayoutTier.Compact)
-            {
-                // No side borders, but pad the row to a stable width so the
-                // streaming-append renderer's redraw clears the full row.
-                int contentWidth = System.Math.Max(1, innerWidth);
-                string c = FormatBodyLine(line, contentWidth);
-                
-                if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                    sb.Append(_config.BackgroundColor);
-                    
-                sb.Append(c);
-                
-                if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                    sb.Append(_config.BackgroundColor);
-                    
-                int vis = Ansi.VisibleLength(c);
-                int padC = System.Math.Max(0, contentWidth - vis);
-                if (padC > 0) sb.Append(' ', padC);
-                
-                if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                    sb.Append(Ansi.Reset);
-                    
-                sb.Append('\n');
-                rendered++;
-                continue;
-            }
-
-            sb.Append(_config.BorderColor);
-            sb.Append(g.Vertical);
-            sb.Append(Ansi.Reset);
-
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sb.Append(_config.BackgroundColor);
-
-            sb.Append(' ');
-
-            string content = FormatBodyLine(line, innerWidth - 2);
-            sb.Append(content);
-
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sb.Append(_config.BackgroundColor);
-
-            int visible = Ansi.VisibleLength(content);
-            int pad = System.Math.Max(0, innerWidth - 2 - visible);
-            if (pad > 0)
-                sb.Append(' ', pad);
-
-            sb.Append(' ');
-
-            if (!string.IsNullOrEmpty(_config.BackgroundColor))
-                sb.Append(Ansi.Reset);
-
-            sb.Append(_config.BorderColor);
-            sb.Append(g.Vertical);
-            sb.Append(Ansi.Reset);
-            sb.Append('\n');
-
-            rendered++;
+            if (rendered >= rows) break;
         }
 
         while (rendered < rows)
@@ -387,7 +332,7 @@ public sealed class BlackBoxRenderer
         }
     }
 
-    private string FormatBodyLine(BufferLine line, int maxVisible)
+    private List<string> FormatBodyLines(BufferLine line, int maxVisible)
     {
         string prefix = "";
         string color = "";
@@ -419,28 +364,35 @@ public sealed class BlackBoxRenderer
 
         string body = line.Text ?? "";
 
-
         int lastCr = body.LastIndexOf('\r');
         if (lastCr >= 0)
             body = body.Substring(lastCr + 1);
 
         string combined = prefix + body;
 
-
         int effectiveStartCol = (ResolveTier() == LayoutTier.Full) ? 2 : 0;
         combined = Ansi.ExpandTabs(combined, tabStop: 8, startCol: effectiveStartCol);
 
-        if (Ansi.VisibleLength(combined) > maxVisible)
-            combined = Ansi.TruncateVisible(combined, maxVisible);
-
-        if (string.IsNullOrEmpty(color))
+        var chunks = Ansi.SplitVisible(combined, maxVisible);
+        if (chunks.Count == 0) chunks.Add("");
+        
+        var results = new List<string>(chunks.Count);
+        foreach (string chunk in chunks)
         {
-            if (combined.Contains('\x1b'))
-                return combined + Ansi.Reset;
-            return combined;
+            if (string.IsNullOrEmpty(color))
+            {
+                if (chunk.Contains('\x1b'))
+                    results.Add(chunk + Ansi.Reset);
+                else
+                    results.Add(chunk);
+            }
+            else
+            {
+                results.Add($"{color}{chunk}{Ansi.Reset}");
+            }
         }
-
-        return $"{color}{combined}{Ansi.Reset}";
+        
+        return results;
     }
 
     private void RenderBottom(StringBuilder sb, BoxGlyphs g, BlackBoxSession session, int outerWidth, int innerWidth, int top, int bodyRows, LayoutTier tier)

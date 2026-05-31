@@ -19,6 +19,8 @@ public class InputHandler
     private int _lastTermWidth;
     private int _lastTermHeight;
     private string _currentPrompt = "";
+    private string _staticPrompt = "";
+    private string _dynamicPrompt = "";
     private int _cursorRowOffset;
     private int _pendingResizeWidth;
     private int _pendingResizeHeight;
@@ -50,20 +52,34 @@ public class InputHandler
         }
 
         _currentPrompt = prompt;
+        int lastNewline = prompt.LastIndexOf('\n');
+        if (lastNewline >= 0)
+        {
+            _staticPrompt = prompt.Substring(0, lastNewline + 1);
+            _dynamicPrompt = prompt.Substring(lastNewline + 1);
+        }
+        else
+        {
+            _staticPrompt = "";
+            _dynamicPrompt = prompt;
+        }
+
         try
         {
-            // Adding OSC 133 tags to let modern terminals know where the prompt and command input are!
-            // This is exactly what zsh and powerlevel10k do under the hood. So professional!
             Console.Write("\x1b]133;A\x07");
-            Console.Write(prompt);
-            Console.Write("\x1b]133;B\x07");
+            if (!string.IsNullOrEmpty(_staticPrompt))
+            {
+                Console.Write(_staticPrompt);
+            }
         }
         catch (Exception)
         {
-            // fallback if writing invisible characters fails somehow.
-            Console.Write(prompt);
+            if (!string.IsNullOrEmpty(_staticPrompt))
+            {
+                Console.Write(_staticPrompt);
+            }
         }
-        _promptVisibleLen = ComputeLastLineVisibleLength(prompt);
+        _promptVisibleLen = Utils.Ansi.VisibleLength(_dynamicPrompt);
         _lastTermWidth = Utils.Platform.TerminalWidth;
         _lastTermHeight = Utils.Platform.TerminalHeight;
 
@@ -791,8 +807,10 @@ public class InputHandler
         }
 
         sb.Append(Utils.Ansi.ClearScreenFromCursor);
+        // _staticPrompt was already printed in ReadLine and left for terminal to native reflow.
+        // We only redraw the _dynamicPrompt (the active line).
         sb.Append("\x1b]133;A\x07");
-        sb.Append(_currentPrompt);
+        sb.Append(_dynamicPrompt);
         sb.Append("\x1b]133;B\x07");
 
         string fullText = _buffer.ToString();
@@ -1005,7 +1023,7 @@ public class InputHandler
 
         try
         {
-            string[] promptLines = _currentPrompt.Split('\n');
+            string[] promptLines = _dynamicPrompt.Split('\n');
             int rows = 0;
 
             for (int i = 0; i < promptLines.Length - 1; i++)
@@ -1054,11 +1072,24 @@ public class InputHandler
 
     private void FullRedraw(bool clearPrevious = false, int cursorRowsFromTop = -1)
     {
-        var prompt = new Prompt(_env);
+        var promptObj = new Prompt(_env);
         string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
         int exitCode = _env.LastExitCode;
-        _currentPrompt = prompt.Render(cwd, exitCode);
-        _promptVisibleLen = prompt.PromptVisibleLength(exitCode);
+        string prompt = promptObj.Render(cwd, exitCode);
+        
+        _currentPrompt = prompt;
+        int lastNewline = prompt.LastIndexOf('\n');
+        if (lastNewline >= 0)
+        {
+            _staticPrompt = prompt.Substring(0, lastNewline + 1);
+            _dynamicPrompt = prompt.Substring(lastNewline + 1);
+        }
+        else
+        {
+            _staticPrompt = "";
+            _dynamicPrompt = prompt;
+        }
+        _promptVisibleLen = Utils.Ansi.VisibleLength(_dynamicPrompt);
 
         if (clearPrevious)
         {
@@ -1069,6 +1100,13 @@ public class InputHandler
                 Console.Write("\r" + Utils.Ansi.ClearScreenFromCursor);
             
             _cursorRowOffset = 0;
+            
+            // Re-print static prompt since we cleared the whole screen
+            if (!string.IsNullOrEmpty(_staticPrompt))
+            {
+                Console.Write("\x1b]133;A\x07");
+                Console.Write(_staticPrompt);
+            }
         }
 
         RedrawLine();

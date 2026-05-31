@@ -1,4 +1,0 @@
-C:\Users\Cortez\Documents\Projects\AurSh\publish\win-x64\aursh.runtimeconfig.json
-C:\Users\Cortez\Documents\Projects\AurSh\publish\win-x64\aursh-context.exe
-C:\Users\Cortez\Documents\Projects\AurSh\publish\win-x64\aursh-context.pdb
-C:\Users\Cortez\Documents\Projects\AurSh\publish\win-x64\aursh.pdb

@@ -449,17 +449,11 @@ public sealed class BlackBoxLiveRenderer
 
             try
             {
-                // We want to re-render the body at the new width.
-                // However, we can only safely overwrite rows that are currently visible on the screen.
-                // Moving the cursor up into the scrollback just clamps to the top and corrupts the display.
-                int maxVisibleBody = System.Math.Max(0, TerminalSize.Height - 3);
-                int visibleBodyRows = System.Math.Min(_emittedBodyRows, maxVisibleBody);
-
-                // Temporarily inflate _lastTransientRows so EmitPending's move-up logic
-                // covers the visible body rows we want to redraw.
-                _lastTransientRows += visibleBodyRows;
-                _emittedBodyRows -= visibleBodyRows;
-
+                // We STRICTLY only want to redraw the footer on a resize.
+                // Erasing and redrawing the body mathematically is fundamentally flawed 
+                // because the terminal natively wraps the rows unpredictably.
+                // We leave the old body rows alone to natively reflow.
+                
                 EmitPending(session, writer);
                 _lastRenderedWidth = newWidth;
                 _lastRenderedTier = newTier;

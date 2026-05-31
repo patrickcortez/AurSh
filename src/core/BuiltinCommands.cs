@@ -208,6 +208,7 @@ public static class BuiltinCommands
         int scrollRow = 0;
         int scrollCol = 0;
 
+        bool insertMode = false;
         bool commandMode = false;
         string commandInput = "";
         string statusMessage = "";
@@ -303,7 +304,8 @@ public static class BuiltinCommands
                 }
                 else
                 {
-                    string info = $"Ln {cursorRow + 1}, Col {cursorCol + 1} | Press ':' for commands";
+                    string modeStr = insertMode ? "-- INSERT --" : "-- NORMAL --";
+                    string info = $"{modeStr} | Ln {cursorRow + 1}, Col {cursorCol + 1} | Press ':' for commands";
                     Console.Write(Utils.Ansi.FgRgb(150, 150, 150) + $"  {info}" + Utils.Ansi.Reset);
                 }
 
@@ -452,11 +454,31 @@ public static class BuiltinCommands
                     continue;
                 }
 
-                if (key.KeyChar == ':')
+                if (insertMode && key.Key == ConsoleKey.Escape)
                 {
-                    commandMode = true;
-                    commandInput = "";
+                    insertMode = false;
                     continue;
+                }
+
+                if (!insertMode)
+                {
+                    if (key.KeyChar == ':')
+                    {
+                        commandMode = true;
+                        commandInput = "";
+                        continue;
+                    }
+                    else if (key.KeyChar == 'i' || key.KeyChar == 'I')
+                    {
+                        insertMode = true;
+                        continue;
+                    }
+                    else if (key.KeyChar == 'a' || key.KeyChar == 'A')
+                    {
+                        insertMode = true;
+                        if (cursorCol < buffer[cursorRow].Length) cursorCol++;
+                        continue;
+                    }
                 }
 
                 if (key.Key == ConsoleKey.LeftArrow)
@@ -493,55 +515,68 @@ public static class BuiltinCommands
                 {
                     cursorRow += textHeight;
                 }
-                else if (key.Key == ConsoleKey.Backspace)
+                else if (insertMode)
                 {
-                    if (cursorCol > 0)
+                    if (key.Key == ConsoleKey.Backspace)
                     {
-                        buffer[cursorRow].Remove(cursorCol - 1, 1);
-                        cursorCol--;
+                        if (cursorCol > 0)
+                        {
+                            buffer[cursorRow].Remove(cursorCol - 1, 1);
+                            cursorCol--;
+                        }
+                        else if (cursorRow > 0)
+                        {
+                            string remainder = buffer[cursorRow].ToString();
+                            buffer.RemoveAt(cursorRow);
+                            cursorRow--;
+                            cursorCol = buffer[cursorRow].Length;
+                            buffer[cursorRow].Append(remainder);
+                        }
                     }
-                    else if (cursorRow > 0)
+                    else if (key.Key == ConsoleKey.Delete)
                     {
-                        string remainder = buffer[cursorRow].ToString();
-                        buffer.RemoveAt(cursorRow);
-                        cursorRow--;
-                        cursorCol = buffer[cursorRow].Length;
-                        buffer[cursorRow].Append(remainder);
+                        if (cursorCol < buffer[cursorRow].Length)
+                        {
+                            buffer[cursorRow].Remove(cursorCol, 1);
+                        }
+                        else if (cursorRow < buffer.Count - 1)
+                        {
+                            string remainder = buffer[cursorRow + 1].ToString();
+                            buffer.RemoveAt(cursorRow + 1);
+                            buffer[cursorRow].Append(remainder);
+                        }
+                    }
+                    else if (key.Key == ConsoleKey.Enter)
+                    {
+                        string remainder = buffer[cursorRow].ToString().Substring(cursorCol);
+                        buffer[cursorRow].Length = cursorCol;
+                        buffer.Insert(cursorRow + 1, new StringBuilder(remainder));
+                        cursorRow++;
+                        cursorCol = 0;
+                    }
+                    else if (!char.IsControl(key.KeyChar) || key.KeyChar == '\t')
+                    {
+                        char c = key.KeyChar;
+                        if (c == '\t')
+                        {
+                            buffer[cursorRow].Insert(cursorCol, "    ");
+                            cursorCol += 4;
+                        }
+                        else
+                        {
+                            buffer[cursorRow].Insert(cursorCol, c);
+                            cursorCol++;
+                        }
                     }
                 }
-                else if (key.Key == ConsoleKey.Delete)
+                else if (!insertMode)
                 {
-                    if (cursorCol < buffer[cursorRow].Length)
+                    if (key.Key == ConsoleKey.Delete || key.KeyChar == 'x')
                     {
-                        buffer[cursorRow].Remove(cursorCol, 1);
-                    }
-                    else if (cursorRow < buffer.Count - 1)
-                    {
-                        string remainder = buffer[cursorRow + 1].ToString();
-                        buffer.RemoveAt(cursorRow + 1);
-                        buffer[cursorRow].Append(remainder);
-                    }
-                }
-                else if (key.Key == ConsoleKey.Enter)
-                {
-                    string remainder = buffer[cursorRow].ToString().Substring(cursorCol);
-                    buffer[cursorRow].Length = cursorCol;
-                    buffer.Insert(cursorRow + 1, new StringBuilder(remainder));
-                    cursorRow++;
-                    cursorCol = 0;
-                }
-                else if (!char.IsControl(key.KeyChar) || key.KeyChar == '\t')
-                {
-                    char c = key.KeyChar;
-                    if (c == '\t')
-                    {
-                        buffer[cursorRow].Insert(cursorCol, "    ");
-                        cursorCol += 4;
-                    }
-                    else
-                    {
-                        buffer[cursorRow].Insert(cursorCol, c);
-                        cursorCol++;
+                        if (cursorCol < buffer[cursorRow].Length)
+                        {
+                            buffer[cursorRow].Remove(cursorCol, 1);
+                        }
                     }
                 }
             }

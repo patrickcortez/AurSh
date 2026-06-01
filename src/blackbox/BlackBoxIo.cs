@@ -148,6 +148,34 @@ public static class BlackBoxIo
                     {
                         string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
                         rawLine = StripCursorSequences(rawLine);
+
+                        if (kind == LineKind.Stderr && rawLine == "#< CLIXML")
+                        {
+                            lineBuf.SetLength(0);
+                            continue;
+                        }
+
+                        if (kind == LineKind.Stderr && rawLine.StartsWith("<Objs") && rawLine.EndsWith("</Objs>"))
+                        {
+                            var matches = System.Text.RegularExpressions.Regex.Matches(rawLine, @"<S S=""Error"">([^<]*)</S>");
+                            foreach (System.Text.RegularExpressions.Match m in matches)
+                            {
+                                string decoded = System.Text.RegularExpressions.Regex.Replace(m.Groups[1].Value, @"_x([0-9a-fA-F]{4})_", match =>
+                                    ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString());
+
+                                string[] split = decoded.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                                foreach (var s in split)
+                                {
+                                    if (string.IsNullOrEmpty(s)) continue;
+                                    session.Buffer.Append(s, kind, stageIndex);
+                                }
+                            }
+                            session.Buffer.PartialLine = null;
+                            lineBuf.SetLength(0);
+                            owner.LiveRenderer.Update(session, session.TerminalOut);
+                            continue;
+                        }
+
                         string statePrefix = ansiTracker.GetStatePrefix();
                         string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
                         ansiTracker.ProcessLine(rawLine);
@@ -273,6 +301,32 @@ public static class BlackBoxIo
             {
                 string rawLine = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
                 rawLine = StripCursorSequences(rawLine);
+
+                if (kind == LineKind.Stderr && rawLine == "#< CLIXML")
+                {
+                    return;
+                }
+
+                if (kind == LineKind.Stderr && rawLine.StartsWith("<Objs") && rawLine.EndsWith("</Objs>"))
+                {
+                    var matches = System.Text.RegularExpressions.Regex.Matches(rawLine, @"<S S=""Error"">([^<]*)</S>");
+                    foreach (System.Text.RegularExpressions.Match m in matches)
+                    {
+                        string decoded = System.Text.RegularExpressions.Regex.Replace(m.Groups[1].Value, @"_x([0-9a-fA-F]{4})_", match =>
+                            ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString());
+
+                        string[] split = decoded.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                        foreach (var s in split)
+                        {
+                            if (string.IsNullOrEmpty(s)) continue;
+                            session.Buffer.Append(s, kind, stageIndex);
+                        }
+                    }
+                    session.Buffer.PartialLine = null;
+                    owner.LiveRenderer.Update(session, session.TerminalOut);
+                    return;
+                }
+
                 string statePrefix = ansiTracker.GetStatePrefix();
                 string line = statePrefix.Length > 0 ? statePrefix + rawLine : rawLine;
 

@@ -14,6 +14,7 @@ public class GitInfo
     private int _cachedModified;
     private int _cachedUntracked;
     private bool _cachedIsRepo;
+    private string? _cachedRemoteUrl;
     private DateTime _cachedAt = DateTime.MinValue;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(2);
 
@@ -26,6 +27,7 @@ public class GitInfo
     public int ModifiedCount { get; private set; }
     public int UntrackedCount { get; private set; }
     public bool IsDetached { get; private set; }
+    public string? RemoteUrl { get; private set; }
 
     public void Refresh(string workingDirectory)
     {
@@ -39,6 +41,7 @@ public class GitInfo
             StagedCount = _cachedStaged;
             ModifiedCount = _cachedModified;
             UntrackedCount = _cachedUntracked;
+            RemoteUrl = _cachedRemoteUrl;
             return;
         }
 
@@ -59,6 +62,7 @@ public class GitInfo
         ReadBranch(workingDirectory);
         ReadStatus(workingDirectory);
         ReadAheadBehind(workingDirectory);
+        ReadRemoteUrl(workingDirectory);
 
         CacheState();
     }
@@ -106,6 +110,7 @@ public class GitInfo
         ModifiedCount = 0;
         UntrackedCount = 0;
         IsDetached = false;
+        RemoteUrl = null;
     }
 
     private void CacheState()
@@ -118,6 +123,7 @@ public class GitInfo
         _cachedStaged = StagedCount;
         _cachedModified = ModifiedCount;
         _cachedUntracked = UntrackedCount;
+        _cachedRemoteUrl = RemoteUrl;
     }
 
     private void ReadBranch(string workingDirectory)
@@ -195,6 +201,19 @@ public class GitInfo
             int.TryParse(parts[1], out int behind);
             Ahead = ahead;
             Behind = behind;
+        }
+    }
+
+    private void ReadRemoteUrl(string workingDirectory)
+    {
+        string? url = RunGit("config --get remote.origin.url", workingDirectory);
+        if (url != null && url.Trim().Length > 0)
+        {
+            RemoteUrl = url.Trim();
+        }
+        else
+        {
+            RemoteUrl = null;
         }
     }
 

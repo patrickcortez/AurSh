@@ -335,6 +335,13 @@ public class Prompt
         sb.Append(gitBg);
         sb.Append(gitFg);
         sb.Append(' ');
+        
+        if (!string.IsNullOrEmpty(_gitInfo.RemoteUrl))
+        {
+            sb.Append(Utils.Ansi.Hyperlink(_gitInfo.RemoteUrl, "\uEA84"));
+            sb.Append(' ');
+        }
+
         sb.Append(_gitInfo.FormatStatus());
         sb.Append(' ');
         sb.Append(Utils.Ansi.Reset);

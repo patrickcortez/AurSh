@@ -157,10 +157,13 @@ public static class Platform
             if (shellName.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase))
             {
                 psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-OutputFormat");
+                psi.ArgumentList.Add("Text");
                 psi.ArgumentList.Add("-ExecutionPolicy");
                 psi.ArgumentList.Add("Bypass");
                 psi.ArgumentList.Add("-EncodedCommand");
-                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(command)));
+                string modifiedCommand = "$ProgressPreference = 'SilentlyContinue'; " + command;
+                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(modifiedCommand)));
                 return;
             }
 
@@ -168,8 +171,11 @@ public static class Platform
                 shellName.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
             {
                 psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-OutputFormat");
+                psi.ArgumentList.Add("Text");
                 psi.ArgumentList.Add("-EncodedCommand");
-                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(command)));
+                string modifiedCommand = "$ProgressPreference = 'SilentlyContinue'; " + command;
+                psi.ArgumentList.Add(Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(modifiedCommand)));
                 return;
             }
         }

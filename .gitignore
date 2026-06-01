@@ -12,3 +12,4 @@ concepts.txt
 src/Contexts/obj/*
 src/Contexts/bin/*
 *.aur
+CSharpTest

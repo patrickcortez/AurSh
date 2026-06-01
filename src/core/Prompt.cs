@@ -399,7 +399,7 @@ public class Prompt
 
         var sb = new StringBuilder();
         string netBg = Utils.Ansi.BgRgb(20, 60, 40); // Dark green background to match aesthetic
-        string netFg = Utils.NetworkInfo.IsConnected ? Utils.Ansi.FgRgb(150, 255, 150) : Utils.Ansi.FgRgb(255, 100, 100);
+        string netFg = (Utils.NetworkInfo.IsConnected && Utils.NetworkInfo.HasInternet) ? Utils.Ansi.FgRgb(150, 255, 150) : Utils.Ansi.FgRgb(255, 100, 100);
 
         string prevFg;
         if (Utils.BatteryInfo.HasBattery) prevFg = Utils.Ansi.FgRgb(45, 45, 55);
@@ -416,7 +416,12 @@ public class Prompt
 
         if (Utils.NetworkInfo.IsConnected)
         {
-            if (Utils.NetworkInfo.IsWired)
+            if (!Utils.NetworkInfo.HasInternet)
+            {
+                // Connected locally, but no internet
+                sb.Append("\udb82\udcfc ");
+            }
+            else if (Utils.NetworkInfo.IsWired)
             {
                 sb.Append("\uF6FF ");
             }

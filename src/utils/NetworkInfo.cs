@@ -8,6 +8,7 @@ namespace AurShell.Utils;
 public static class NetworkInfo
 {
     public static bool IsConnected { get; private set; } = false;
+    public static bool HasInternet { get; private set; } = false;
     public static string Ssid { get; private set; } = string.Empty;
     public static int SignalStrength { get; private set; } = 0;
     public static int Bars { get; private set; } = 0;
@@ -16,6 +17,7 @@ public static class NetworkInfo
 
     private static DateTime _lastUpdate = DateTime.MinValue;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(2);
+    private static System.Threading.Tasks.Task<bool>? _internetCheckTask;
 
     public static void Refresh()
     {
@@ -88,16 +90,31 @@ public static class NetworkInfo
             IsConnected = false;
         }
 
-        // Final TCP fallback if nothing is found
-        if (!IsConnected)
+        // Non-blocking internet check
+        try
         {
-            if (TryTcpFallback())
+            if (_internetCheckTask == null || _internetCheckTask.IsCompleted)
             {
-                IsConnected = true;
-                IsWired = true;
-                SignalStrength = 100;
-                Ssid = "Connected";
+                if (_internetCheckTask != null)
+                {
+                    HasInternet = _internetCheckTask.Result;
+                }
+                
+                _internetCheckTask = System.Threading.Tasks.Task.Run(() => TryTcpFallback());
             }
+        }
+        catch
+        {
+            HasInternet = false;
+        }
+
+        // Final TCP fallback if nothing is found locally but internet is up
+        if (!IsConnected && HasInternet)
+        {
+            IsConnected = true;
+            IsWired = true;
+            SignalStrength = 100;
+            Ssid = "Connected";
         }
 
         if (IsConnected)

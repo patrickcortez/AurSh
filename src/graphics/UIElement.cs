@@ -9,4 +9,9 @@ public abstract class UIElement
     public int ZIndex { get; set; }
 
     public abstract void Render(GraphicsContext g);
+
+    public virtual void OnMouseMove(MouseEventArgs e) {}
+    public virtual void OnMouseDown(MouseEventArgs e) {}
+    public virtual void OnMouseUp(MouseEventArgs e) {}
+    public virtual void OnMouseWheel(MouseEventArgs e) {}
 }

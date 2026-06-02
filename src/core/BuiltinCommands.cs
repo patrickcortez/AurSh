@@ -103,10 +103,40 @@ public static class BuiltinCommands
             return 1;
         }
 
+        string ext = System.IO.Path.GetExtension(targetFile).ToLowerInvariant();
+        if (ext == ".md")
+        {
+            try
+            {
+                int windowWidth = 800;
+                int windowHeight = 600;
+
+                AurShell.Graphics.Compositor compositor = new AurShell.Graphics.Compositor(windowWidth, windowHeight);
+                compositor.BackgroundColor = new AurShell.Graphics.Color32(255, 30, 30, 30);
+
+                var scrollView = new AurShell.Graphics.UI.ScrollViewerElement { X = 0, Y = 0, Width = windowWidth, Height = windowHeight, ZIndex = 0 };
+                var mdElem = new AurShell.Graphics.UI.MarkdownElement { X = 0, Y = 0, Width = windowWidth - 15, ZIndex = 0 };
+                mdElem.MarkdownText = System.IO.File.ReadAllText(targetFile);
+                scrollView.Content.Children.Add(mdElem);
+                compositor.AddElement(scrollView);
+
+                using (var host = new AurShell.Graphics.SdlWindowHost(windowWidth, windowHeight, $"Markdown Viewer - {System.IO.Path.GetFileName(targetFile)}"))
+                {
+                    host.Show(compositor);
+                }
+
+                return 0;
+            }
+            catch (System.Exception ex)
+            {
+                Console.Error.WriteLine($"aursh: aursh-view: Error rendering markdown viewer - {ex.Message}");
+                return 1;
+            }
+        }
+
         AurShell.Graphics.VirtualScreen imageBuffer;
         try
         {
-            string ext = System.IO.Path.GetExtension(targetFile).ToLowerInvariant();
             imageBuffer = ext switch
             {
                 ".bmp" => AurShell.Graphics.BmpDecoder.Decode(targetFile),

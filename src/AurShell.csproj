@@ -52,6 +52,7 @@
     <EmbeddedResource Remove="Contexts/**/*" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Markdig" Version="0.37.0" />
     <PackageReference Include="Silk.NET.SDL" Version="2.23.0" />
     <PackageReference Include="StbImageSharp" Version="2.30.15" />
     <PackageReference Include="Svg.Skia" Version="5.0.0" />

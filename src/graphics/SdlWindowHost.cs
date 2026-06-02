@@ -116,6 +116,7 @@ public unsafe class SdlWindowHost : IDisposable
         bool running = true;
         Event e = new Event();
 
+        int mouseX = 0, mouseY = 0;
         while (running)
         {
             while (_sdl.PollEvent(ref e) != 0)
@@ -131,6 +132,24 @@ public unsafe class SdlWindowHost : IDisposable
                     {
                         running = false;
                     }
+                }
+                else if (e.Type == (uint)EventType.Mousemotion)
+                {
+                    mouseX = e.Motion.X;
+                    mouseY = e.Motion.Y;
+                    compositor.HandleMouseEvent(new MouseEventArgs { X = mouseX, Y = mouseY }, "MouseMove");
+                }
+                else if (e.Type == (uint)EventType.Mousebuttondown)
+                {
+                    compositor.HandleMouseEvent(new MouseEventArgs { X = e.Button.X, Y = e.Button.Y, Button = e.Button.Button }, "MouseDown");
+                }
+                else if (e.Type == (uint)EventType.Mousebuttonup)
+                {
+                    compositor.HandleMouseEvent(new MouseEventArgs { X = e.Button.X, Y = e.Button.Y, Button = e.Button.Button }, "MouseUp");
+                }
+                else if (e.Type == (uint)EventType.Mousewheel)
+                {
+                    compositor.HandleMouseEvent(new MouseEventArgs { X = mouseX, Y = mouseY, DeltaY = e.Wheel.Y }, "Wheel");
                 }
             }
 

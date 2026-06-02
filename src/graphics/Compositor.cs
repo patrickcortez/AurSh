@@ -44,4 +44,28 @@ public class Compositor
     {
         return _screen;
     }
+
+    public void HandleMouseEvent(MouseEventArgs e, string eventType)
+    {
+        // Route from front to back
+        var sortedElements = _elements.OrderByDescending(el => el.ZIndex).ToList();
+        foreach (var element in sortedElements)
+        {
+            if (e.Handled) break;
+
+            bool hit = e.X >= element.X && e.X < element.X + element.Width &&
+                       e.Y >= element.Y && e.Y < element.Y + element.Height;
+
+            // Send events to element. Hover/Motion sometimes doesn't require a hit if they capture, but keep it simple.
+            // Wheel events might not require strict hit if focus is held, but we'll do hit testing.
+            if (hit || eventType == "Wheel" || eventType == "MouseUp" || eventType == "MouseMove")
+            {
+                // Simple routing: if it's within bounds, give it a chance
+                if (eventType == "MouseMove") element.OnMouseMove(e);
+                else if (eventType == "MouseDown" && hit) element.OnMouseDown(e);
+                else if (eventType == "MouseUp") element.OnMouseUp(e);
+                else if (eventType == "Wheel" && hit) element.OnMouseWheel(e);
+            }
+        }
+    }
 }

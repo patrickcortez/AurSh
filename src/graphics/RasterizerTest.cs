@@ -22,14 +22,45 @@ public class WindowElement : UIElement
 
 public class LabelElement : UIElement
 {
-    public string Text { get; set; }
+    public string Text { get; set; } = "";
     public Color32 TextColor { get; set; } = Color32.White;
+    public bool WordWrap { get; set; } = false;
 
     public override void Render(GraphicsContext g)
     {
         if (!string.IsNullOrEmpty(Text))
         {
-            g.DrawText(Text, X, Y, TextColor);
+            if (WordWrap && Width > 0)
+            {
+                int maxCharsPerLine = Width / 8;
+                if (maxCharsPerLine <= 0) maxCharsPerLine = 1;
+
+                string[] words = Text.Split(' ');
+                string currentLine = "";
+                int currentY = Y;
+
+                foreach (string word in words)
+                {
+                    if ((currentLine + word).Length > maxCharsPerLine)
+                    {
+                        g.DrawText(currentLine, X, currentY, TextColor);
+                        currentY += 10;
+                        currentLine = word + " ";
+                    }
+                    else
+                    {
+                        currentLine += word + " ";
+                    }
+                }
+                if (currentLine.Length > 0)
+                {
+                    g.DrawText(currentLine, X, currentY, TextColor);
+                }
+            }
+            else
+            {
+                g.DrawText(Text, X, Y, TextColor);
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 # AurShell Makefile
 # Cross-platform build, publish, and install automation
-# Works on: Linux, macOS, Windows (native + MSYS2/Git-Bash), Termux
+# Works on: Linux, macOS, Windows, Termux
 
 PROJECT := src/AurShell.csproj
 UPDATE_PROJECT := src/aursh-update/AurShUpdate.csproj
@@ -14,9 +14,7 @@ FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 2.0.0
 ENSURE_DEPS := scripts/linux-termux-macos/ensure-deps.sh
 
-# ──────────────────────────────────────────────
 # OS and Architecture Detection
-# ──────────────────────────────────────────────
 
 UNAME_S := $(shell uname -s 2>nul || echo Windows)
 UNAME_M := $(shell uname -m 2>nul || echo x86_64)
@@ -63,12 +61,7 @@ else
     ARCH := x64
 endif
 
-# ──────────────────────────────────────────────
 # Shell Selection
-# ──────────────────────────────────────────────
-# GNU Make 3.81 on Windows uses cmd.exe by default.
-# We keep cmd.exe as the shell and wrap Windows commands
-# in explicit powershell calls. MSYS/Git-Bash uses bash.
 
 ifneq ($(WIN_ENV),native)
     SHELL := /bin/bash
@@ -77,9 +70,7 @@ endif
 # PowerShell invocation prefix for native Windows
 PS := powershell -NoProfile -NoLogo -Command
 
-# ──────────────────────────────────────────────
 # Runtime Identifier and Platform Paths
-# ──────────────────────────────────────────────
 
 ifeq ($(DETECTED_OS),Windows)
     RID := win-$(ARCH)
@@ -123,9 +114,7 @@ else
     PATHSEP := :
 endif
 
-# ──────────────────────────────────────────────
 # Targets
-# ──────────────────────────────────────────────
 
 .PHONY: all build release publish install install-user uninstall clean run info help setfont deps
 
@@ -194,9 +183,7 @@ else
 	@echo "User Dir:    $(USER_INSTALL_DIR)"
 endif
 
-# ──────────────────────────────────────────────
 # Build Targets
-# ──────────────────────────────────────────────
 
 build:
 ifeq ($(WIN_ENV),native)
@@ -224,9 +211,7 @@ else
 	@echo "[release] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
 endif
 
-# ──────────────────────────────────────────────
 # Dependency Check
-# ──────────────────────────────────────────────
 
 deps:
 ifeq ($(WIN_ENV),native)
@@ -284,9 +269,7 @@ ifeq ($(DETECTED_OS),Termux)
 endif
 endif
 
-# ──────────────────────────────────────────────
 # Install Targets
-# ──────────────────────────────────────────────
 
 install: publish
 ifeq ($(WIN_ENV),native)
@@ -414,9 +397,7 @@ else
 	@echo "[uninstall] Done."
 endif
 
-# ──────────────────────────────────────────────
 # Utility Targets
-# ──────────────────────────────────────────────
 
 run: build
 ifeq ($(WIN_ENV),native)
@@ -464,13 +445,7 @@ else
 	@echo "[clean] Done."
 endif
 
-# ──────────────────────────────────────────────
 # Font Installation
-# ──────────────────────────────────────────────
-# Installs JetBrains Mono NL Nerd Font (bundled in Assets/fonts) into the
-# current user's font directory and refreshes the font cache. Tells the user
-# how to apply it to their terminal — we intentionally do NOT mutate global
-# OS settings, that's too invasive.
 
 setfont:
 ifeq ($(WIN_ENV),native)

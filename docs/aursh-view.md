@@ -93,3 +93,17 @@ If you want to draw your own custom graphics directly, you can use the `Graphics
 *   **`FillRectangle(x, y, width, height, color)`**: Draws a solid, filled rectangle.
 *   **`DrawText(string text, x, y, color)`**: Draws text using a built-in blocky font.
 *   **`Blit(VirtualScreen source, destX, destY)`**: Copies pixels from another screen onto this one, supporting transparency!
+
+---
+
+## Troubleshooting & Debugging
+
+If you encounter issues with `aursh-view` failing to display a window or crashing on certain systems (like WSL or headless servers), you can enable detailed renderer diagnostics.
+
+Set the `AURSH_DEBUG_RENDERER` environment variable to `1` before running your command:
+
+```bash
+AURSH_DEBUG_RENDERER=1 aursh-view my_image.png
+```
+
+This will automatically create a dedicated log file at `~/.aursh/logs/aursh-view.log`. You can inspect this log to see exactly which SDL graphics drivers were discovered on your system and which one was ultimately selected by the engine.

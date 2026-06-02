@@ -106,11 +106,18 @@ public static class BuiltinCommands
         AurShell.Graphics.VirtualScreen imageBuffer;
         try
         {
-            imageBuffer = AurShell.Graphics.PngDecoder.Decode(targetFile);
+            string ext = System.IO.Path.GetExtension(targetFile).ToLowerInvariant();
+            imageBuffer = ext switch
+            {
+                ".bmp" => AurShell.Graphics.BmpDecoder.Decode(targetFile),
+                ".jpg" or ".jpeg" => AurShell.Graphics.JpgDecoder.Decode(targetFile),
+                ".svg" => AurShell.Graphics.SvgDecoder.Decode(targetFile),
+                _ => AurShell.Graphics.PngDecoder.Decode(targetFile) // default to png
+            };
         }
         catch (System.Exception ex)
         {
-            Console.Error.WriteLine($"aursh: aursh-view: Error decoding PNG - {ex.Message}");
+            Console.Error.WriteLine($"aursh: aursh-view: Error decoding image '{System.IO.Path.GetFileName(targetFile)}' - {ex.Message}");
             return 1;
         }
 

@@ -295,6 +295,9 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.dll') { Copy-Item -Path '$(PUBLISH_DIR)/*.dll' -Destination '$(INSTALL_DIR)/' -Force }"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.so') { Copy-Item -Path '$(PUBLISH_DIR)/*.so' -Destination '$(INSTALL_DIR)/' -Force }"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.dylib') { Copy-Item -Path '$(PUBLISH_DIR)/*.dylib' -Destination '$(INSTALL_DIR)/' -Force }"
 	@echo [install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE) + $(INSTALL_DIR)/$(CONTEXT_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
@@ -305,6 +308,7 @@ else ifeq ($(DETECTED_OS),Windows)
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
 	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(INSTALL_DIR)/$(CONTEXT_EXE)"
+	-cp "$(PUBLISH_DIR)/"*.dll "$(PUBLISH_DIR)/"*.so "$(PUBLISH_DIR)/"*.dylib "$(INSTALL_DIR)/" 2>/dev/null || true
 	@echo "[install] Installed to $(INSTALL_DIR)/$(EXE) + $(INSTALL_DIR)/$(UPDATE_EXE) + $(INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','Machine'); if ($$p -notlike '*$(INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(INSTALL_DIR)', 'Machine'); Write-Host '  PATH updated (Machine). Restart your terminal.' } else { Write-Host '  $(INSTALL_DIR) is already in PATH.' }"
@@ -319,6 +323,7 @@ endif
 	install -m 755 "$(PUBLISH_DIR)/$(EXE)" "$(INSTALL_DIR)/$(EXE)"
 	install -m 755 "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(INSTALL_DIR)/$(UPDATE_EXE)"
 	install -m 755 "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(INSTALL_DIR)/$(CONTEXT_EXE)"
+	-cp "$(PUBLISH_DIR)/"*.dll "$(PUBLISH_DIR)/"*.so "$(PUBLISH_DIR)/"*.dylib "$(INSTALL_DIR)/" 2>/dev/null || true
 	@if [ -w "$(PREFIX)/etc/shells" ] && ! grep -Fxq "$(INSTALL_DIR)/$(EXE)" "$(PREFIX)/etc/shells"; then \
 		echo "$(INSTALL_DIR)/$(EXE)" >> "$(PREFIX)/etc/shells"; \
 		echo "[install] Added $(INSTALL_DIR)/$(EXE) to $(PREFIX)/etc/shells"; \
@@ -337,6 +342,9 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.dll') { Copy-Item -Path '$(PUBLISH_DIR)/*.dll' -Destination '$(USER_INSTALL_DIR)/' -Force }"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.so') { Copy-Item -Path '$(PUBLISH_DIR)/*.so' -Destination '$(USER_INSTALL_DIR)/' -Force }"
+	@$(PS) "if (Test-Path '$(PUBLISH_DIR)/*.dylib') { Copy-Item -Path '$(PUBLISH_DIR)/*.dylib' -Destination '$(USER_INSTALL_DIR)/' -Force }"
 	@echo [install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE) + $(USER_INSTALL_DIR)/$(CONTEXT_EXE)
 	@cmd /c "echo."
 	@$(PS) "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated. Restart your terminal to use aursh.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
@@ -348,6 +356,7 @@ else ifeq ($(DETECTED_OS),Windows)
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
+	-cp "$(PUBLISH_DIR)/"*.dll "$(PUBLISH_DIR)/"*.so "$(PUBLISH_DIR)/"*.dylib "$(USER_INSTALL_DIR)/" 2>/dev/null || true
 	@echo "[install] Installed to $(USER_INSTALL_DIR)/$(EXE) + $(USER_INSTALL_DIR)/$(UPDATE_EXE) + $(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo ""
 	@powershell.exe -NoProfile -Command "$$p = [System.Environment]::GetEnvironmentVariable('PATH','User'); if ($$p -notlike '*$(USER_INSTALL_DIR)*') { [System.Environment]::SetEnvironmentVariable('PATH', $$p + ';$(USER_INSTALL_DIR)', 'User'); Write-Host '  PATH updated (User). Restart your terminal.' } else { Write-Host '  $(USER_INSTALL_DIR) is already in PATH.' }"
@@ -359,6 +368,7 @@ else
 	cp "$(PUBLISH_DIR)/$(EXE)" "$(USER_INSTALL_DIR)/$(EXE)"
 	cp "$(PUBLISH_DIR)/$(UPDATE_EXE)" "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	cp "$(PUBLISH_DIR)/$(CONTEXT_EXE)" "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
+	-cp "$(PUBLISH_DIR)/"*.dll "$(PUBLISH_DIR)/"*.so "$(PUBLISH_DIR)/"*.dylib "$(USER_INSTALL_DIR)/" 2>/dev/null || true
 	chmod +x "$(USER_INSTALL_DIR)/$(EXE)"
 	chmod +x "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
 	chmod +x "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"

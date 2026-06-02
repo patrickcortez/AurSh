@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -55,6 +55,7 @@ public static class BuiltinCommands
             "aursh-update" => ExecuteUpdate(cmd),
             "aursh-context" => ExecuteContext(cmd),
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
+            "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -85,6 +86,59 @@ public static class BuiltinCommands
             return onPath;
 
         return null;
+    }
+
+    private static int ExecuteAurshView(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    {
+        if (cmd.Args.Count == 0)
+        {
+            Console.Error.WriteLine("aursh: aursh-view: missing file operand");
+            return 1;
+        }
+
+        string targetFile = Utils.FileSystem.ResolvePath(cmd.Args[0], workingDirectory);
+        if (!System.IO.File.Exists(targetFile))
+        {
+            Console.Error.WriteLine($"aursh: aursh-view: cannot access '{targetFile}': No such file or directory");
+            return 1;
+        }
+
+        try
+        {
+            AurShell.Graphics.VirtualScreen imageBuffer = AurShell.Graphics.PngDecoder.Decode(targetFile);
+
+            int windowWidth = imageBuffer.Width + 40;
+            int windowHeight = imageBuffer.Height + 80;
+
+            AurShell.Graphics.Compositor compositor = new AurShell.Graphics.Compositor(windowWidth, windowHeight);
+            compositor.BackgroundColor = new AurShell.Graphics.Color32(255, 30, 30, 30);
+
+            AurShell.Graphics.WindowElement win = new AurShell.Graphics.WindowElement
+            {
+                X = 10, Y = 10, Width = imageBuffer.Width + 20, Height = imageBuffer.Height + 50,
+                ZIndex = 1, Title = $"Image Viewer - {System.IO.Path.GetFileName(targetFile)}"
+            };
+
+            AurShell.Graphics.ImageElement img = new AurShell.Graphics.ImageElement
+            {
+                X = 20, Y = 40, ZIndex = 2, Image = imageBuffer
+            };
+
+            compositor.AddElement(win);
+            compositor.AddElement(img);
+
+            using (var host = new AurShell.Graphics.SdlWindowHost(windowWidth, windowHeight, "AurSh Native Window Viewer"))
+            {
+                host.Show(compositor);
+            }
+
+            return 0;
+        }
+        catch (System.Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: aursh-view: Error decoding PNG - {ex.Message}");
+            return 1;
+        }
     }
 
     private static int ExecuteContext(CommandNode cmd)

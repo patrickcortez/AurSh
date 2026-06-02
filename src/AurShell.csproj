@@ -7,6 +7,7 @@
     <AssemblyName>aursh</AssemblyName>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <InvariantGlobalization>false</InvariantGlobalization>
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
@@ -49,6 +50,9 @@
     <Compile Remove="Contexts/**/*.cs" />
     <None Remove="Contexts/**/*" />
     <EmbeddedResource Remove="Contexts/**/*" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.SDL" Version="2.23.0" />
   </ItemGroup>
 
 </Project>

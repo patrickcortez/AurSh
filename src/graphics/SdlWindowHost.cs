@@ -29,7 +29,12 @@ public unsafe class SdlWindowHost : IDisposable
         _renderer = _sdl.CreateRenderer(_window, -1, (uint)RendererFlags.Accelerated | (uint)RendererFlags.Presentvsync);
         if (_renderer == null)
         {
-            throw new Exception("Failed to create SDL Renderer: " + _sdl.GetErrorS());
+            // Fallback to software renderer for environments without GPU acceleration (e.g., WSL, CI)
+            _renderer = _sdl.CreateRenderer(_window, -1, (uint)RendererFlags.Software);
+            if (_renderer == null)
+            {
+                throw new Exception("Failed to create SDL Renderer (both Accelerated and Software failed): " + _sdl.GetErrorS());
+            }
         }
 
         // Texture to upload our VirtualScreen ARGB data

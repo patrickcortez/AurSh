@@ -103,10 +103,19 @@ public static class BuiltinCommands
             return 1;
         }
 
+        AurShell.Graphics.VirtualScreen imageBuffer;
         try
         {
-            AurShell.Graphics.VirtualScreen imageBuffer = AurShell.Graphics.PngDecoder.Decode(targetFile);
+            imageBuffer = AurShell.Graphics.PngDecoder.Decode(targetFile);
+        }
+        catch (System.Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: aursh-view: Error decoding PNG - {ex.Message}");
+            return 1;
+        }
 
+        try
+        {
             int windowWidth = imageBuffer.Width + 40;
             int windowHeight = imageBuffer.Height + 80;
 
@@ -136,7 +145,7 @@ public static class BuiltinCommands
         }
         catch (System.Exception ex)
         {
-            Console.Error.WriteLine($"aursh: aursh-view: Error decoding PNG - {ex.Message}");
+            Console.Error.WriteLine($"aursh: aursh-view: Error rendering image viewer - {ex.Message}");
             return 1;
         }
     }

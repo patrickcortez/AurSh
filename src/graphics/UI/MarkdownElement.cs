@@ -513,16 +513,20 @@ public class MarkdownElement : PanelElement
                 
                 else if (tag.StartsWith("<br")) flow.Children.Add(new PanelElement { Width = 9999, Height = 0 });
                 else if (tag.StartsWith("<hr")) flow.Children.Add(new PanelElement { Width = 9999, Height = 2 });
-                else if (tag.StartsWith("<img"))
+                else if (tag.Contains("<img"))
                 {
-                    var srcMatch = System.Text.RegularExpressions.Regex.Match(htmlInline.Tag, @"src\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    var widthMatch = System.Text.RegularExpressions.Regex.Match(htmlInline.Tag, @"width\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    var heightMatch = System.Text.RegularExpressions.Regex.Match(htmlInline.Tag, @"height\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    if (srcMatch.Success)
+                    var imgMatches = System.Text.RegularExpressions.Regex.Matches(htmlInline.Tag, @"<img\s+[^>]*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    foreach (System.Text.RegularExpressions.Match m in imgMatches)
                     {
-                        int reqWidth = widthMatch.Success ? int.Parse(widthMatch.Groups[1].Value) : 0;
-                        int reqHeight = heightMatch.Success ? int.Parse(heightMatch.Groups[1].Value) : 0;
-                        RenderImage(srcMatch.Groups[1].Value, flow, 1000, reqWidth, reqHeight);
+                        var srcMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"src\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        var widthMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"width\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        var heightMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"height\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (srcMatch.Success)
+                        {
+                            int reqWidth = widthMatch.Success ? int.Parse(widthMatch.Groups[1].Value) : 0;
+                            int reqHeight = heightMatch.Success ? int.Parse(heightMatch.Groups[1].Value) : 0;
+                            RenderImage(srcMatch.Groups[1].Value, flow, 1000, reqWidth, reqHeight);
+                        }
                     }
                 }
             }

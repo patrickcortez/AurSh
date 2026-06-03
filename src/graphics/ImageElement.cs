@@ -8,7 +8,14 @@ public class ImageElement : UIElement
     {
         if (Image != null)
         {
-            g.Blit(Image, X, Y);
+            if (Width != Image.Width || Height != Image.Height)
+            {
+                g.BlitScaled(Image, X, Y, Width, Height);
+            }
+            else
+            {
+                g.Blit(Image, X, Y);
+            }
         }
     }
 }

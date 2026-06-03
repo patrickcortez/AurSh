@@ -412,6 +412,7 @@ public class MarkdownElement : PanelElement
                 int finalHeight = reqHeight > 0 ? reqHeight : vs.Height;
                 var imgEl = new ImageElement { Image = vs, Width = finalWidth, Height = finalHeight };
                 flow.Children.Add(imgEl);
+                System.IO.File.AppendAllText("render_debug.txt", $"RENDERED IMAGE: {url} Width={finalWidth} Height={finalHeight}\n");
             }
             else
             {
@@ -497,7 +498,7 @@ public class MarkdownElement : PanelElement
             }
             else if (inline is HtmlInline htmlInline)
             {
-                string tag = htmlInline.Tag.ToLower();
+                string tag = htmlInline.Tag.Trim().ToLower();
                 if (tag.StartsWith("<b") || tag.StartsWith("<strong")) bold = true;
                 else if (tag.StartsWith("</b") || tag.StartsWith("</strong")) bold = initBold;
                 

@@ -3,7 +3,7 @@ bin/*
 .gitignore
 publish
 nupkg
-problems.txt
+Todo.txt
 src/obj/*
 src/aursh-update/obj/*
 src/aursh-update/bin/*
@@ -13,3 +13,4 @@ src/Contexts/obj/*
 src/Contexts/bin/*
 *.aur
 CSharpTest
+MarkdigTest

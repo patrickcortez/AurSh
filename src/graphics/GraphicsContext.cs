@@ -61,18 +61,138 @@ public class GraphicsContext
         }
     }
 
-    public void DrawText(string text, int x, int y, Color32 color)
+
+
+    public void DrawEllipse(int xc, int yc, int rx, int ry, Color32 color)
     {
+        float dx, dy, d1, d2, x, y;
+        x = 0;
+        y = ry;
+        d1 = (ry * ry) - (rx * rx * ry) + (0.25f * rx * rx);
+        dx = 2 * ry * ry * x;
+        dy = 2 * rx * rx * y;
+
+        while (dx < dy)
+        {
+            _screen.SetPixel((int)(x + xc), (int)(y + yc), color);
+            _screen.SetPixel((int)(-x + xc), (int)(y + yc), color);
+            _screen.SetPixel((int)(x + xc), (int)(-y + yc), color);
+            _screen.SetPixel((int)(-x + xc), (int)(-y + yc), color);
+
+            if (d1 < 0)
+            {
+                x++;
+                dx = dx + (2 * ry * ry);
+                d1 = d1 + dx + (ry * ry);
+            }
+            else
+            {
+                x++;
+                y--;
+                dx = dx + (2 * ry * ry);
+                dy = dy - (2 * rx * rx);
+                d1 = d1 + dx - dy + (ry * ry);
+            }
+        }
+
+        d2 = ((ry * ry) * ((x + 0.5f) * (x + 0.5f))) + ((rx * rx) * ((y - 1) * (y - 1))) - (rx * rx * ry * ry);
+        while (y >= 0)
+        {
+            _screen.SetPixel((int)(x + xc), (int)(y + yc), color);
+            _screen.SetPixel((int)(-x + xc), (int)(y + yc), color);
+            _screen.SetPixel((int)(x + xc), (int)(-y + yc), color);
+            _screen.SetPixel((int)(-x + xc), (int)(-y + yc), color);
+
+            if (d2 > 0)
+            {
+                y--;
+                dy = dy - (2 * rx * rx);
+                d2 = d2 + (rx * rx) - dy;
+            }
+            else
+            {
+                y--;
+                x++;
+                dx = dx + (2 * ry * ry);
+                dy = dy - (2 * rx * rx);
+                d2 = d2 + dx - dy + (rx * rx);
+            }
+        }
+    }
+
+    public void DrawBezierCurve(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, Color32 color, int segments = 50)
+    {
+        float prevX = x0;
+        float prevY = y0;
+        for (int i = 1; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            float u = 1 - t;
+            float tt = t * t;
+            float uu = u * u;
+            float uuu = uu * u;
+            float ttt = tt * t;
+
+            float pX = uuu * x0; //first term
+            pX += 3 * uu * t * x1; //second term
+            pX += 3 * u * tt * x2; //third term
+            pX += ttt * x3; //fourth term
+
+            float pY = uuu * y0;
+            pY += 3 * uu * t * y1;
+            pY += 3 * u * tt * y2;
+            pY += ttt * y3;
+
+            DrawLine((int)prevX, (int)prevY, (int)pX, (int)pY, color);
+            prevX = pX;
+            prevY = pY;
+        }
+    }
+
+    public void FillPolygon(int[] xs, int[] ys, Color32 color)
+    {
+        if (xs.Length != ys.Length || xs.Length < 3) return;
+        int minY = ys[0], maxY = ys[0];
+        for (int i = 1; i < ys.Length; i++)
+        {
+            if (ys[i] < minY) minY = ys[i];
+            if (ys[i] > maxY) maxY = ys[i];
+        }
+
+        for (int y = minY; y <= maxY; y++)
+        {
+            var nodes = new System.Collections.Generic.List<int>();
+            int j = xs.Length - 1;
+            for (int i = 0; i < xs.Length; i++)
+            {
+                if (ys[i] < y && ys[j] >= y || ys[j] < y && ys[i] >= y)
+                {
+                    nodes.Add((int)(xs[i] + (y - ys[i]) / (float)(ys[j] - ys[i]) * (xs[j] - xs[i])));
+                }
+                j = i;
+            }
+            nodes.Sort();
+            for (int i = 0; i < nodes.Count - 1; i += 2)
+            {
+                DrawLine(nodes[i], y, nodes[i + 1], y, color);
+            }
+        }
+    }
+
+    public void DrawText(string text, int x, int y, Color32 color, int scale = 1, bool bold = false, bool italic = false, bool strikethrough = false, bool underline = false)
+    {
+        if (scale < 1) scale = 1;
         int curX = x;
         foreach (char c in text)
         {
             if (c == '\n')
             {
-                y += 8;
+                y += 8 * scale;
                 curX = x;
                 continue;
             }
 
+            int charStartX = curX;
             byte[] glyph = BasicFont.GetGlyph(c);
             for (int r = 0; r < 8; r++)
             {
@@ -80,11 +200,43 @@ public class GraphicsContext
                 {
                     if ((glyph[r] & (1 << (7 - cIdx))) != 0)
                     {
-                        _screen.SetPixel(curX + cIdx, y + r, color);
+                        for (int sy = 0; sy < scale; sy++)
+                        {
+                            for (int sx = 0; sx < scale; sx++)
+                            {
+                                int italicOffset = italic ? ((7 - r) * scale) / 3 : 0;
+                                _screen.SetPixel(curX + cIdx * scale + sx + italicOffset, y + r * scale + sy, color);
+                                if (bold)
+                                {
+                                    _screen.SetPixel(curX + cIdx * scale + sx + italicOffset + 1, y + r * scale + sy, color);
+                                }
+                            }
+                        }
                     }
                 }
             }
-            curX += 8;
+            curX += 8 * scale;
+            if (bold) curX += 1;
+            if (italic) curX += scale / 2; // Slight extra spacing for italic so it doesn't overlap next char too much
+            
+            if (strikethrough)
+            {
+                int sY = y + 4 * scale;
+                for (int i = charStartX; i < curX; i++)
+                {
+                    for (int s = 0; s < scale; s++)
+                        _screen.SetPixel(i, sY + s, color);
+                }
+            }
+            if (underline)
+            {
+                int uY = y + 7 * scale;
+                for (int i = charStartX; i < curX; i++)
+                {
+                    for (int s = 0; s < scale; s++)
+                        _screen.SetPixel(i, uY + s, color);
+                }
+            }
         }
     }
 
@@ -109,6 +261,26 @@ public class GraphicsContext
                     {
                         _screen.SetPixel(destX + sx, destY + sy, color);
                     }
+                }
+            }
+        }
+    }
+
+    public void BlitScaled(VirtualScreen source, int destX, int destY, int destWidth, int destHeight)
+    {
+        for (int y = 0; y < destHeight; y++)
+        {
+            for (int x = 0; x < destWidth; x++)
+            {
+                if (destX + x < 0 || destX + x >= _screen.Width || destY + y < 0 || destY + y >= _screen.Height) continue;
+                
+                int srcX = (x * source.Width) / destWidth;
+                int srcY = (y * source.Height) / destHeight;
+                
+                Color32 color = source.GetPixel(srcX, srcY);
+                if (color.A > 0)
+                {
+                    _screen.SetPixel(destX + x, destY + y, color);
                 }
             }
         }

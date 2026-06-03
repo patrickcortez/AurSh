@@ -115,7 +115,8 @@ public static class BuiltinCommands
                 compositor.BackgroundColor = new AurShell.Graphics.Color32(255, 30, 30, 30);
 
                 var scrollView = new AurShell.Graphics.UI.ScrollViewerElement { X = 0, Y = 0, Width = windowWidth, Height = windowHeight, ZIndex = 0 };
-                var mdElem = new AurShell.Graphics.UI.MarkdownElement { X = 0, Y = 0, Width = windowWidth - 15, ZIndex = 0 };
+                var mdElem = new AurShell.Graphics.UI.MarkdownElement { X = 15, Y = 10, Width = windowWidth - 30, ZIndex = 0 };
+                mdElem.BasePath = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(targetFile)) ?? System.Environment.CurrentDirectory;
                 mdElem.MarkdownText = System.IO.File.ReadAllText(targetFile);
                 scrollView.Content.Children.Add(mdElem);
                 compositor.AddElement(scrollView);

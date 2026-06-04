@@ -238,7 +238,11 @@ public class Executor
         if (input == "." || input == "..")
             return true;
 
-        if (input.StartsWith("./") || input.StartsWith(".\\") ||
+        if (input.StartsWith("./") || input.StartsWith(".\\"))
+            return false;
+
+        if (input.StartsWith("/") || input.StartsWith("\\") ||
+            input.StartsWith("~/") || input.StartsWith("~\\") ||
             input.StartsWith("../") || input.StartsWith("..\\"))
         {
             bool hasSpaces = false;

@@ -641,146 +641,159 @@ public class InputHandler
         };
     }
 
- private string SyntaxHighlight(string data) // Syntax highlightning
-{
-
-    data = Utils.Ansi.Strip(data);
-
-    var sb = new StringBuilder();
-
-    bool inQuotes = false;
-    bool inSingles = false;
-    bool firstToken = true;
-
-    int i = 0;
-
-    while (i < data.Length)
+    private string SyntaxHighlight(string data) // Syntax highlightning
     {
-        char c = data[i];
+        data = Utils.Ansi.Strip(data);
+        var sb = new StringBuilder();
 
+        bool inQuotes = false;
+        bool inSingles = false;
+        bool firstToken = true;
 
-        if (c == '"') // if were in qoutes, display as meganta
+        int i = 0;
+
+        while (i < data.Length)
         {
-            inQuotes = !inQuotes;
+            char c = data[i];
 
-            sb.Append(Ansi.FgBrightMagenta);
-            sb.Append(c);
-            sb.Append(Ansi.Reset);
-
-            i++;
-            continue;
-        }
-
-        if(c == '\'')
-        {
-            inSingles = !inSingles;
-
-            sb.Append(Ansi.FgBrightMagenta);
-            sb.Append(c);
-            sb.Append(Ansi.Reset);
-
-            i++;
-            continue;
-        }
-
-        if (inSingles && !inQuotes)
-        {
-            sb.Append(Ansi.FgBrightMagenta);
-
-            while(i < data.Length && !char.IsWhiteSpace(data[i]))
-            {
-                sb.Append(data[i]);
-                i++;
-            }
-
-            continue;
-        }
-
-            if (isParenthesis(c) && !inQuotes && !firstToken)
-            {
-                sb.Append(Ansi.FgBrightRed);
-                sb.Append(c);
-                sb.Append(Ansi.Reset);
-
-                i++;
-                continue;
-            }
-
-        if(c == '$' && !inQuotes && !firstToken)
-        {
-                sb.Append(Ansi.FgBrightGreen);
-
-                while(i < data.Length && !char.IsWhiteSpace(data[i])){
-                    sb.Append(data[i]);
-                    i++;
-                }
-
-                continue;
-        }
-
-       
-        if (firstToken)
-        {
             if (char.IsWhiteSpace(c))
             {
-                firstToken = false;
-
-                if(i == data.Length - 1)
-                {
-                    sb.Append(c);
-                }
-                else
-                {
-                    sb.Append(Ansi.Reset);
-                    sb.Append(c);
-                }
-            }
-            else
-            {
-                sb.Append(Ansi.FgBrightCyan);
                 sb.Append(c);
+                if (firstToken)
+                {
+                    firstToken = false;
+                    sb.Append(Ansi.Reset);
+                }
+                i++;
+                continue;
             }
 
-            i++;
-            continue;
-        }
-
-        if (!inQuotes && c == '-')
-        {
-            sb.Append(Ansi.Dim);
-
-            while (i < data.Length &&
-                   !char.IsWhiteSpace(data[i]))
+            // Extract the whole word
+            int start = i;
+            bool localQuotes = inQuotes;
+            bool localSingles = inSingles;
+            
+            while (i < data.Length)
             {
-                sb.Append(data[i]);
+                char wc = data[i];
+                if (wc == '"') localQuotes = !localQuotes;
+                else if (wc == '\'') localSingles = !localSingles;
+                else if (char.IsWhiteSpace(wc) && !localQuotes && !localSingles) break;
                 i++;
             }
+            
+            string word = data.Substring(start, i - start);
+            
+            bool isDir = false;
+            try 
+            {
+                string cleanWord = word.Trim('"', '\'');
+                if (cleanWord.Length > 0 && !cleanWord.StartsWith("-"))
+                {
+                    string resolved = Utils.FileSystem.ResolvePath(cleanWord, _env.Get("PWD") ?? Directory.GetCurrentDirectory());
+                    if (Directory.Exists(resolved)) isDir = true;
+                }
+            } catch { }
 
-            sb.Append(Ansi.Reset);
-            continue;
+            if (isDir) sb.Append(Ansi.Underline);
+
+            // Re-process the word using the existing logic, just bounded by the word length
+            int wordIdx = 0;
+            while (wordIdx < word.Length)
+            {
+                char wc = word[wordIdx];
+
+                if (wc == '"')
+                {
+                    inQuotes = !inQuotes;
+                    sb.Append(Ansi.FgBrightMagenta).Append(wc).Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    wordIdx++;
+                    continue;
+                }
+
+                if (wc == '\'')
+                {
+                    inSingles = !inSingles;
+                    sb.Append(Ansi.FgBrightMagenta).Append(wc).Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    wordIdx++;
+                    continue;
+                }
+
+                if (inSingles && !inQuotes)
+                {
+                    sb.Append(Ansi.FgBrightMagenta);
+                    while (wordIdx < word.Length)
+                    {
+                        sb.Append(word[wordIdx]);
+                        wordIdx++;
+                    }
+                    sb.Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    continue;
+                }
+
+                if (isParenthesis(wc) && !inQuotes && !firstToken)
+                {
+                    sb.Append(Ansi.FgBrightRed).Append(wc).Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    wordIdx++;
+                    continue;
+                }
+
+                if (wc == '$' && !inQuotes && !firstToken)
+                {
+                    sb.Append(Ansi.FgBrightGreen);
+                    while (wordIdx < word.Length)
+                    {
+                        sb.Append(word[wordIdx]);
+                        wordIdx++;
+                    }
+                    sb.Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    continue;
+                }
+
+                if (firstToken)
+                {
+                    sb.Append(Ansi.FgBrightCyan).Append(wc);
+                    wordIdx++;
+                    continue;
+                }
+
+                if (!inQuotes && wc == '-')
+                {
+                    sb.Append(Ansi.Dim);
+                    while (wordIdx < word.Length)
+                    {
+                        sb.Append(word[wordIdx]);
+                        wordIdx++;
+                    }
+                    sb.Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    continue;
+                }
+
+                if (inQuotes)
+                {
+                    sb.Append(Ansi.FgBrightMagenta).Append(wc).Append(Ansi.Reset);
+                    if (isDir) sb.Append(Ansi.Underline);
+                    wordIdx++;
+                    continue;
+                }
+
+                sb.Append(Ansi.FgBrightWhite).Append(wc).Append(Ansi.Reset);
+                if (isDir) sb.Append(Ansi.Underline);
+                wordIdx++;
+            }
+
+            if (isDir) sb.Append(Ansi.UnderlineOff);
         }
 
-        if (inQuotes)
-        {
-            sb.Append(Ansi.FgBrightMagenta);
-            sb.Append(c);
-            sb.Append(Ansi.Reset);
-
-            i++;
-            continue;
-        }
-
-        sb.Append(Ansi.FgBrightWhite);
-        sb.Append(c);
         sb.Append(Ansi.Reset);
-
-        i++;
+        return sb.ToString();
     }
-
-    sb.Append(Ansi.Reset);
-
-    return sb.ToString();
-}
 
     private void RedrawLine()
     {

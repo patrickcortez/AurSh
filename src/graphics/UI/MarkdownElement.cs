@@ -144,7 +144,7 @@ public class MarkdownElement : PanelElement
         }
         else if (block is FencedCodeBlock code)
         {
-            string codeText = string.Join("\n", code.Lines.Lines.Select(l => l.ToString()));
+            string codeText = string.Join("\n", code.Lines.Lines.Take(code.Lines.Count).Select(l => l.ToString()));
             int lines = code.Lines.Count;
             int ch = lines * 8 + 10;
             Children.Add(new PanelElement { X = x, Y = y, Width = maxWidth, Height = ch, BackgroundColor = new Color32(255, 30, 30, 30) });
@@ -153,7 +153,7 @@ public class MarkdownElement : PanelElement
         }
         else if (block is CodeBlock inlineCodeBlock)
         {
-            string codeText = string.Join("\n", inlineCodeBlock.Lines.Lines.Select(l => l.ToString()));
+            string codeText = string.Join("\n", inlineCodeBlock.Lines.Lines.Take(inlineCodeBlock.Lines.Count).Select(l => l.ToString()));
             int lines = inlineCodeBlock.Lines.Count;
             int ch = lines * 8 + 10;
             Children.Add(new PanelElement { X = x, Y = y, Width = maxWidth, Height = ch, BackgroundColor = new Color32(255, 30, 30, 30) });
@@ -167,9 +167,8 @@ public class MarkdownElement : PanelElement
         }
         else if (block is HtmlBlock htmlBlock)
         {
-            string htmlText = string.Join("\n", htmlBlock.Lines.Lines.Select(l => l.ToString()));
+            string htmlText = string.Join("\n", htmlBlock.Lines.Lines.Take(htmlBlock.Lines.Count).Select(l => l.ToString()));
             
-
             // Check for tags
             var tagMatch = System.Text.RegularExpressions.Regex.Match(htmlText, @"<(h[1-6]|p|div)([^>]*)>(.*?)<\/\1>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (tagMatch.Success)
@@ -177,21 +176,40 @@ public class MarkdownElement : PanelElement
                 string tag = tagMatch.Groups[1].Value.ToLower();
                 string attrs = tagMatch.Groups[2].Value;
                 string content = tagMatch.Groups[3].Value;
-                
+
                 int scale = 1;
                 if (tag.StartsWith("h"))
                 {
                     if (int.TryParse(tag.Substring(1), out int level))
                         scale = Math.Max(1, 4 - level + 1); // h1=4, h2=3, h3=2, h4-h6=1
                 }
-                
+
                 var flow = new FlowPanelElement { X = x, Y = y, Width = maxWidth, HorizontalSpacing = 0, VerticalSpacing = 4 };
                 
+                // check for align
                 var alignMatch = System.Text.RegularExpressions.Regex.Match(attrs, @"align\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (alignMatch.Success) flow.Align = alignMatch.Groups[1].Value.ToLower();
-                
+
+                // Extract and render images manually first to bypass Markdig parsing quirks
+                var innerImgMatches = System.Text.RegularExpressions.Regex.Matches(content, @"<img\s+[^>]*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                foreach (System.Text.RegularExpressions.Match m in innerImgMatches)
+                {
+                    var srcMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"src\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var widthMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"width\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var heightMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"height\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (srcMatch.Success)
+                    {
+                        int reqWidth = widthMatch.Success ? int.Parse(widthMatch.Groups[1].Value) : 0;
+                        int reqHeight = heightMatch.Success ? int.Parse(heightMatch.Groups[1].Value) : 0;
+                        RenderImage(srcMatch.Groups[1].Value.Trim(), flow, maxWidth, reqWidth, reqHeight);
+                    }
+                }
+
+                // Remove images from content so subDoc doesn't double-process them
+                string textContent = System.Text.RegularExpressions.Regex.Replace(content, @"<img\s+[^>]*>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
                 var pipeline = new Markdig.MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-                var subDoc = Markdig.Markdown.Parse(content, pipeline);
+                var subDoc = Markdig.Markdown.Parse(textContent, pipeline);
                 foreach (var b in subDoc)
                 {
                     if (b is Markdig.Syntax.ParagraphBlock pb) 
@@ -200,20 +218,7 @@ public class MarkdownElement : PanelElement
                     }
                     else if (b is Markdig.Syntax.HtmlBlock hb)
                     {
-                        string subHtml = string.Join("\n", hb.Lines.Lines.Select(l => l.ToString()));
-                        var subImgMatches = System.Text.RegularExpressions.Regex.Matches(subHtml, @"<img\s+[^>]*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                        foreach (System.Text.RegularExpressions.Match m in subImgMatches)
-                        {
-                            var srcMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"src\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                            var widthMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"width\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                            var heightMatch = System.Text.RegularExpressions.Regex.Match(m.Value, @"height\s*=\s*[""'](\d+)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                            if (srcMatch.Success)
-                            {
-                                int reqWidth = widthMatch.Success ? int.Parse(widthMatch.Groups[1].Value) : 0;
-                                int reqHeight = heightMatch.Success ? int.Parse(heightMatch.Groups[1].Value) : 0;
-                                RenderImage(srcMatch.Groups[1].Value, flow, maxWidth, reqWidth, reqHeight);
-                            }
-                        }
+                        // Any remaining HTML is processed, but imgs are already handled
                     }
                 }
                 
@@ -266,7 +271,7 @@ public class MarkdownElement : PanelElement
         }
         else if (block is MathBlock mathBlock)
         {
-            string mathText = string.Join("\n", mathBlock.Lines.Lines.Select(l => l.ToString()));
+            string mathText = string.Join("\n", mathBlock.Lines.Lines.Take(mathBlock.Lines.Count).Select(l => l.ToString()));
             var mathEl = new MathElement { MathText = mathText, X = x, Y = y, Width = maxWidth, IsBlock = true };
             Children.Add(mathEl);
             return mathEl.MeasureHeight();
@@ -338,7 +343,6 @@ public class MarkdownElement : PanelElement
             return fy - y;
         }
         
-        // Failsafe for ANY unrecognized block
         else
         {
             string rawContent = block.ToString() ?? "Unknown Block";
@@ -392,9 +396,15 @@ public class MarkdownElement : PanelElement
             else
             {
                 string absolutePath = url;
-                if (!Path.IsPathRooted(url))
+                if (!Path.IsPathRooted(url) || url.StartsWith("/") || url.StartsWith("\\"))
                 {
                     absolutePath = Path.Combine(BasePath, url.TrimStart('/', '\\'));
+                }
+
+                if (!File.Exists(absolutePath) && Path.IsPathRooted(url))
+                {
+                    // Fallback to literal rooted path if not found in BasePath
+                    absolutePath = url;
                 }
 
                 if (File.Exists(absolutePath))

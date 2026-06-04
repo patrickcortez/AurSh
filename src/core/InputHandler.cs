@@ -155,6 +155,8 @@ public class InputHandler
                     string pasted = _buffer.ToString();
                     if (!IsInputIncomplete(pasted))
                     {
+                        _ghostText = "";
+                        RedrawLine();
                         Console.WriteLine();
                         try
                         {
@@ -611,11 +613,14 @@ public class InputHandler
     private static bool IsPathLikeInput(string word)
     {
         if (string.IsNullOrEmpty(word))
+        {
             return false;
+        }
 
         return word.StartsWith("./") || word.StartsWith(".\\") ||
                word.StartsWith("../") || word.StartsWith("..\\") ||
-               word.StartsWith("/") || word.StartsWith("~/") || word.StartsWith("~\\");
+               word.StartsWith("/") || word.StartsWith("~/") || word.StartsWith("~\\") ||
+               word.Contains("/") || word.Contains("\\");
     }
 
     private void ReplaceLine(string newContent)
@@ -690,8 +695,22 @@ public class InputHandler
                 string cleanWord = word.Trim('"', '\'');
                 if (cleanWord.Length > 0 && !cleanWord.StartsWith("-"))
                 {
-                    string resolved = Utils.FileSystem.ResolvePath(cleanWord, _env.Get("PWD") ?? Directory.GetCurrentDirectory());
-                    if (Directory.Exists(resolved)) isDir = true;
+                    string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
+                    string resolved = Utils.FileSystem.ResolvePath(cleanWord, cwd);
+
+                    // Leading / or \ is auto-cd trigger: try relative if absolute fails
+                    if (!Directory.Exists(resolved) && cleanWord.Length > 1 &&
+                        (cleanWord[0] == '/' || cleanWord[0] == '\\') &&
+                        !cleanWord.StartsWith("~/") && !cleanWord.StartsWith("~\\"))
+                    {
+                        string relative = cleanWord.Substring(1);
+                        resolved = Utils.FileSystem.ResolvePath(relative, cwd);
+                    }
+
+                    if (Directory.Exists(resolved))
+                    {
+                        isDir = true;
+                    }
                 }
             } catch { }
 
@@ -1240,40 +1259,12 @@ public class InputHandler
                 completions.AddRange(sugResults);
             }
 
-            string expanded = Utils.Platform.ExpandTilde(partial);
-            string? dir = Path.GetDirectoryName(expanded);
-            string prefix = Path.GetFileName(expanded);
-
-            if (string.IsNullOrEmpty(dir))
-                dir = ".";
-
-            try
+            var pathCompletions = GetPathCompletions(partial);
+            foreach (var pc in pathCompletions)
             {
-                if (Directory.Exists(dir))
-                {
-                    foreach (string entry in Directory.GetFileSystemEntries(dir))
-                    {
-                        string name = Path.GetFileName(entry);
-                        if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            string completion = dir == "." ? name : Path.Combine(dir, name);
-
-                            if (Directory.Exists(entry))
-                                completion += Path.DirectorySeparatorChar;
-
-                            if (partial.StartsWith("~/") || partial.StartsWith("~\\"))
-                            {
-                                string home = Utils.Platform.HomeDirectory;
-                                if (completion.StartsWith(home, StringComparison.OrdinalIgnoreCase))
-                                    completion = "~" + completion.Substring(home.Length);
-                            }
-
-                            completions.Add(completion);
-                        }
-                    }
-                }
+                if (!completions.Contains(pc))
+                    completions.Add(pc);
             }
-            catch { }
         }
 
         completions.Sort(StringComparer.OrdinalIgnoreCase);
@@ -1284,11 +1275,81 @@ public class InputHandler
     {
         var completions = new List<string>();
         string expanded = Utils.Platform.ExpandTilde(partial);
-        string? dir = Path.GetDirectoryName(expanded);
-        string prefix = Path.GetFileName(expanded);
 
-        if (string.IsNullOrEmpty(dir))
-            dir = ".";
+        string? dir = null;
+        string prefix = "";
+
+        // Leading / or \ is an auto-cd trigger prefix: resolve relative to cwd first
+        bool isSlashTrigger = partial.Length > 0 &&
+            (partial[0] == '/' || partial[0] == '\\') &&
+            !partial.StartsWith("~/") && !partial.StartsWith("~\\");
+
+        if (isSlashTrigger)
+        {
+            string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
+            string rest = expanded.Substring(1);
+
+            if (string.IsNullOrEmpty(rest))
+            {
+                dir = cwd;
+                prefix = "";
+            }
+            else
+            {
+                string combined = Path.Combine(cwd, rest);
+                bool restEndsWithSep = rest[rest.Length - 1] == '/' || rest[rest.Length - 1] == '\\';
+
+                if (restEndsWithSep)
+                {
+                    dir = combined;
+                    prefix = "";
+                }
+                else
+                {
+                    dir = Path.GetDirectoryName(combined);
+                    prefix = Path.GetFileName(combined);
+                    if (string.IsNullOrEmpty(dir))
+                    {
+                        dir = cwd;
+                    }
+                }
+            }
+
+            // If relative resolution failed, fall back to absolute interpretation
+            if (!Directory.Exists(dir))
+            {
+                isSlashTrigger = false;
+            }
+        }
+
+        if (!isSlashTrigger)
+        {
+            bool endsWithSep = expanded.Length > 0 &&
+                (expanded[expanded.Length - 1] == '/' || expanded[expanded.Length - 1] == '\\');
+
+            if (endsWithSep)
+            {
+                dir = expanded;
+                prefix = "";
+            }
+            else
+            {
+                dir = Path.GetDirectoryName(expanded);
+                prefix = Path.GetFileName(expanded);
+
+                if (string.IsNullOrEmpty(dir))
+                {
+                    if (expanded.StartsWith("/") || expanded.StartsWith("\\"))
+                    {
+                        dir = expanded.Substring(0, 1);
+                    }
+                    else
+                    {
+                        dir = ".";
+                    }
+                }
+            }
+        }
 
         try
         {
@@ -1299,24 +1360,16 @@ public class InputHandler
                     string name = Path.GetFileName(entry);
                     if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     {
-                        string completion = dir == "." ? name : Path.Combine(dir, name);
-
+                        string completion = partial + name.Substring(prefix.Length);
                         if (Directory.Exists(entry))
-                            completion += Path.DirectorySeparatorChar;
-
-                        if (partial.StartsWith("~/") || partial.StartsWith("~\\"))
                         {
-                            string home = Utils.Platform.HomeDirectory;
-                            if (completion.StartsWith(home, StringComparison.OrdinalIgnoreCase))
-                                completion = "~" + completion.Substring(home.Length);
+                            completion += Path.DirectorySeparatorChar;
                         }
 
-                        string originalPrefix = partial.Substring(0, partial.Length - prefix.Length);
-                        completion = originalPrefix + name;
-                        if (Directory.Exists(entry))
-                            completion += Path.DirectorySeparatorChar;
-
-                        completions.Add(completion);
+                        if (!completions.Contains(completion))
+                        {
+                            completions.Add(completion);
+                        }
                     }
                 }
             }

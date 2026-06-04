@@ -58,6 +58,21 @@ public class Executor
         if (IsAutoCdPath(trimmedInput))
         {
             string resolved = Utils.FileSystem.ResolvePath(trimmedInput, _workingDirectory);
+
+            // Leading / or \ is an auto-cd trigger prefix (replaces ./)
+            // If absolute resolution fails, strip the prefix and try relative to cwd
+            if (!Directory.Exists(resolved) && trimmedInput.Length > 1 &&
+                (trimmedInput[0] == '/' || trimmedInput[0] == '\\') &&
+                !trimmedInput.StartsWith("~/") && !trimmedInput.StartsWith("~\\"))
+            {
+                string relative = trimmedInput.Substring(1);
+                string relResolved = Utils.FileSystem.ResolvePath(relative, _workingDirectory);
+                if (Directory.Exists(relResolved))
+                {
+                    resolved = relResolved;
+                }
+            }
+
             if (Directory.Exists(resolved))
             {
                 string oldDir = _workingDirectory;
@@ -226,25 +241,44 @@ public class Executor
         catch { }
     }
 
-    private static bool IsAutoCdPath(string input)
+    private bool IsAutoCdPath(string input)
     {
         if (string.IsNullOrEmpty(input))
+        {
             return false;
+        }
 
         if (input.Contains('|') || input.Contains(';') || input.Contains('>') ||
             input.Contains('<') || input.Contains('&'))
+        {
             return false;
+        }
 
         if (input == "." || input == "..")
+        {
             return true;
+        }
 
         if (input.StartsWith("./") || input.StartsWith(".\\"))
+        {
             return false;
+        }
 
-        if (input.StartsWith("/") || input.StartsWith("\\") ||
+        if (input.EndsWith("/") || input.EndsWith("\\") || 
+            input.StartsWith("/") || input.StartsWith("\\") ||
             input.StartsWith("~/") || input.StartsWith("~\\") ||
             input.StartsWith("../") || input.StartsWith("..\\"))
         {
+            try
+            {
+                string resolved = Utils.FileSystem.ResolvePath(input, _workingDirectory);
+                if (Directory.Exists(resolved))
+                {
+                    return true;
+                }
+            }
+            catch { }
+
             bool hasSpaces = false;
             for (int i = 0; i < input.Length; i++)
             {

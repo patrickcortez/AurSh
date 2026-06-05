@@ -78,6 +78,7 @@ aursh-assoc .py "python \"{0}\" {1}"
 It saves the association rule to the configuration. When the shell's `Parser` sees a file execution, it checks the extension, looks up the association rule, replaces `{0}` with the file path, and executes the substituted string.
 
 ### Other Native Tools
+- `aursh-ssh`: A visual TUI for managing and connecting to remote SSH hosts and keys (see [AurSh SSH documentation](aursh-ssh.md)).
 - `aursh-history`: Opens a visual TUI list of your past commands to search and execute them.
 - `aursh-context`: Manages persistent disk-backed variables (see Contexts documentation).
 - `aursh-net`: A cross-platform Wi-Fi manager and P2P file sender (see AurshNet documentation).

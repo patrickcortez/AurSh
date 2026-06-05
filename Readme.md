@@ -29,6 +29,7 @@ When using the shell, make sure you put any process/app that you have installed 
 </div>
 
 Has:
+
 - Shell Scripting: .aur scripts
 - A rc script: .aurc
 - Text and object Piping and redirection
@@ -60,6 +61,7 @@ the command-line.
 - `aursh-update` : updates the shell from the remote repository then exits the shell to apply changes.
 - `aursh-context` : A disk backed object like that can hold multiple attributes to structurize and organize variables. `aursh-context <new,del,list,insert,remove,update> <args...>`
 - `aursh-net` : A network tool for connecting,disconnecting and recieving/sending data through the command-line.
+- `aursh-ssh` : A TUI interface for managing SSH keys and remote hosts.
 
 ---
 
@@ -91,6 +93,7 @@ This repositories structure is relatively simple:
 - **src** : Contains all the source code
 - **docs** : Contains documentations
 - **scripts** : Contains Helper scripts
+- **tests** : Contains Unit Tests
 
 ---
 
@@ -110,7 +113,6 @@ Log-in To your *proot* with `proot-distro login <distro>`.
 After than you may proceed to install the *.Net SDK* and *make*.
 
 Then run `make install`.
-
 
 ---
 

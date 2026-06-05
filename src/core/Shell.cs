@@ -56,6 +56,7 @@ public class Shell
 
 
         InitializeDefaultVariables();
+        _env.SshAvailable = Utils.Platform.IsSshInstalled();
         Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
@@ -86,6 +87,7 @@ public class Shell
         _running = true;
 
         InitializeDefaultVariables();
+        _env.SshAvailable = Utils.Platform.IsSshInstalled();
         Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();

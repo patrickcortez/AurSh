@@ -156,7 +156,7 @@ public class InputHandler
                     if (!IsInputIncomplete(pasted))
                     {
                         _ghostText = "";
-                        RedrawLine();
+                        RedrawLine(skipGhostUpdate: true);
                         Console.WriteLine();
                         try
                         {
@@ -181,7 +181,7 @@ public class InputHandler
                 }
 
                 _ghostText = "";
-                RedrawLine(); // Ensure ghost text is cleared visually before confirming
+                RedrawLine(skipGhostUpdate: true); // Ensure ghost text is cleared visually before confirming
                 Console.WriteLine();
                 try
                 {
@@ -814,9 +814,10 @@ public class InputHandler
         return sb.ToString();
     }
 
-    private void RedrawLine()
+    private void RedrawLine(bool skipGhostUpdate = false)
     {
-        UpdateGhostText();
+        if (!skipGhostUpdate)
+            UpdateGhostText();
 
         int width = Utils.Platform.TerminalWidth;
         if (width <= 0) width = 80;

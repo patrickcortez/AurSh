@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -56,6 +56,7 @@ public static class BuiltinCommands
             "aursh-context" => ExecuteContext(cmd),
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
             "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
+            "aursh-ssh" => ExecuteSsh(cmd, env, workingDirectory),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -747,6 +748,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-update : {Ansi.FgBrightBlue}Updates the shell from the remote repository.
                                 - {Ansi.FgBrightCyan}aursh-context : {Ansi.FgBrightBlue}Create, Modify or Delete Contexts.
                                 - {Ansi.FgBrightCyan}aursh-net : {Ansi.FgBrightBlue}A network tool for connecting,disconnecting and recieving/sending data through the command-line.
+                                - {Ansi.FgBrightCyan}aursh-ssh : {Ansi.FgBrightBlue}TUI interface for managing SSH keys and remote hosts.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";
@@ -2578,5 +2580,16 @@ public static class BuiltinCommands
     {
         string[] args = cmd.Args.ToArray();
         return AurShell.BlackBoxView.BlackBoxDemo.Run(args);
+    }
+
+    private static int ExecuteSsh(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    {
+        if (!env.SshAvailable)
+        {
+            Console.Error.WriteLine("aursh: aursh-ssh: ssh is not installed");
+            return 127;
+        }
+
+        return SshTui.Run(workingDirectory);
     }
 }

@@ -60,6 +60,8 @@ public static class Platform
     public static char PathListSeparator => CurrentOS == OperatingSystemType.Windows ? ';' : ':';
     public static string ExecutableExtension => CurrentOS == OperatingSystemType.Windows ? ".exe" : "";
     public static bool IsUnixLike => CurrentOS != OperatingSystemType.Windows;
+    public static string SshDirectory => Path.Combine(HomeDirectory, ".ssh");
+    public static string SshConfigDirectory => Path.Combine(HomeDirectory, ".aursh", "ssh");
 
     public static string[] ExecutableExtensions => CurrentOS == OperatingSystemType.Windows
         ? new[] { ".exe", ".cmd", ".bat", ".com", ".ps1" }
@@ -507,5 +509,18 @@ public static class Platform
             return builtinPwsh;
 
         return "powershell.exe";
+    }
+
+    // Checks if ssh is available on the system PATH
+    public static bool IsSshInstalled()
+    {
+        try
+        {
+            return FindExecutableInPath("ssh") != null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

@@ -26,6 +26,8 @@ public class ShellEnvironment
 
     public FileAssociator Associator { get; } = new();
 
+    public bool SshAvailable { get; set; }
+
     public IReadOnlyDictionary<string, string> Variables => _variables;
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
     public IReadOnlyDictionary<string, string> Aliases => _aliases;

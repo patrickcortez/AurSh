@@ -1,5 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using AurShell.Parser;
 using AurShell.Utils;
 

@@ -201,8 +201,6 @@ public static class Platform
 
     public static void EnableAnsiOnWindows()
     {
-        if (CurrentOS != OperatingSystemType.Windows)
-            return;
         try
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;

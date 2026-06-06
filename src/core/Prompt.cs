@@ -430,7 +430,7 @@ public class Prompt
             }
             else if (Utils.NetworkInfo.IsWired)
             {
-                sb.Append("\uF6FF ");
+                sb.Append("\uDB80\uDE00 "); // nf-md-ethernet U+F0200
             }
             else
             {

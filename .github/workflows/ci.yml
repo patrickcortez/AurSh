@@ -55,7 +55,12 @@ jobs:
         sed -i 's/^#\?SandboxUser.*/SandboxUser = root/' /etc/pacman.conf
 
     - name: Install dependencies
-      run: pacman -Sy --noconfirm python dotnet-sdk
+      run: pacman -Sy --noconfirm python icu
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
     - name: Build
       run: make build

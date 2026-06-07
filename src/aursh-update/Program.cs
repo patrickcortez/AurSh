@@ -175,6 +175,9 @@ internal static class Program
         string branch = ResolveUpdateBranch(sourceDir);
         Console.WriteLine($"Synchronizing updates from channel '{branch}'...");
 
+        // Stash any uncommitted changes to avoid conflicts during update
+        RunGit(sourceDir, "stash --quiet");
+
         int pullCode = RunGit(sourceDir, $"pull origin {branch} --quiet");
         if (pullCode != 0)
             return Fail($"failed to download updates from channel '{branch}'.");

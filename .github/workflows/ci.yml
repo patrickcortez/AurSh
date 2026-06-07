@@ -24,10 +24,6 @@ jobs:
           - name: Termux (cross-compile)
             os: ubuntu-latest
 
-    defaults:
-      run:
-        shell: bash
-
     steps:
     - uses: actions/checkout@v4
 
@@ -38,9 +34,11 @@ jobs:
 
     - name: Install Windows Dependencies
       if: matrix.name == 'Windows'
+      shell: powershell
       run: choco install make -y
 
     - name: Build
+      shell: bash
       run: |
         if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
           make build DETECTED_OS=Termux
@@ -49,6 +47,7 @@ jobs:
         fi
 
     - name: Install (User Directory)
+      shell: bash
       run: |
         if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
           make install-user DETECTED_OS=Termux

@@ -409,7 +409,7 @@ else
 endif
 
 test: build
-ifeq ($(WIN_ENV),native)
+ifeq ($(DETECTED_OS),Windows)
 	@echo [test] Running tests...
 	@python tests/test.py
 else

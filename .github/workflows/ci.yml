@@ -55,7 +55,7 @@ jobs:
         sed -i 's/^#\?SandboxUser.*/SandboxUser = root/' /etc/pacman.conf
 
     - name: Install dependencies
-      run: pacman -Sy --noconfirm python icu sdl2
+      run: pacman -Sy --noconfirm python icu sdl2 fontconfig freetype2 libx11 mesa openssl krb5
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4

@@ -78,11 +78,11 @@ public sealed class BlackBoxLiveRenderer
             _activeSession = session;
             _activeWriter = writer;
             _lastRenderedWidth = TerminalSize.Width;
-            _lastRenderedTier = _renderer.Tier;
+            _lastRenderedTier = BlackBoxRenderer.ResolveTier(_lastRenderedWidth);
             // Don't subscribe to resize in passthrough mode: the child
             // process owns the screen between header and footer, so we'd
             // have nothing to redraw without corrupting its output.
-            _renderer.RenderHeaderOnly(session, writer);
+            _renderer.RenderHeaderOnly(session, writer, _lastRenderedWidth, _lastRenderedTier);
         }
     }
 
@@ -104,7 +104,7 @@ public sealed class BlackBoxLiveRenderer
             }
             catch { }
 
-            _renderer.RenderFooterOnly(session, writer);
+            _renderer.RenderFooterOnly(session, writer, _lastRenderedWidth, _lastRenderedTier);
             DetachResize();
             _activeSession = null;
             _activeWriter = null;
@@ -124,15 +124,15 @@ public sealed class BlackBoxLiveRenderer
             _activeSession = session;
             _activeWriter = writer;
             _lastRenderedWidth = TerminalSize.Width;
-            _lastRenderedTier = _renderer.Tier;
+            _lastRenderedTier = BlackBoxRenderer.ResolveTier(_lastRenderedWidth);
             HideCursor(writer);
 
             var sb = new StringBuilder();
-            sb.Append(_renderer.RenderFooterToString(session));
+            sb.Append(_renderer.RenderFooterToString(session, _lastRenderedWidth, _lastRenderedTier));
             // The header is emitted via RenderHeaderOnly which already writes a
             // trailing newline; the footer string above has no trailing newline
             // and is appended just below the header.
-            _renderer.RenderHeaderOnly(session, writer);
+            _renderer.RenderHeaderOnly(session, writer, _lastRenderedWidth, _lastRenderedTier);
             writer.Write(sb.ToString());
             writer.Write('\n');
             writer.Flush();
@@ -315,7 +315,7 @@ public sealed class BlackBoxLiveRenderer
         for (int i = _emittedBodyRows; i < bufCount; i++)
         {
             BufferLine line = session.Buffer[i];
-            List<string> physicalRows = _renderer.RenderBodyRows(line);
+            List<string> physicalRows = _renderer.RenderBodyRows(line, _lastRenderedWidth, _lastRenderedTier);
             foreach (string r in physicalRows)
             {
                 sb.Append(r);
@@ -334,7 +334,7 @@ public sealed class BlackBoxLiveRenderer
 
         if ((hasInput || hasPartial) && !_completed)
         {
-            int innerWidth = System.Math.Max(4, _lastRenderedWidth - (_renderer.Tier == LayoutTier.Bar ? 0 : 2));
+            int innerWidth = System.Math.Max(4, _lastRenderedWidth - (_lastRenderedTier == LayoutTier.Bar ? 0 : 2));
             int contentWidth = System.Math.Max(1, innerWidth - 2);
 
             string partialText = partialLine?.Text ?? "";
@@ -349,7 +349,7 @@ public sealed class BlackBoxLiveRenderer
             for (int i = 0; i < chunks.Count; i++)
             {
                 var kind = partialLine?.Kind ?? LineKind.Stdout;
-                var renderedRows = _renderer.RenderBodyRows(new BufferLine(chunks[i], kind, partialLine?.StageIndex));
+                var renderedRows = _renderer.RenderBodyRows(new BufferLine(chunks[i], kind, partialLine?.StageIndex), _lastRenderedWidth, _lastRenderedTier);
                 foreach (string renderedRow in renderedRows)
                 {
                     sb.Append(renderedRow);
@@ -362,11 +362,11 @@ public sealed class BlackBoxLiveRenderer
             int cursorCol = cursorPhysicalIndex % contentWidth;
             
             cursorRowOffset = 1 + (chunks.Count - cursorChunk);
-            cursorColOffset = (_renderer.Tier == LayoutTier.Compact || _renderer.Tier == LayoutTier.Bar) ? cursorCol : cursorCol + 2;
+            cursorColOffset = (_lastRenderedTier == LayoutTier.Compact || _lastRenderedTier == LayoutTier.Bar) ? cursorCol : cursorCol + 2;
         }
 
         // Re-emit the footer in its current state.
-        sb.Append(_renderer.RenderFooterToString(session));
+        sb.Append(_renderer.RenderFooterToString(session, _lastRenderedWidth, _lastRenderedTier));
         sb.Append('\n');
         transientRows++;
 
@@ -437,35 +437,9 @@ public sealed class BlackBoxLiveRenderer
     /// </summary>
     private void OnTerminalResized()
     {
-        lock (_lock)
-        {
-            if (!_started || _completed) return;
-            if (_passthrough) return; // child owns the screen
-            BlackBoxSession? session = _activeSession;
-            System.IO.TextWriter? writer = _activeWriter;
-            if (session == null || writer == null) return;
-
-            int newWidth = TerminalSize.Width;
-            LayoutTier newTier = _renderer.Tier;
-            if (newWidth == _lastRenderedWidth && newTier == _lastRenderedTier) return;
-
-
-            try
-            {
-                // We STRICTLY only want to redraw the footer on a resize.
-                // Erasing and redrawing the body mathematically is fundamentally flawed 
-                // because the terminal natively wraps the rows unpredictably.
-                // We leave the old body rows alone to natively reflow.
-                
-                EmitPending(session, writer);
-                _lastRenderedWidth = newWidth;
-                _lastRenderedTier = newTier;
-            }
-            catch(Exception ex)
-            {
-                Console.Error.WriteLine($"{Ansi.FgRed}AurSh: {ex.Message} | {ex.StackTrace}");
-            }
-        }
+        // Dimensions are frozen for the lifetime of the active session.
+        // The terminal's native text wrapping handles the visual adjustment.
+        // New dimensions will be picked up by the next session's Start().
     }
 
     private void HideCursor(System.IO.TextWriter writer)

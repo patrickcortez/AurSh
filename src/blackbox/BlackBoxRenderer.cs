@@ -33,18 +33,16 @@ public sealed class BlackBoxRenderer
         _config = config;
     }
 
-    /// <summary>Current adaptive layout tier (derived from terminal width).</summary>
-    public LayoutTier Tier => ResolveTier();
+
 
     /// <summary>
     /// Render only the box header (top border), for passthrough mode where the
     /// child writes directly to the terminal between the header and footer.
     /// </summary>
-    public void RenderHeaderOnly(BlackBoxSession session, System.IO.TextWriter writer)
+    public void RenderHeaderOnly(BlackBoxSession session, System.IO.TextWriter writer, int width, LayoutTier tier)
     {
         var glyphs = BoxChars.From(_config.Border);
-        var tier = ResolveTier();
-        int outerWidth = ResolveOuterWidth();
+        int outerWidth = ResolveOuterWidth(width);
         int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
@@ -57,11 +55,10 @@ public sealed class BlackBoxRenderer
     /// Render only the box footer (bottom border), for passthrough mode after
     /// the child has finished writing directly to the terminal.
     /// </summary>
-    public void RenderFooterOnly(BlackBoxSession session, System.IO.TextWriter writer)
+    public void RenderFooterOnly(BlackBoxSession session, System.IO.TextWriter writer, int width, LayoutTier tier)
     {
         var glyphs = BoxChars.From(_config.Border);
-        var tier = ResolveTier();
-        int outerWidth = ResolveOuterWidth();
+        int outerWidth = ResolveOuterWidth(width);
         int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
@@ -70,22 +67,21 @@ public sealed class BlackBoxRenderer
         writer.Flush();
     }
 
-    public List<string> RenderBodyRows(BufferLine line)
+    public List<string> RenderBodyRows(BufferLine line, int width, LayoutTier tier)
     {
         var glyphs = BoxChars.From(_config.Border);
-        var tier = ResolveTier();
-        int outerWidth = ResolveOuterWidth();
+        int outerWidth = ResolveOuterWidth(width);
 
         if (tier == LayoutTier.Bar)
         {
             // No decoration. Just wrap to width.
-            return FormatBodyLines(line, System.Math.Max(1, outerWidth));
+            return FormatBodyLines(line, System.Math.Max(1, outerWidth), tier);
         }
 
         if (tier == LayoutTier.Compact)
         {
             int contentWidth = System.Math.Max(1, outerWidth);
-            List<string> compactLines = FormatBodyLines(line, contentWidth);
+            List<string> compactLines = FormatBodyLines(line, contentWidth, tier);
             var results = new List<string>(compactLines.Count);
             
             foreach (string c in compactLines)
@@ -113,7 +109,7 @@ public sealed class BlackBoxRenderer
         }
 
         int innerWidth = System.Math.Max(4, outerWidth - 2);
-        List<string> lines = FormatBodyLines(line, innerWidth - 2);
+        List<string> lines = FormatBodyLines(line, innerWidth - 2, tier);
         var res = new List<string>(lines.Count);
         
         foreach (string content in lines)
@@ -155,11 +151,10 @@ public sealed class BlackBoxRenderer
     /// <summary>
     /// Return the footer (bottom border) as a string (without trailing \n).
     /// </summary>
-    public string RenderFooterToString(BlackBoxSession session)
+    public string RenderFooterToString(BlackBoxSession session, int width, LayoutTier tier)
     {
         var glyphs = BoxChars.From(_config.Border);
-        var tier = ResolveTier();
-        int outerWidth = ResolveOuterWidth();
+        int outerWidth = ResolveOuterWidth(width);
         int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         var sb = new StringBuilder();
@@ -174,9 +169,10 @@ public sealed class BlackBoxRenderer
     public void Render(BlackBoxSession session, System.IO.TextWriter writer)
     {
         var glyphs = BoxChars.From(_config.Border);
-        var tier = ResolveTier();
+        int w = TerminalSize.Width;
+        var tier = ResolveTier(w);
 
-        int outerWidth = ResolveOuterWidth();
+        int outerWidth = ResolveOuterWidth(w);
         int innerWidth = System.Math.Max(4, outerWidth - (tier == LayoutTier.Bar ? 0 : 2));
 
         // Y-axis autoscale: render every line the buffer has. No height cap, no
@@ -187,28 +183,26 @@ public sealed class BlackBoxRenderer
 
         var sb = new StringBuilder();
         RenderTop(sb, glyphs, session, outerWidth, innerWidth, tier);
-        RenderBody(sb, glyphs, session.Buffer, top, bodyRows, innerWidth, tier);
+        RenderBody(sb, glyphs, session.Buffer, top, bodyRows, innerWidth, tier, w);
         RenderBottom(sb, glyphs, session, outerWidth, innerWidth, top, bodyRows, tier);
 
         writer.Write(sb.ToString());
         writer.Flush();
     }
 
-    private int ResolveOuterWidth()
+    public static int ResolveOuterWidth(int width)
     {
-        int w = TerminalSize.Width;
         // Min usable width: 20. Below that, callers still render but content
         // gets aggressively truncated. We *don't* silently fall back to 80
         // here because that hides real failures from the user.
-        if (w < 20) w = 20;
-        return w;
+        if (width < 20) width = 20;
+        return width;
     }
 
-    private LayoutTier ResolveTier()
+    public static LayoutTier ResolveTier(int width)
     {
-        int w = TerminalSize.Width;
-        if (w < 30) return LayoutTier.Bar;
-        if (w < 60) return LayoutTier.Compact;
+        if (width < 30) return LayoutTier.Bar;
+        if (width < 60) return LayoutTier.Compact;
         return LayoutTier.Full;
     }
 
@@ -282,12 +276,12 @@ public sealed class BlackBoxRenderer
         return $"{cwd}  {time}";
     }
 
-    private void RenderBody(StringBuilder sb, BoxGlyphs g, BlackBoxBuffer buffer, int top, int rows, int innerWidth, LayoutTier tier)
+    private void RenderBody(StringBuilder sb, BoxGlyphs g, BlackBoxBuffer buffer, int top, int rows, int innerWidth, LayoutTier tier, int width)
     {
         int rendered = 0;
         foreach (var line in buffer.Window(top, rows))
         {
-            foreach (string renderedRow in RenderBodyRows(line))
+            foreach (string renderedRow in RenderBodyRows(line, width, tier))
             {
                 sb.Append(renderedRow);
                 sb.Append('\n');
@@ -332,7 +326,7 @@ public sealed class BlackBoxRenderer
         }
     }
 
-    private List<string> FormatBodyLines(BufferLine line, int maxVisible)
+    private List<string> FormatBodyLines(BufferLine line, int maxVisible, LayoutTier tier)
     {
         string prefix = "";
         string color = "";
@@ -370,7 +364,7 @@ public sealed class BlackBoxRenderer
 
         string combined = prefix + body;
 
-        int effectiveStartCol = (ResolveTier() == LayoutTier.Full) ? 2 : 0;
+        int effectiveStartCol = (tier == LayoutTier.Full) ? 2 : 0;
         combined = Ansi.ExpandTabs(combined, tabStop: 8, startCol: effectiveStartCol);
 
         var chunks = Ansi.SplitVisible(combined, maxVisible);

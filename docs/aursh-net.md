@@ -1,30 +1,90 @@
 # AurSh Net Module
 
-**What it does**
-`aursh-net` is a built-in networking utility for AurSh. It lets you scan for and connect to Wi-Fi networks using a sleek, interactive terminal menu. It also lets you seamlessly send and receive files or entire folders to other devices on your local network without needing any third-party tools.
+## What it does
 
-**Example Usage**
-To open the interactive Wi-Fi scanner and select a network:
+`aursh-net` is a built-in networking utility for AurSh. 
+
+It allows you to:
+- Scan and connect to Wi-Fi networks using an interactive menu.
+- Send and receive files across your local network securely.
+- Manage allowed IP addresses for incoming file transfers.
+
+---
+
+## Network Management
+
+Manage your Wi-Fi connections easily from the terminal.
+
+**Scan and select a network interactively:**
 ```bash
 aursh-net list
 ```
 
-To manually connect to a specific Wi-Fi network:
+**Connect manually to a Wi-Fi network:**
 ```bash
 aursh-net connect "MyHomeWiFi" "MyPassword123"
 ```
 
-To send a folder to another computer running AurSh:
+**Disconnect from the current network:**
 ```bash
-aursh-net send ./my_project 192.168.1.50
+aursh-net disconnect
 ```
 
-To view your current connection status and IP address:
+**View your network information and IP address:**
 ```bash
 aursh-net info
 ```
 
-**How it works internally**
-1. **Wi-Fi Management**: `aursh-net` acts as a cross-platform wrapper. When you run a command, it detects your operating system and runs the appropriate native tool in the background (e.g. `netsh` on Windows, `nmcli` on Linux, or `networksetup` on macOS).
-2. **File Transfer Daemon**: Every time you launch AurSh, it automatically starts a background listener (daemon) on port `15333`. 
-3. **Receiving Files**: When someone uses `aursh-net send` to your IP address, this background daemon catches the incoming data and safely unpacks it into the `~/Downloads/AurshNet/` directory.
+---
+
+## File Transfers
+
+Seamlessly send files or directories to other devices running AurSh on your local network.
+
+**Discover nearby peers and send a file interactively:**
+```bash
+aursh-net send ./my_project
+```
+
+**Send a file directly to a specific IP address:**
+```bash
+aursh-net send ./my_project 192.168.1.50
+```
+
+---
+
+## Security (IP Whitelisting)
+
+To ensure secure file transfers, you can manage which IP addresses are allowed to send files to your device.
+
+**Allow an IP address:**
+```bash
+aursh-net allow 192.168.1.50
+```
+
+**Remove an IP address from the allowed list:**
+```bash
+aursh-net disallow 192.168.1.50
+```
+
+**View all allowed IP addresses:**
+```bash
+aursh-net allowed
+```
+
+---
+
+## How it works internally
+
+1. **Wi-Fi Management**: 
+   - `aursh-net` detects your operating system automatically. 
+   - It runs native tools in the background (`netsh` for Windows, `nmcli` for Linux, or `networksetup` for macOS) to manage connections seamlessly.
+
+2. **File Transfer Daemon**: 
+   - Whenever AurSh starts, a background listener (daemon) opens on port `15333`.
+   - This listener automatically handles incoming files.
+
+3. **Receiving Files & Security**: 
+   - When someone uses `aursh-net send` to your IP, the daemon receives the data.
+   - It unpacks the files safely into the `~/Downloads/AurshNet/` directory.
+   - *Security Check*: Incoming transfers are validated against your allowed IP list to prevent unauthorized access.

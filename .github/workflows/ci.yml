@@ -7,10 +7,10 @@ on:
     branches: [ master, main ]
 
 jobs:
+  # Standard runners (Ubuntu, Windows, macOS, Termux cross-compile)
   build-and-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container || null }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,10 +21,7 @@ jobs:
             os: windows-latest
           - name: macOS
             os: macos-latest
-          - name: Arch Linux
-            os: ubuntu-latest
-            container: archlinux:base-devel
-          - name: Termux
+          - name: Termux (cross-compile)
             os: ubuntu-latest
 
     defaults:
@@ -34,13 +31,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install dependencies (Arch Linux)
-      if: matrix.name == 'Arch Linux'
-      run: |
-        pacman -Sy --noconfirm python dotnet-sdk
-
     - name: Setup .NET
-      if: matrix.name != 'Arch Linux'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
@@ -51,7 +42,7 @@ jobs:
 
     - name: Build
       run: |
-        if [ "${{ matrix.name }}" == "Termux" ]; then
+        if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
           make build DETECTED_OS=Termux
         else
           make build
@@ -59,17 +50,40 @@ jobs:
 
     - name: Install (User Directory)
       run: |
-        if [ "${{ matrix.name }}" == "Termux" ]; then
+        if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
           make install-user DETECTED_OS=Termux
         else
           make install-user
         fi
 
     - name: Test
-      if: matrix.name != 'Termux'
+      if: matrix.name != 'Termux (cross-compile)'
+      run: make test
+
+  # Arch Linux runs inside a container (separate job)
+  build-arch:
+    name: Arch Linux
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+      options: --privileged
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure pacman sandbox
       run: |
-        if [ "${{ matrix.name }}" == "Windows" ]; then
-          python tests/test.py
-        else
-          make test
-        fi
+        sed -i 's/^#\?SandboxUser.*/SandboxUser = root/' /etc/pacman.conf
+
+    - name: Install dependencies
+      run: |
+        pacman -Sy --noconfirm python dotnet-sdk
+
+    - name: Build
+      run: make build
+
+    - name: Install (User Directory)
+      run: make install-user
+
+    - name: Test
+      run: make test

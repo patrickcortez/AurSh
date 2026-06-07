@@ -7,9 +7,10 @@ namespace AurShell.Contexts;
 
 internal class ContextEntry
 {
-    Action<string,bool> print = (string data,bool isError) =>{
+    Action<string, bool> print = (string data, bool isError) =>
+    {
 
-        if(data.Length < 1)
+        if (data.Length < 1)
         {
             Console.Error.WriteLine("Data cannot be empty!");
             return;
@@ -40,7 +41,7 @@ internal class ContextEntry
                       aursh-context  update <obj-name> <attribute> <value>
         
         ";
-        print(msg,false);
+        print(msg, false);
     }
 
     public static int Main(string[] args)

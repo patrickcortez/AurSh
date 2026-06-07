@@ -348,9 +348,9 @@ public static class Platform
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
-        
+
         string aurshDir = Path.Combine(HomeDirectory, ".aursh");
-        
+
         // If the directory doesn't exist at all, this is a brand new fresh install.
         // We will pre-generate everything so it doesn't instantly crash on the first command.
         if (!Directory.Exists(aurshDir))

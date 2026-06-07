@@ -42,7 +42,7 @@ public static class PngDecoder
                 height = ReadInt32BE(chunkData, 4);
                 bitDepth = chunkData[8];
                 colorType = chunkData[9];
-                
+
                 if (bitDepth != 8 || (colorType != 2 && colorType != 6))
                 {
                     throw new Exception("Only 8-bit truecolor (with or without alpha) PNGs are currently supported by this native decoder.");
@@ -77,14 +77,14 @@ public static class PngDecoder
         VirtualScreen screen = new VirtualScreen(width, height);
         int bytesPerPixel = colorType == 6 ? 4 : 3;
         int stride = width * bytesPerPixel + 1; // +1 for the filter type byte
-        
+
         byte[] priorRow = new byte[width * bytesPerPixel];
 
         for (int y = 0; y < height; y++)
         {
             int offset = y * stride;
             if (offset >= data.Length) break;
-            
+
             byte filterType = data[offset];
             byte[] currentRow = new byte[width * bytesPerPixel];
 

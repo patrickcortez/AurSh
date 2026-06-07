@@ -29,7 +29,7 @@ public unsafe class SdlWindowHost : IDisposable
         int numDrivers = _sdl.GetNumRenderDrivers();
         bool debugRenderer = Environment.GetEnvironmentVariable("AURSH_DEBUG_RENDERER") == "1";
         string logPath = null;
-        
+
         if (debugRenderer)
         {
             string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -49,12 +49,12 @@ public unsafe class SdlWindowHost : IDisposable
             RendererInfo info = new RendererInfo();
             _sdl.GetRenderDriverInfo(i, ref info);
             string driverName = System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)info.Name) ?? "unknown";
-            
+
             if (debugRenderer)
             {
                 System.IO.File.AppendAllText(logPath, $"Driver {i}: '{driverName}', Flags: {info.Flags}\n");
             }
-            
+
             bool isAccel = (info.Flags & (uint)RendererFlags.Accelerated) != 0;
             bool isSoftware = (info.Flags & (uint)RendererFlags.Software) != 0;
             bool isVsync = (info.Flags & (uint)RendererFlags.Presentvsync) != 0;
@@ -68,14 +68,14 @@ public unsafe class SdlWindowHost : IDisposable
             {
                 bestScore = score;
                 bestIndex = i;
-                
+
                 bestFlags = 0;
                 if (isAccel) bestFlags |= (uint)RendererFlags.Accelerated;
                 if (isSoftware) bestFlags |= (uint)RendererFlags.Software;
                 if (isVsync) bestFlags |= (uint)RendererFlags.Presentvsync;
             }
         }
-        
+
         if (bestIndex != -1)
         {
             if (debugRenderer)
@@ -84,14 +84,14 @@ public unsafe class SdlWindowHost : IDisposable
             }
             _renderer = _sdl.CreateRenderer(_window, bestIndex, bestFlags);
         }
-        
+
         if (_renderer == null)
         {
             if (debugRenderer)
             {
                 System.IO.File.AppendAllText(logPath, $"Smart selection failed or no drivers found. Falling back to default index -1.\n");
             }
-            
+
             _renderer = _sdl.CreateRenderer(_window, -1, (uint)RendererFlags.Accelerated | (uint)RendererFlags.Presentvsync);
             if (_renderer == null)
             {
@@ -157,7 +157,7 @@ public unsafe class SdlWindowHost : IDisposable
             compositor.RenderPass();
 
             VirtualScreen screen = compositor.GetBuffer();
-            
+
             // Upload the pixel buffer directly to the GPU texture
             fixed (uint* ptr = screen.Pixels)
             {

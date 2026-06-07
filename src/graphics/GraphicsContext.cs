@@ -218,7 +218,7 @@ public class GraphicsContext
             curX += 8 * scale;
             if (bold) curX += 1;
             if (italic) curX += scale / 2; // Slight extra spacing for italic so it doesn't overlap next char too much
-            
+
             if (strikethrough)
             {
                 int sY = y + 4 * scale;
@@ -252,7 +252,7 @@ public class GraphicsContext
             for (int sx = 0; sx < srcWidth; sx++)
             {
                 if (srcX + sx < 0 || srcX + sx >= source.Width || srcY + sy < 0 || srcY + sy >= source.Height) continue;
-                
+
                 Color32 color = source.GetPixel(srcX + sx, srcY + sy);
                 if (color.A > 0)
                 {
@@ -273,10 +273,10 @@ public class GraphicsContext
             for (int x = 0; x < destWidth; x++)
             {
                 if (destX + x < 0 || destX + x >= _screen.Width || destY + y < 0 || destY + y >= _screen.Height) continue;
-                
+
                 int srcX = (x * source.Width) / destWidth;
                 int srcY = (y * source.Height) / destHeight;
-                
+
                 Color32 color = source.GetPixel(srcX, srcY);
                 if (color.A > 0)
                 {
@@ -357,7 +357,7 @@ public class GraphicsContext
                 float w1 = ((y2 - y3) * (px - x3) + (x3 - x2) * (py - y3)) / den;
                 float w2 = ((y3 - y1) * (px - x3) + (x1 - x3) * (py - y3)) / den;
                 float w3 = 1.0f - w1 - w2;
-                
+
                 if (w1 >= 0 && w2 >= 0 && w3 >= 0)
                 {
                     _screen.SetPixel(px, py, color);
@@ -370,14 +370,14 @@ public class GraphicsContext
     {
         // Clamp radius
         r = Math.Min(r, Math.Min(width / 2, height / 2));
-        
+
         for (int i = 0; i < width; i++)
         {
             for (int j = 0; j < height; j++)
             {
                 int px = i;
                 int py = j;
-                
+
                 if (px < r && py < r) // top-left
                 {
                     if ((r - px - 1) * (r - px - 1) + (r - py - 1) * (r - py - 1) > r * r) continue;
@@ -394,7 +394,7 @@ public class GraphicsContext
                 {
                     if ((px - (width - r)) * (px - (width - r)) + (py - (height - r)) * (py - (height - r)) > r * r) continue;
                 }
-                
+
                 _screen.SetPixel(x + i, y + j, color);
             }
         }

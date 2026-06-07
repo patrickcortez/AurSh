@@ -11,7 +11,7 @@ public static class SvgDecoder
     {
         var svg = new SKSvg();
         svg.Load(filePath);
-        
+
         if (svg.Picture == null)
         {
             throw new Exception("Could not load SVG picture.");
@@ -38,7 +38,7 @@ public static class SvgDecoder
         using (var canvas = new SKCanvas(bitmap))
         {
             canvas.Clear(SKColors.Transparent);
-            
+
             // Adjust matrix if we scaled it down
             if (width != (int)Math.Ceiling(svg.Picture.CullRect.Width))
             {
@@ -49,9 +49,9 @@ public static class SvgDecoder
 
             canvas.DrawPicture(svg.Picture);
         }
-        
+
         VirtualScreen screen = new VirtualScreen(width, height);
-        
+
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
@@ -60,7 +60,7 @@ public static class SvgDecoder
                 screen.SetPixel(x, y, new Color32(color.Alpha, color.Red, color.Green, color.Blue));
             }
         }
-        
+
         return screen;
     }
 }

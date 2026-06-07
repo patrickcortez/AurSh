@@ -39,14 +39,14 @@ public static class NetworkInfo
                 .Where(a => a.OperationalStatus == OperationalStatus.Up && IsRealConnection(a))
                 .ToList();
 
-            var wifiAdapter = activeAdapters.FirstOrDefault(a => 
+            var wifiAdapter = activeAdapters.FirstOrDefault(a =>
                 a.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ||
                 a.Name.StartsWith("wlan", StringComparison.OrdinalIgnoreCase) ||
                 a.Name.StartsWith("wifi", StringComparison.OrdinalIgnoreCase));
 
-            var ethernetAdapter = activeAdapters.FirstOrDefault(a => 
-                a != wifiAdapter && 
-                (a.NetworkInterfaceType == NetworkInterfaceType.Ethernet || 
+            var ethernetAdapter = activeAdapters.FirstOrDefault(a =>
+                a != wifiAdapter &&
+                (a.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
                  a.Name.StartsWith("eth", StringComparison.OrdinalIgnoreCase) ||
                  a.Name.StartsWith("en", StringComparison.OrdinalIgnoreCase)));
 
@@ -99,7 +99,7 @@ public static class NetworkInfo
                 {
                     HasInternet = _internetCheckTask.Result;
                 }
-                
+
                 _internetCheckTask = System.Threading.Tasks.Task.Run(() => TryTcpFallback());
             }
         }
@@ -127,21 +127,21 @@ public static class NetworkInfo
 
     private static bool IsRealConnection(NetworkInterface adapter)
     {
-        if (adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback || 
-            adapter.NetworkInterfaceType == NetworkInterfaceType.Tunnel) 
+        if (adapter.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+            adapter.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
         {
             return false;
         }
-        
-        try 
+
+        try
         {
             var props = adapter.GetIPProperties();
             // A genuine internet or primary LAN connection will virtually always have a Default Gateway
             bool hasGateway = props.GatewayAddresses.Any(g => g.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork || g.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
-            
+
             return hasGateway;
         }
-        catch 
+        catch
         {
             return false;
         }

@@ -32,7 +32,7 @@ public class VirtualScreen
                 Color32 dest = new Color32(_pixels[y * Width + x]);
                 float alpha = color.A / 255f;
                 float invAlpha = 1f - alpha;
-                
+
                 byte r = (byte)(color.R * alpha + dest.R * invAlpha);
                 byte g = (byte)(color.G * alpha + dest.G * invAlpha);
                 byte b = (byte)(color.B * alpha + dest.B * invAlpha);
@@ -63,7 +63,7 @@ public class VirtualScreen
             return;
 
         uint[] newPixels = new uint[newWidth * newHeight];
-        
+
         int minWidth = Math.Min(Width, newWidth);
         int minHeight = Math.Min(Height, newHeight);
 

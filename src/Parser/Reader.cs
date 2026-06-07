@@ -18,7 +18,7 @@ public class Reader //instance based.
 {
     private List<string> LineBuffer; // store all lines in file in here.
     private string configfile = Helper.configfile;
-    List<Context> contexts ;
+    List<Context> contexts;
 
     public Reader()
     {
@@ -32,9 +32,10 @@ public class Reader //instance based.
     {
         try
         {
-            using( StreamReader sr = new StreamReader(configfile)){
+            using (StreamReader sr = new StreamReader(configfile))
+            {
                 string? line;
-                while((line = sr.ReadLine()) != null)
+                while ((line = sr.ReadLine()) != null)
                 {
                     LineBuffer.Add(line);
                 }
@@ -51,21 +52,21 @@ public class Reader //instance based.
     private void InterpretLines()
     {
         StringBuilder Current_ContextName = new();
-        Dictionary<string,string> Attributes = new();
-        foreach(string line in LineBuffer)
+        Dictionary<string, string> Attributes = new();
+        foreach (string line in LineBuffer)
         {
             if (string.IsNullOrWhiteSpace(line)) // for every whitespace if the current contextname length isnt 0 and attribute coun isnt zero, we append a new context in our contexts.
             {
-                if(Current_ContextName.Length > 0 && Attributes.Count > 0) // Context Validation
+                if (Current_ContextName.Length > 0 && Attributes.Count > 0) // Context Validation
                 {
-                    contexts.Add(new Context(Current_ContextName.ToString(),new Dictionary<string, string>(Attributes)));
+                    contexts.Add(new Context(Current_ContextName.ToString(), new Dictionary<string, string>(Attributes)));
                     Current_ContextName.Clear();
                     Attributes.Clear();
                 }
                 continue;
             }
 
-            if(line.StartsWith('[') && line.EndsWith(']')) // Context Name
+            if (line.StartsWith('[') && line.EndsWith(']')) // Context Name
             {
                 Current_ContextName.Append(line.TrimStart('[').TrimEnd(']').Trim());
                 continue;
@@ -81,19 +82,19 @@ public class Reader //instance based.
             }
         }
 
-        if(Current_ContextName.Length > 0 && Attributes.Count > 0)
+        if (Current_ContextName.Length > 0 && Attributes.Count > 0)
         {
-            contexts.Add(new Context(Current_ContextName.ToString(),new Dictionary<string, string>(Attributes)));
+            contexts.Add(new Context(Current_ContextName.ToString(), new Dictionary<string, string>(Attributes)));
             Current_ContextName.Clear();
             Attributes.Clear();
         }
     }
-    public string GetAttribute(string ContextName,string AttributeName) // Context={Attribute:Value}
+    public string GetAttribute(string ContextName, string AttributeName) // Context={Attribute:Value}
     {
         string value = string.Empty;
-        foreach(Context con in contexts)
+        foreach (Context con in contexts)
         {
-            if(con.ContextName == ContextName)
+            if (con.ContextName == ContextName)
             {
                 value = con.GetAttributeValue(AttributeName);
                 break;
@@ -106,6 +107,6 @@ public class Reader //instance based.
 
     public Context[]? GetContexts()
     {
-        return contexts.ToArray() ?.ToArray();
+        return contexts.ToArray()?.ToArray();
     }
 }

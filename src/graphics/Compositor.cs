@@ -8,7 +8,7 @@ public class Compositor
     private VirtualScreen _screen;
     private GraphicsContext _graphics;
     private List<UIElement> _elements;
-    
+
     public Color32 BackgroundColor { get; set; } = Color32.Black;
 
     public Compositor(int width, int height)
@@ -31,7 +31,7 @@ public class Compositor
     public void RenderPass()
     {
         _graphics.Clear(BackgroundColor);
-        
+
         // Painter's Algorithm
         var sortedElements = _elements.OrderBy(e => e.ZIndex).ToList();
         foreach (var element in sortedElements)

@@ -22,7 +22,7 @@ public class MermaidElement : UIElement
 
         // Extremely basic parser for "A-->B" or "A --> B"
         var lines = MermaidText.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-        
+
         var nodes = new HashSet<string>();
         var edges = new List<Tuple<string, string>>();
 
@@ -30,7 +30,7 @@ public class MermaidElement : UIElement
         {
             var l = line.Trim();
             if (l.StartsWith("graph") || l.StartsWith("flowchart")) continue;
-            
+
             var parts = l.Split(new[] { "-->", "---", "-.->", "==>" }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 2)
             {
@@ -76,7 +76,7 @@ public class MermaidElement : UIElement
         foreach (var kvp in nodePositions)
         {
             g.DrawCircle(kvp.Value.x, kvp.Value.y, 20, NodeColor);
-            
+
             // Draw node text centered
             int textW = kvp.Key.Length * 8;
             g.DrawText(kvp.Key, kvp.Value.x - textW / 2, kvp.Value.y - 4, TextColor);

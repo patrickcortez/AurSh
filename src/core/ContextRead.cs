@@ -5,7 +5,7 @@ namespace AurShell.Core;
 
 internal class ContextReader
 {
-    readonly string confile = Path.Combine(Platform.HomeDirectory,".aursh","Contexts.con");
+    readonly string confile = Path.Combine(Platform.HomeDirectory, ".aursh", "Contexts.con");
 
     Context[]? cons;
 
@@ -22,11 +22,11 @@ internal class ContextReader
 
     }
 
-    public string GetAttributeValue(string ContextName,string AttributeName)
+    public string GetAttributeValue(string ContextName, string AttributeName)
     {
-        foreach(Context con in cons)
+        foreach (Context con in cons)
         {
-            if(con.ContextName == ContextName)
+            if (con.ContextName == ContextName)
             {
                 return con.GetAttributeValue(AttributeName);
             }
@@ -47,7 +47,7 @@ internal class ContextReader
         Context[]? cons = read.GetContexts();
         if (cons == null) return false;
 
-        foreach(Context con in cons)
+        foreach (Context con in cons)
         {
             if (con.ContextName.Equals(contextCandidate))
             {

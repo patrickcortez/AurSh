@@ -30,7 +30,8 @@ public class Prompt
         {
             _reader = new AurShell.Parser.Reader();
             string edge = _reader.GetAttribute("Config", "SegmentEdges")?.ToLowerInvariant() ?? "";
-            _segmentEdge = edge switch {
+            _segmentEdge = edge switch
+            {
                 "arrow" => "\uE0B0",
                 "rounded" => "\uE0B4",
                 "angled" => "\uE0B8",
@@ -38,7 +39,8 @@ public class Prompt
             };
 
             string pLine = _reader.GetAttribute("Config", "PromptLine")?.ToLowerInvariant() ?? "";
-            _promptLineChar = pLine switch {
+            _promptLineChar = pLine switch
+            {
                 "line" => '\u2500',
                 "dotted" => '\u00B7',
                 "none" => ' ',
@@ -335,7 +337,7 @@ public class Prompt
         sb.Append(gitBg);
         sb.Append(gitFg);
         sb.Append(' ');
-        
+
         if (!string.IsNullOrEmpty(_gitInfo.RemoteUrl))
         {
             sb.Append(Utils.Ansi.Hyperlink(_gitInfo.RemoteUrl, "\uEA84"));

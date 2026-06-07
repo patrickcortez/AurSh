@@ -83,26 +83,26 @@ public sealed class BlackBoxRenderer
             int contentWidth = System.Math.Max(1, outerWidth);
             List<string> compactLines = FormatBodyLines(line, contentWidth, tier);
             var results = new List<string>(compactLines.Count);
-            
+
             foreach (string c in compactLines)
             {
                 var sbCompact = new StringBuilder();
                 if (!string.IsNullOrEmpty(_config.BackgroundColor))
                     sbCompact.Append(_config.BackgroundColor);
-                    
+
                 sbCompact.Append(c);
-                
+
                 if (!string.IsNullOrEmpty(_config.BackgroundColor))
                     sbCompact.Append(_config.BackgroundColor);
-                    
+
                 int vis = Ansi.VisibleLength(c);
                 int padC = System.Math.Max(0, contentWidth - vis);
                 if (padC > 0)
                     sbCompact.Append(' ', padC);
-                    
+
                 if (!string.IsNullOrEmpty(_config.BackgroundColor))
                     sbCompact.Append(Ansi.Reset);
-                    
+
                 results.Add(sbCompact.ToString());
             }
             return results;
@@ -111,7 +111,7 @@ public sealed class BlackBoxRenderer
         int innerWidth = System.Math.Max(4, outerWidth - 2);
         List<string> lines = FormatBodyLines(line, innerWidth - 2, tier);
         var res = new List<string>(lines.Count);
-        
+
         foreach (string content in lines)
         {
             var sb = new StringBuilder();
@@ -141,10 +141,10 @@ public sealed class BlackBoxRenderer
             sb.Append(_config.BorderColor);
             sb.Append(glyphs.Vertical);
             sb.Append(Ansi.Reset);
-            
+
             res.Add(sb.ToString());
         }
-        
+
         return res;
     }
 
@@ -232,7 +232,7 @@ public sealed class BlackBoxRenderer
             return;
         }
 
-        string title = _config.ShowTitle 
+        string title = _config.ShowTitle
             ? $" {_config.TitleColor}{displayTitle}{Ansi.Reset}{_config.BorderColor} :: {_config.TitleColor}{TruncateForHeader(session.CommandTitle, innerWidth / 2)}{Ansi.Reset}{_config.BorderColor} "
             : "";
 
@@ -315,9 +315,9 @@ public sealed class BlackBoxRenderer
             {
                 if (!string.IsNullOrEmpty(_config.BackgroundColor))
                     sb.Append(_config.BackgroundColor);
-                    
+
                 sb.Append(' ', System.Math.Max(0, innerWidth));
-                
+
                 if (!string.IsNullOrEmpty(_config.BackgroundColor))
                     sb.Append(Ansi.Reset);
             }
@@ -369,7 +369,7 @@ public sealed class BlackBoxRenderer
 
         var chunks = Ansi.SplitVisible(combined, maxVisible);
         if (chunks.Count == 0) chunks.Add("");
-        
+
         var results = new List<string>(chunks.Count);
         foreach (string chunk in chunks)
         {
@@ -385,7 +385,7 @@ public sealed class BlackBoxRenderer
                 results.Add($"{color}{chunk}{Ansi.Reset}");
             }
         }
-        
+
         return results;
     }
 

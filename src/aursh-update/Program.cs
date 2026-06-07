@@ -31,10 +31,10 @@ internal static class Program
             string sub = args[0].ToLowerInvariant();
             return sub switch
             {
-                "set"     => SetRepo(args),
-                "change"  => ChangeBranch(args),
-                "check"   => CheckUpdate(),
-                "where"   => PrintRepoPath(),
+                "set" => SetRepo(args),
+                "change" => ChangeBranch(args),
+                "check" => CheckUpdate(),
+                "where" => PrintRepoPath(),
                 "-h" or "--help" or "help" => PrintHelp(),
                 _ => Fail($"unknown subcommand '{sub}'. Try 'aursh-update --help'."),
             };

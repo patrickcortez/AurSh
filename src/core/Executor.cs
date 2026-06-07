@@ -40,7 +40,8 @@ public class Executor
         if (string.IsNullOrWhiteSpace(input))
             return 0;
 
-        if(input.StartsWith(';')){
+        if (input.StartsWith(';'))
+        {
             return 1;
         }
 
@@ -115,7 +116,7 @@ public class Executor
                 {
                     string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
                     string resolvedRaw = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].RawExpandedValue);
-                    
+
                     if (ContextReader.isContext(resolved))
                     {
                         int colonIdx = resolved.IndexOf(':');
@@ -264,7 +265,7 @@ public class Executor
             return false;
         }
 
-        if (input.EndsWith("/") || input.EndsWith("\\") || 
+        if (input.EndsWith("/") || input.EndsWith("\\") ||
             input.StartsWith("/") || input.StartsWith("\\") ||
             input.StartsWith("~/") || input.StartsWith("~\\") ||
             input.StartsWith("../") || input.StartsWith("..\\"))
@@ -298,11 +299,11 @@ public class Executor
     {
         string ext = Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows ? ".ps1" : ".sh";
         string tempFile = Path.Combine(Path.GetTempPath(), $"aursh_script_{Guid.NewGuid()}{ext}");
-        
+
         try
         {
             File.WriteAllText(tempFile, input);
-            
+
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows ? "powershell.exe" : Utils.Platform.DefaultShell,
@@ -355,11 +356,11 @@ public class Executor
         {
             string varName = assignMatch.Groups[1].Value;
             string value = assignMatch.Groups[2].Value;
-            
+
             var lexer = new Lexer(value, _env);
             var tokens = lexer.Tokenize();
             string expandedValue = string.Join("", tokens.Where(t => t.Type == TokenType.Word).Select(t => t.Value));
-            
+
             _env.Set(varName, expandedValue);
             return true;
         }
@@ -376,7 +377,7 @@ public class Executor
 
             var rightLexer = new Lexer(rightSide, _env);
             string rightExpanded = string.Join("", rightLexer.Tokenize().Where(t => t.Type == TokenType.Word).Select(t => t.Value));
-            
+
             double rightVal = EvaluateMath(rightExpanded);
 
             double result = currentVal;
@@ -397,10 +398,10 @@ public class Executor
         {
             string varName = assignArithMatch.Groups[1].Value;
             string rightSide = assignArithMatch.Groups[2].Value;
-            
+
             var rightLexer = new Lexer(rightSide, _env);
             string rightExpanded = string.Join("", rightLexer.Tokenize().Where(t => t.Type == TokenType.Word).Select(t => t.Value));
-            
+
             if (System.Text.RegularExpressions.Regex.IsMatch(rightExpanded, @"[\+\-\*/]"))
             {
                 double result = EvaluateMath(rightExpanded);
@@ -420,7 +421,7 @@ public class Executor
     {
         expression = expression.Replace(" ", "");
         var tokens = System.Text.RegularExpressions.Regex.Split(expression, @"([\+\-\*/])").Where(s => !string.IsNullOrEmpty(s)).ToList();
-        
+
         if (tokens.Count > 1 && (tokens[0] == "-" || tokens[0] == "+"))
         {
             tokens[1] = tokens[0] + tokens[1];

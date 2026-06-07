@@ -23,7 +23,7 @@ public class ScrollViewerElement : UIElement
 
         VerticalScrollbar.ContentSize = maxH;
         VerticalScrollbar.ViewportSize = Height - HorizontalScrollbar.Height;
-        
+
         HorizontalScrollbar.ContentSize = maxW;
         HorizontalScrollbar.ViewportSize = Width - VerticalScrollbar.Width;
 
@@ -45,11 +45,11 @@ public class ScrollViewerElement : UIElement
         // 2. Blit the visible region from the internal buffer to the main screen
         int viewW = Width - VerticalScrollbar.Width;
         int viewH = Height - HorizontalScrollbar.Height;
-        
-        g.BlitRegion(_contentBuffer, 
-                     HorizontalScrollbar.ScrollPosition, 
-                     VerticalScrollbar.ScrollPosition, 
-                     viewW, viewH, 
+
+        g.BlitRegion(_contentBuffer,
+                     HorizontalScrollbar.ScrollPosition,
+                     VerticalScrollbar.ScrollPosition,
+                     viewW, viewH,
                      X, Y);
 
         // 3. Render Scrollbars
@@ -62,7 +62,7 @@ public class ScrollViewerElement : UIElement
         HorizontalScrollbar.Y = Y + viewH;
         HorizontalScrollbar.Width = viewW;
         HorizontalScrollbar.Render(g);
-        
+
         // Render corner block
         g.FillRectangle(X + viewW, Y + viewH, VerticalScrollbar.Width, HorizontalScrollbar.Height, new Color32(255, 30, 30, 30));
     }
@@ -89,7 +89,7 @@ public class ScrollViewerElement : UIElement
     {
         VerticalScrollbar.OnMouseMove(e);
         HorizontalScrollbar.OnMouseMove(e);
-        
+
         int viewW = Width - VerticalScrollbar.Width;
         int viewH = Height - HorizontalScrollbar.Height;
         if (e.X >= X && e.X < X + viewW && e.Y >= Y && e.Y < Y + viewH)
@@ -103,7 +103,7 @@ public class ScrollViewerElement : UIElement
     {
         VerticalScrollbar.OnMouseUp(e);
         HorizontalScrollbar.OnMouseUp(e);
-        
+
         int viewW = Width - VerticalScrollbar.Width;
         int viewH = Height - HorizontalScrollbar.Height;
         if (e.X >= X && e.X < X + viewW && e.Y >= Y && e.Y < Y + viewH)

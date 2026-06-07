@@ -98,63 +98,63 @@ public static class VsCodeIntegration
         switch (Platform.CurrentOS)
         {
             case OperatingSystemType.Windows:
-            {
-                string? appData = System.Environment.GetEnvironmentVariable("APPDATA");
-                if (!string.IsNullOrEmpty(appData))
                 {
-                    editorDirs = new[]
+                    string? appData = System.Environment.GetEnvironmentVariable("APPDATA");
+                    if (!string.IsNullOrEmpty(appData))
                     {
+                        editorDirs = new[]
+                        {
                         Path.Combine(appData, "Code", "User"),
                         Path.Combine(appData, "Code - Insiders", "User"),
                         Path.Combine(appData, "VSCodium", "User"),
                         Path.Combine(appData, "Antigravity", "User"),
                     };
+                        foreach (string dir in editorDirs)
+                        {
+                            string settingsPath = Path.Combine(dir, "settings.json");
+                            if (Directory.Exists(dir))
+                                yield return settingsPath;
+                        }
+                    }
+                    break;
+                }
+            case OperatingSystemType.MacOS:
+                {
+                    string lib = Path.Combine(Platform.HomeDirectory, "Library", "Application Support");
+                    editorDirs = new[]
+                    {
+                    Path.Combine(lib, "Code", "User"),
+                    Path.Combine(lib, "Code - Insiders", "User"),
+                    Path.Combine(lib, "VSCodium", "User"),
+                    Path.Combine(lib, "Antigravity", "User"),
+                };
                     foreach (string dir in editorDirs)
                     {
                         string settingsPath = Path.Combine(dir, "settings.json");
                         if (Directory.Exists(dir))
                             yield return settingsPath;
                     }
+                    break;
                 }
-                break;
-            }
-            case OperatingSystemType.MacOS:
-            {
-                string lib = Path.Combine(Platform.HomeDirectory, "Library", "Application Support");
-                editorDirs = new[]
-                {
-                    Path.Combine(lib, "Code", "User"),
-                    Path.Combine(lib, "Code - Insiders", "User"),
-                    Path.Combine(lib, "VSCodium", "User"),
-                    Path.Combine(lib, "Antigravity", "User"),
-                };
-                foreach (string dir in editorDirs)
-                {
-                    string settingsPath = Path.Combine(dir, "settings.json");
-                    if (Directory.Exists(dir))
-                        yield return settingsPath;
-                }
-                break;
-            }
             default:
-            {
-                string configBase = System.Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
-                                    ?? Path.Combine(Platform.HomeDirectory, ".config");
-                editorDirs = new[]
                 {
+                    string configBase = System.Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+                                        ?? Path.Combine(Platform.HomeDirectory, ".config");
+                    editorDirs = new[]
+                    {
                     Path.Combine(configBase, "Code", "User"),
                     Path.Combine(configBase, "Code - Insiders", "User"),
                     Path.Combine(configBase, "VSCodium", "User"),
                     Path.Combine(configBase, "Antigravity", "User"),
                 };
-                foreach (string dir in editorDirs)
-                {
-                    string settingsPath = Path.Combine(dir, "settings.json");
-                    if (Directory.Exists(dir))
-                        yield return settingsPath;
+                    foreach (string dir in editorDirs)
+                    {
+                        string settingsPath = Path.Combine(dir, "settings.json");
+                        if (Directory.Exists(dir))
+                            yield return settingsPath;
+                    }
+                    break;
                 }
-                break;
-            }
         }
     }
 

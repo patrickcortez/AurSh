@@ -30,12 +30,24 @@ public class LuaLexer
 
     private static readonly Dictionary<string, TkType> Keywords = new(StringComparer.Ordinal)
     {
-        ["and"] = TkType.And, ["break"] = TkType.Break, ["do"] = TkType.Do,
-        ["else"] = TkType.Else, ["elseif"] = TkType.Elseif, ["end"] = TkType.End,
-        ["false"] = TkType.False, ["for"] = TkType.For, ["function"] = TkType.Function,
-        ["if"] = TkType.If, ["in"] = TkType.In, ["local"] = TkType.Local,
-        ["nil"] = TkType.Nil, ["not"] = TkType.Not, ["or"] = TkType.Or,
-        ["return"] = TkType.Return, ["then"] = TkType.Then, ["true"] = TkType.True,
+        ["and"] = TkType.And,
+        ["break"] = TkType.Break,
+        ["do"] = TkType.Do,
+        ["else"] = TkType.Else,
+        ["elseif"] = TkType.Elseif,
+        ["end"] = TkType.End,
+        ["false"] = TkType.False,
+        ["for"] = TkType.For,
+        ["function"] = TkType.Function,
+        ["if"] = TkType.If,
+        ["in"] = TkType.In,
+        ["local"] = TkType.Local,
+        ["nil"] = TkType.Nil,
+        ["not"] = TkType.Not,
+        ["or"] = TkType.Or,
+        ["return"] = TkType.Return,
+        ["then"] = TkType.Then,
+        ["true"] = TkType.True,
         ["while"] = TkType.While
     };
 

@@ -6,7 +6,7 @@ using System.Linq;
 public class FlowPanelElement : UIElement
 {
     public List<UIElement> Children { get; } = new List<UIElement>();
-    
+
     // Spacing between elements
     public int HorizontalSpacing { get; set; } = 4;
     public int VerticalSpacing { get; set; } = 4;
@@ -17,7 +17,7 @@ public class FlowPanelElement : UIElement
         var rows = new List<List<UIElement>>();
         var currentRow = new List<UIElement>();
         var rowWidths = new List<int>();
-        
+
         int curX = 0;
         int maxRowHeight = 0;
 
@@ -33,7 +33,7 @@ public class FlowPanelElement : UIElement
                 currentRow = new List<UIElement>();
                 curX = 0;
             }
-            
+
             currentRow.Add(child);
             curX += childWidth + HorizontalSpacing;
         }
@@ -48,7 +48,7 @@ public class FlowPanelElement : UIElement
         {
             var row = rows[i];
             int rWidth = rowWidths[i];
-            
+
             int offsetX = 0;
             if (Align == "center" && rWidth < Width) offsetX = (Width - rWidth) / 2;
             else if (Align == "right" && rWidth < Width) offsetX = Width - rWidth;
@@ -89,7 +89,7 @@ public class FlowPanelElement : UIElement
         {
             int childWidth = child.Width;
             int childHeight = child.Height;
-            
+
             if (child is LabelElement lbl)
             {
                 childWidth = lbl.MeasureWidth();

@@ -10,9 +10,9 @@ public static class BmpDecoder
     {
         using var stream = File.OpenRead(filePath);
         ImageResult image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
-        
+
         VirtualScreen screen = new VirtualScreen(image.Width, image.Height);
-        
+
         for (int y = 0; y < image.Height; y++)
         {
             for (int x = 0; x < image.Width; x++)
@@ -22,11 +22,11 @@ public static class BmpDecoder
                 byte g = image.Data[i + 1];
                 byte b = image.Data[i + 2];
                 byte a = image.Data[i + 3];
-                
+
                 screen.SetPixel(x, y, new Color32(a, r, g, b));
             }
         }
-        
+
         return screen;
     }
 }

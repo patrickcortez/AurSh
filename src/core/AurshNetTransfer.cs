@@ -199,11 +199,11 @@ public static class AurshNetTransfer
                 if (magic != "AURSH_NET_V2")
                 {
                     DebugLog($"Transfer rejected: Unknown or outdated protocol '{magic}'. Expected 'AURSH_NET_V2'.");
-                    return; 
+                    return;
                 }
 
                 long fileCount = reader.ReadInt64();
-                
+
                 for (long i = 0; i < fileCount; i++)
                 {
                     if (token.IsCancellationRequested)
@@ -216,7 +216,7 @@ public static class AurshNetTransfer
 
                     string targetPath = Path.Combine(DownloadDirectory, relativePath);
                     string? targetDir = Path.GetDirectoryName(targetPath);
-                    
+
                     if (targetDir != null && !Directory.Exists(targetDir))
                     {
                         Directory.CreateDirectory(targetDir);
@@ -249,7 +249,7 @@ public static class AurshNetTransfer
                     using (FileStream fs = new FileStream(targetPath, mode, FileAccess.Write))
                     {
                         // BIG 1MB buffer for maximum speed
-                        byte[] buffer = new byte[1048576]; 
+                        byte[] buffer = new byte[1048576];
                         long totalRead = existingSize;
 
                         while (totalRead < fileSize)
@@ -383,7 +383,7 @@ public static class AurshNetTransfer
     public static List<(string Hostname, string IPAddress)> DiscoverPeers()
     {
         List<(string Hostname, string IPAddress)> peers = new List<(string Hostname, string IPAddress)>();
-        
+
         try
         {
             using (UdpClient udpClient = new UdpClient())
@@ -393,7 +393,7 @@ public static class AurshNetTransfer
 
                 IPEndPoint endpoint = new IPEndPoint(IPAddress.Broadcast, 15334);
                 byte[] requestBytes = System.Text.Encoding.UTF8.GetBytes("AURSH_DISCOVER");
-                
+
                 // Blast the beacon
                 udpClient.Send(requestBytes, requestBytes.Length, endpoint);
 
@@ -411,7 +411,7 @@ public static class AurshNetTransfer
                         {
                             string hostname = response.Substring(11);
                             string ip = remoteEP.Address.ToString();
-                            
+
                             // Prevent duplicates
                             if (!peers.Exists(p => p.IPAddress == ip))
                             {

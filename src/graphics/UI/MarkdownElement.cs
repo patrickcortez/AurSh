@@ -14,14 +14,14 @@ public class MarkdownElement : PanelElement
 {
     public string BasePath { get; set; } = Environment.CurrentDirectory; // issue # 1: This is gettig the path of AurSh's Exe, not the parent folder path of the md file.
     private string _markdownText = "";
-    public string MarkdownText 
-    { 
-        get => _markdownText; 
-        set 
-        { 
-            _markdownText = value; 
-            BuildElements(); 
-        } 
+    public string MarkdownText
+    {
+        get => _markdownText;
+        set
+        {
+            _markdownText = value;
+            BuildElements();
+        }
     }
 
     private void BuildElements()
@@ -29,7 +29,7 @@ public class MarkdownElement : PanelElement
         Children.Clear();
         var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
         var doc = Markdown.Parse(_markdownText, pipeline);
-        
+
         int currentY = 0;
         foreach (var block in doc)
         {
@@ -54,11 +54,11 @@ public class MarkdownElement : PanelElement
 
             var flow = new FlowPanelElement { X = x, Y = y, Width = maxWidth, HorizontalSpacing = 0, VerticalSpacing = 2 };
             ProcessInlines(heading.Inline, flow, scale, bold, new Color32(255, 255, 215, 0));
-            
+
             int flowHeight = flow.MeasureTotalHeight();
             flow.Height = flowHeight;
             Children.Add(flow);
-            
+
             // Draw underline for h1 and h2
             if (heading.Level <= 2)
             {
@@ -71,7 +71,7 @@ public class MarkdownElement : PanelElement
         {
             var flow = new FlowPanelElement { X = x, Y = y, Width = maxWidth, HorizontalSpacing = 0, VerticalSpacing = 4 };
             ProcessInlines(paragraph.Inline, flow, 1, false, Color32.White);
-            
+
             int flowHeight = flow.MeasureTotalHeight();
             flow.Height = flowHeight;
             Children.Add(flow);
@@ -81,12 +81,12 @@ public class MarkdownElement : PanelElement
         {
             int qy = y;
             Children.Add(new PanelElement { X = x, Y = y, Width = 2, Height = 10, BackgroundColor = new Color32(255, 150, 150, 150) });
-            
+
             foreach (var b in quote)
             {
                 qy += ProcessBlock(b, x + 15, qy, maxWidth - 15, nestingLevel);
             }
-            
+
             var panel = Children.Last(c => c is PanelElement && c.Width == 2) as PanelElement;
             if (panel != null) panel.Height = qy - y;
 
@@ -101,7 +101,7 @@ public class MarkdownElement : PanelElement
                 if (item is ListItemBlock listItem)
                 {
                     string bullet = list.IsOrdered ? $"{itemIdx}. " : (nestingLevel % 3 == 0 ? "* " : (nestingLevel % 3 == 1 ? "o " : "- "));
-                    
+
                     // Task list check
                     bool isTask = false;
                     bool isChecked = false;
@@ -125,9 +125,9 @@ public class MarkdownElement : PanelElement
                     {
                         bulletElement = new LabelElement { Text = bullet, X = x, Y = ly, TextColor = new Color32(255, 0, 255, 255) };
                     }
-                    
+
                     Children.Add(bulletElement);
-                    
+
                     int bWidthMeasure = (bulletElement as LabelElement)?.MeasureWidth() ?? 24;
                     int bx = x + bWidthMeasure + (isTask ? 5 : 0);
                     int bWidth = maxWidth - bWidthMeasure - (isTask ? 5 : 0);
@@ -168,7 +168,7 @@ public class MarkdownElement : PanelElement
         else if (block is HtmlBlock htmlBlock)
         {
             string htmlText = string.Join("\n", htmlBlock.Lines.Lines.Take(htmlBlock.Lines.Count).Select(l => l.ToString()));
-            
+
             // Check for tags
             var tagMatch = System.Text.RegularExpressions.Regex.Match(htmlText, @"<(h[1-6]|p|div)([^>]*)>(.*?)<\/\1>", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (tagMatch.Success)
@@ -185,7 +185,7 @@ public class MarkdownElement : PanelElement
                 }
 
                 var flow = new FlowPanelElement { X = x, Y = y, Width = maxWidth, HorizontalSpacing = 0, VerticalSpacing = 4 };
-                
+
                 // check for align
                 var alignMatch = System.Text.RegularExpressions.Regex.Match(attrs, @"align\s*=\s*[""'](.*?)[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (alignMatch.Success) flow.Align = alignMatch.Groups[1].Value.ToLower();
@@ -212,7 +212,7 @@ public class MarkdownElement : PanelElement
                 var subDoc = Markdig.Markdown.Parse(textContent, pipeline);
                 foreach (var b in subDoc)
                 {
-                    if (b is Markdig.Syntax.ParagraphBlock pb) 
+                    if (b is Markdig.Syntax.ParagraphBlock pb)
                     {
                         ProcessInlines(pb.Inline, flow, scale, tag.StartsWith("h"));
                     }
@@ -221,7 +221,7 @@ public class MarkdownElement : PanelElement
                         // Any remaining HTML is processed, but imgs are already handled
                     }
                 }
-                
+
                 if (flow.Children.Count == 0) ProcessInlineText(content, flow, scale, tag.StartsWith("h"), false, null);
 
                 int flowHeight = flow.MeasureTotalHeight();
@@ -287,7 +287,7 @@ public class MarkdownElement : PanelElement
                     int tx = x;
                     int cellWidth = maxWidth / Math.Max(1, tableRow.Count);
                     int maxCellHeight = 0;
-                    
+
                     if (isHeader)
                     {
                         // Draw header row background
@@ -305,23 +305,23 @@ public class MarkdownElement : PanelElement
                             }
                             if (cy - ty > maxCellHeight) maxCellHeight = cy - ty;
                         }
-                        
+
                         // Vertical divider
                         Children.Add(new PanelElement { X = tx, Y = ty, Width = 1, Height = maxCellHeight + 5, BackgroundColor = new Color32(255, 50, 50, 50) });
-                        
+
                         tx += cellWidth;
                     }
-                    
+
                     // Final right border
                     Children.Add(new PanelElement { X = x + maxWidth - 1, Y = ty, Width = 1, Height = maxCellHeight + 5, BackgroundColor = new Color32(255, 50, 50, 50) });
-                    
+
                     if (isHeader)
                     {
                         var bgPanel = Children.LastOrDefault(c => c is PanelElement && ((PanelElement)c).BackgroundColor.R == 40 && c.Y == ty) as PanelElement;
                         if (bgPanel != null) bgPanel.Height = maxCellHeight + 5;
                         isHeader = false;
                     }
-                    
+
                     Children.Add(new PanelElement { X = x, Y = ty + maxCellHeight + 5, Width = maxWidth, Height = 1, BackgroundColor = new Color32(255, 50, 50, 50) });
                     ty += maxCellHeight + 6;
                 }
@@ -342,13 +342,13 @@ public class MarkdownElement : PanelElement
             }
             return fy - y;
         }
-        
+
         else
         {
             string rawContent = block.ToString() ?? "Unknown Block";
             var flow = new FlowPanelElement { X = x, Y = y, Width = maxWidth, HorizontalSpacing = 0, VerticalSpacing = 4 };
             ProcessInlineText($"[{rawContent}]", flow, 1, false, false, new Color32(255, 200, 0, 0));
-            
+
             int flowHeight = flow.MeasureTotalHeight();
             flow.Height = flowHeight;
             Children.Add(flow);
@@ -369,7 +369,7 @@ public class MarkdownElement : PanelElement
                 // Add user agent just in case some servers require it
                 client.DefaultRequestHeaders.Add("User-Agent", "AurSh-Browser/1.0");
                 var bytes = client.GetByteArrayAsync(url).Result;
-                
+
                 bool isSvg = false, isPng = false, isJpg = false, isBmp = false;
                 if (bytes.Length >= 8 && bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71 && bytes[4] == 13 && bytes[5] == 10 && bytes[6] == 26 && bytes[7] == 10)
                     isPng = true;
@@ -387,7 +387,7 @@ public class MarkdownElement : PanelElement
                 string ext = isSvg ? ".svg" : (isPng ? ".png" : (isBmp ? ".bmp" : ".jpg"));
                 string tempFile = Path.GetTempFileName() + ext;
                 File.WriteAllBytes(tempFile, bytes);
-                
+
                 if (isSvg) vs = SvgDecoder.Decode(tempFile);
                 else if (isPng) vs = PngDecoder.Decode(tempFile);
                 else if (isBmp) vs = BmpDecoder.Decode(tempFile);
@@ -511,16 +511,16 @@ public class MarkdownElement : PanelElement
                 string tag = htmlInline.Tag.Trim().ToLower();
                 if (tag.StartsWith("<b") || tag.StartsWith("<strong")) bold = true;
                 else if (tag.StartsWith("</b") || tag.StartsWith("</strong")) bold = initBold;
-                
+
                 else if (tag.StartsWith("<i") || tag.StartsWith("<em")) italic = true;
                 else if (tag.StartsWith("</i") || tag.StartsWith("</em")) italic = initItalic;
-                
+
                 else if (tag.StartsWith("<u")) underline = true;
                 else if (tag.StartsWith("</u")) underline = initUnderline;
-                
+
                 else if (tag.StartsWith("<s") || tag.StartsWith("<strike") || tag.StartsWith("<del")) strikethrough = true;
                 else if (tag.StartsWith("</s") || tag.StartsWith("</strike") || tag.StartsWith("</del")) strikethrough = initStrikethrough;
-                
+
                 else if (tag.StartsWith("<br")) flow.Children.Add(new PanelElement { Width = 9999, Height = 0 });
                 else if (tag.StartsWith("<hr")) flow.Children.Add(new PanelElement { Width = 9999, Height = 2 });
                 else if (tag.Contains("<img"))

@@ -130,7 +130,7 @@ public sealed class BlackBoxConfig
             if (!Directory.Exists(aurshDir)) Directory.CreateDirectory(aurshDir);
 
             string configPath = Path.Combine(aurshDir, "blackconfig.json");
-            
+
             if (!File.Exists(configPath)) // if the config file does not exist, we make a new one
             {
                 var defaultData = new BlackBoxConfigFile
@@ -177,7 +177,7 @@ public sealed class BlackBoxConfig
                 };
             }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Console.Error.WriteLine($"{Ansi.FgRed}Aursh: {ex.Message} | {ex.StackTrace}");
         }

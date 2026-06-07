@@ -43,7 +43,7 @@ public static class Watchdog
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         LogCrash(e.Exception, "TaskScheduler.UnobservedTaskException");
-        e.SetObserved(); 
+        e.SetObserved();
     }
 
     private static void LogCrash(Exception ex, string source)
@@ -51,7 +51,7 @@ public static class Watchdog
         try
         {
             string crashLogPath = Path.Combine(Platform.DataDirectory, "crash.log");
-            
+
             using (StreamWriter writer = new StreamWriter(crashLogPath, append: true))
             {
                 writer.WriteLine("==================================================");
@@ -74,13 +74,13 @@ public static class Watchdog
                 }
                 writer.WriteLine("==================================================\n");
             }
-            
+
             // Output a graceful message to the user before termination
             Console.WriteLine();
             Console.WriteLine(Ansi.FgRed + "[AurSh Watchdog] A critical background error occurred." + Ansi.Reset);
             Console.WriteLine(Ansi.FgBrightYellow + $"Details have been logged to: {crashLogPath}" + Ansi.Reset);
         }
-        catch 
+        catch
         {
             // If the crash logger itself crashes, we can't do much. 
             // Just swallow it to prevent recursive crash loops.

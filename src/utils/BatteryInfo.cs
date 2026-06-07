@@ -98,7 +98,7 @@ public static class BatteryInfo
                     {
                         HasBattery = true;
                         IsCharging = output.Contains("charging") || output.Contains("AC Power");
-                        
+
                         int percentIndex = output.IndexOf("%");
                         if (percentIndex > 0)
                         {

@@ -593,7 +593,7 @@ public static class Pipeline
                         var nextCmd = commands[i + 1];
                         bool isNextBuiltin = BuiltinCommands.IsBuiltin(nextCmd.Name);
                         string? nextExe = ResolveCommand(nextCmd.Name, workingDirectory);
-                        
+
                         if (!isNextBuiltin && nextExe == null && !TryGetAssociationShellCommand(nextCmd, env, workingDirectory, out _))
                         {
                             // Let the next iteration handle the shell command parsing, we don't abort.
@@ -608,7 +608,7 @@ public static class Pipeline
 
                         var nextPsi = CreateProcessStartInfo(nextExe ?? Utils.Platform.DefaultShell, nextCmd, env, workingDirectory);
                         nextPsi.RedirectStandardInput = true;
-                        
+
                         if (i + 1 != count - 1)
                             nextPsi.RedirectStandardOutput = true;
 
@@ -618,7 +618,7 @@ public static class Pipeline
                         if (nextProc != null)
                         {
                             processes[i + 1] = nextProc;
-                            
+
                             System.Threading.Tasks.Task.Run(async () =>
                             {
                                 await PumpStreamResilientAsync(clientStream!, nextProc.StandardInput.BaseStream);
@@ -1307,7 +1307,7 @@ public static class Pipeline
     private static bool TryGetAssociationShellCommand(CommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)
     {
         shellCommand = "";
-        
+
         if (string.IsNullOrEmpty(cmd.Name))
             return false;
 
@@ -1334,7 +1334,7 @@ public static class Pipeline
                         {
                             template += " \"{0}\" {1}";
                         }
-                        
+
                         string newArgsStr = string.Join(" ", cmd.RawExpandedArgs);
                         shellCommand = template.Replace("{0}", fullPath).Replace("{1}", newArgsStr).Trim();
                         return true;

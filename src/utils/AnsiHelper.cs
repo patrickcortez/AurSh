@@ -244,7 +244,7 @@ public static class Ansi
     public static List<string> SplitVisible(string text, int maxVisible)
     {
         var list = new List<string>();
-        
+
         if (string.IsNullOrEmpty(text) || maxVisible <= 0)
         {
             if (maxVisible > 0)
@@ -258,7 +258,7 @@ public static class Ansi
         int taken = 0;
         int charsAdded = 0;
         string activeFormatting = "";
-        
+
         try
         {
             for (int i = 0; i < text.Length; i++)
@@ -272,7 +272,7 @@ public static class Ansi
                     {
                         string seq = text.Substring(m.Index, m.Length);
                         sb.Append(seq);
-                        
+
                         // Just accumulate formatting. If it's a reset, wipe the slate clean.
                         if (seq == Reset)
                         {
@@ -282,7 +282,7 @@ public static class Ansi
                         {
                             activeFormatting += seq;
                         }
-                            
+
                         charsAdded += seq.Length;
                         i = m.Index + m.Length - 1;
                         continue;
@@ -298,7 +298,7 @@ public static class Ansi
                     // Defensive reset for this chunk so we don't bleed into the box borders
                     sb.Append(Reset);
                     list.Add(sb.ToString());
-                    
+
                     sb.Clear();
                     // Carry over the formatting to the next chunk!
                     sb.Append(activeFormatting);
@@ -313,8 +313,8 @@ public static class Ansi
                 list.Add(sb.ToString());
             }
         }
-        catch 
-        { 
+        catch
+        {
             // Better safe than sorry, just dump whatever we have if it panics
             if (sb.Length > 0) list.Add(sb.ToString());
         }

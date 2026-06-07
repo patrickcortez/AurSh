@@ -16,5 +16,5 @@ internal class NUllAttributeException(string msg = "Attribute does not exist.")
         return Environment.StackTrace;
     }
 
-    public int ErrorCode {get;} = 6969; // yep this is my error code }=}}
+    public int ErrorCode { get; } = 6969; // yep this is my error code }=}}
 }

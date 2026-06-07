@@ -5,15 +5,15 @@ using AurShell.Utils;
 
 public struct Context
 {
-    public string ContextName {get;set;}
+    public string ContextName { get; set; }
 
-    private Dictionary<string,string> Attributes;
+    private Dictionary<string, string> Attributes;
 
-    public Context(string NewContextName,Dictionary<string,string> NewAttributes)
+    public Context(string NewContextName, Dictionary<string, string> NewAttributes)
     {
         // Always initialize — NativeAOT's trimmer will scream if these are left hanging
         ContextName = string.Empty;
-        Attributes = new Dictionary<string,string>();
+        Attributes = new Dictionary<string, string>();
 
         if (!string.IsNullOrWhiteSpace(NewContextName))
         {
@@ -33,7 +33,7 @@ public struct Context
         return string.Empty;
     }
 
-    public int ChangeAttributeValue(string AttributeName,string NewValue)
+    public int ChangeAttributeValue(string AttributeName, string NewValue)
     {
         if (!Attributes.ContainsKey(AttributeName)) //Guard clauses
         {
@@ -49,14 +49,14 @@ public struct Context
         return 0;
     }
 
-    public int InsertAttribute(string AttributeName,string AttributeValue)
+    public int InsertAttribute(string AttributeName, string AttributeValue)
     {
-        if(string.IsNullOrWhiteSpace(AttributeName) || string.IsNullOrWhiteSpace(AttributeValue))
+        if (string.IsNullOrWhiteSpace(AttributeName) || string.IsNullOrWhiteSpace(AttributeValue))
         {
             return 1;
         }
 
-        Attributes.Add(AttributeName,AttributeValue);
+        Attributes.Add(AttributeName, AttributeValue);
         return 0;
     }
 
@@ -66,11 +66,11 @@ public struct Context
         {
             return 0;
         }
-        
+
         return 1;
     }
 
-    public Dictionary<string,string> GetAttributes()
+    public Dictionary<string, string> GetAttributes()
     {
         return Attributes;
     }
@@ -78,7 +78,7 @@ public struct Context
 
 internal static class Helper
 {
-    public static string configfile = Path.Combine(Platform.HomeDirectory,".aursh","AurSh.config.con");
+    public static string configfile = Path.Combine(Platform.HomeDirectory, ".aursh", "AurSh.config.con");
 
     public static void EnsureConfigExists()
     {
@@ -122,7 +122,7 @@ internal static class Helper
         return FindDelimiterIndex(trimmed) != -1;
     }
 
-    public static KeyValuePair<string,string> TokenizeAttribute(string line)
+    public static KeyValuePair<string, string> TokenizeAttribute(string line)
     {
         string trimmed = line.Trim();
         int delimIdx = FindDelimiterIndex(trimmed);

@@ -254,7 +254,7 @@ public class Lexer
                     continue;
                 }
 
-                
+
                 string expanded = ExpandInline();
                 sb.Append(expanded);
                 rawSb.Append(expanded);

@@ -73,7 +73,7 @@ public class InputHandler
                 Console.Write(_staticPrompt);
             }
         }
-        
+
         _promptVisibleLen = Utils.Ansi.VisibleLength(_dynamicPrompt);
 
         _buffer.Clear();
@@ -115,7 +115,7 @@ public class InputHandler
                 return null;
             }
 
-            if(key.Key == ConsoleKey.Spacebar)
+            if (key.Key == ConsoleKey.Spacebar)
             {
                 count++;
             }
@@ -134,7 +134,7 @@ public class InputHandler
                 {
                     _buffer.Insert(_cursorPos, '\n');
                     _cursorPos++;
-                    
+
                     while (Console.KeyAvailable)
                     {
                         var nextKey = Console.ReadKey(true);
@@ -151,7 +151,7 @@ public class InputHandler
                     }
                     _multilineActive = _buffer.ToString().Contains('\n');
                     RedrawLine();
-                    
+
                     string pasted = _buffer.ToString();
                     if (!IsInputIncomplete(pasted))
                     {
@@ -634,7 +634,8 @@ public class InputHandler
 
     private bool isParenthesis(char c)
     {
-        return c switch{
+        return c switch
+        {
             '(' => true,
             ')' => true,
             '[' => true,
@@ -677,7 +678,7 @@ public class InputHandler
             int start = i;
             bool localQuotes = inQuotes;
             bool localSingles = inSingles;
-            
+
             while (i < data.Length)
             {
                 char wc = data[i];
@@ -686,11 +687,11 @@ public class InputHandler
                 else if (char.IsWhiteSpace(wc) && !localQuotes && !localSingles) break;
                 i++;
             }
-            
+
             string word = data.Substring(start, i - start);
-            
+
             bool isDir = false;
-            try 
+            try
             {
                 string cleanWord = word.Trim('"', '\'');
                 if (cleanWord.Length > 0 && !cleanWord.StartsWith("-"))
@@ -712,7 +713,8 @@ public class InputHandler
                         isDir = true;
                     }
                 }
-            } catch { }
+            }
+            catch { }
 
             if (isDir) sb.Append(Ansi.Underline);
 
@@ -823,17 +825,17 @@ public class InputHandler
         if (width <= 0) width = 80;
 
         var currentCursorPos = ComputeCursorPosition(width);
-        
+
         var sb = new StringBuilder();
         sb.Append(Utils.Ansi.CursorHide);
-        
+
         if (currentCursorPos.Row > 0)
         {
             sb.Append(Utils.Ansi.MoveCursorUp(currentCursorPos.Row));
         }
         sb.Append('\r');
         sb.Append(Utils.Ansi.ClearScreenFromCursor);
-        
+
         sb.Append("\x1b]133;A\x07");
         sb.Append(_dynamicPrompt);
         sb.Append("\x1b]133;B\x07");
@@ -858,8 +860,8 @@ public class InputHandler
         Console.Write(sb.ToString());
 
         var endPos = ComputeCursorPositionForText(width, _buffer.ToString() + _ghostText);
-        
-        try 
+
+        try
         {
             int rowsUp = endPos.Row - currentCursorPos.Row;
             if (rowsUp > 0)
@@ -869,7 +871,7 @@ public class InputHandler
             Console.Write($"\x1b[{currentCursorPos.Col + 1}G");
         }
         catch { }
-        
+
         Console.Write(Utils.Ansi.CursorShow);
     }
 
@@ -993,23 +995,23 @@ public class InputHandler
             int rows = 0;
 
             string[] linesBeforeCursor = textBeforeCursor.Split('\n');
-            
+
             for (int i = 0; i < linesBeforeCursor.Length - 1; i++)
             {
                 int prefixVis = (i == 0) ? _promptVisibleLen : _continuationPromptLen;
                 int textVis = Utils.Ansi.VisibleLength(linesBeforeCursor[i]);
                 rows += ((prefixVis + textVis) / width) + 1;
             }
-            
+
             int lastLinePrefixVis = (linesBeforeCursor.Length == 1) ? _promptVisibleLen : _continuationPromptLen;
             int lastLineTextVis = Utils.Ansi.VisibleLength(linesBeforeCursor[^1]);
             int totalVisOnLastLine = lastLinePrefixVis + lastLineTextVis;
-            
+
             int rowInLine = totalVisOnLastLine / width;
             int col = totalVisOnLastLine % width;
-            
+
             rows += rowInLine;
-            
+
             return (rows, col);
         }
         catch (Exception)
@@ -1025,7 +1027,7 @@ public class InputHandler
         string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
         int exitCode = _env.LastExitCode;
         string prompt = promptObj.Render(cwd, exitCode);
-        
+
         _currentPrompt = prompt;
         int lastNewline = prompt.LastIndexOf('\n');
         if (lastNewline >= 0)
@@ -1043,7 +1045,7 @@ public class InputHandler
         if (clearPrevious)
         {
             Console.Write("\r" + Utils.Ansi.ClearScreenFromCursor);
-            
+
             // Re-print static prompt since we cleared the whole screen from our cursor
             if (!string.IsNullOrEmpty(_staticPrompt))
             {
@@ -1426,10 +1428,10 @@ public class InputHandler
         if (width <= 0) return 2;
 
         int totalLines = 0;
-        
+
         string fullContent = _buffer.ToString() + _ghostText;
         string[] contentLines = fullContent.Split('\n');
-        
+
         for (int i = 0; i < contentLines.Length; i++)
         {
             int prefixVis = (i == 0) ? _promptVisibleLen : _continuationPromptLen;

@@ -6,7 +6,7 @@ public class LabelElement : UIElement
 {
     public string Text { get; set; } = "";
     public Color32 TextColor { get; set; } = Color32.White;
-    
+
     public int Scale { get; set; } = 1;
     public bool Bold { get; set; } = false;
     public bool Italic { get; set; } = false;

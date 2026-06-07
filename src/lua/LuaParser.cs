@@ -50,9 +50,15 @@ public class LuaParser
 
     private static string TkName(TkType t) => t switch
     {
-        TkType.Name => "name", TkType.Eof => "eof", TkType.End => "end",
-        TkType.Then => "then", TkType.Do => "do", TkType.RParen => ")",
-        TkType.RBracket => "]", TkType.Assign => "=", TkType.Comma => ",",
+        TkType.Name => "name",
+        TkType.Eof => "eof",
+        TkType.End => "end",
+        TkType.Then => "then",
+        TkType.Do => "do",
+        TkType.RParen => ")",
+        TkType.RBracket => "]",
+        TkType.Assign => "=",
+        TkType.Comma => ",",
         _ => t.ToString().ToLowerInvariant()
     };
 

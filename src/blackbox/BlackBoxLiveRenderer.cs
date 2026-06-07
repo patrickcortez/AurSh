@@ -339,7 +339,7 @@ public sealed class BlackBoxLiveRenderer
 
             string partialText = partialLine?.Text ?? "";
             string fullText = partialText + inputLine;
-            
+
             // Calculate physical cursor position based on visible length of the partial line
             int cursorPhysicalIndex = Ansi.VisibleLength(partialText) + inputCursor;
 
@@ -360,7 +360,7 @@ public sealed class BlackBoxLiveRenderer
 
             int cursorChunk = cursorPhysicalIndex / contentWidth;
             int cursorCol = cursorPhysicalIndex % contentWidth;
-            
+
             cursorRowOffset = 1 + (chunks.Count - cursorChunk);
             cursorColOffset = (_lastRenderedTier == LayoutTier.Compact || _lastRenderedTier == LayoutTier.Bar) ? cursorCol : cursorCol + 2;
         }

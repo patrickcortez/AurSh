@@ -92,7 +92,7 @@ public static class AurshNetCommand
             }
         }
         catch { }
-        
+
         return networks.GroupBy(n => n.Ssid).Select(g => g.First()).ToList();
     }
 
@@ -508,7 +508,7 @@ public static class AurshNetCommand
                 {
                     running = false;
                     Console.Write("\x1b[?1049l\x1b[?25h");
-                    
+
                     WifiNetwork selected = networks[selectedIndex];
 
                     if (selected.IsWired)
@@ -536,7 +536,7 @@ public static class AurshNetCommand
         }
         finally
         {
-            if (running) 
+            if (running)
             {
                 Console.Write("\x1b[?1049l\x1b[?25h");
             }
@@ -581,7 +581,7 @@ public static class AurshNetCommand
                 else
                     output = RunCommand("networksetup", $"-setairportnetwork en0 \"{ssid}\" \"{password}\"");
             }
-            
+
             Console.WriteLine(output.Trim());
             NetworkInfo.Refresh();
             if (NetworkInfo.IsConnected && NetworkInfo.Ssid == ssid)
@@ -703,7 +703,7 @@ public static class AurshNetCommand
             {
                 Console.Write("\x1b[?1049l\x1b[?25h"); // Exit alt screen, show cursor
             }
-            
+
             if (string.IsNullOrEmpty(ip))
             {
                 return 1; // Safety fallback
@@ -711,12 +711,12 @@ public static class AurshNetCommand
         }
 
         Console.WriteLine(Ansi.FgBrightCyan + $"Sending to {ip}..." + Ansi.Reset);
-        
+
         long lastReported = 0;
-        
+
         try
         {
-            AurshNetTransfer.Send(targetPath, ip, (file, sent, total) => 
+            AurshNetTransfer.Send(targetPath, ip, (file, sent, total) =>
             {
                 long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 if (now - lastReported > 200 || sent == total)
@@ -725,7 +725,7 @@ public static class AurshNetCommand
                     Console.Write($"\rSending {file}: {sent}/{total} bytes ({percent:F1}%)   ");
                     lastReported = now;
                 }
-                
+
                 if (sent == total)
                 {
                     Console.WriteLine();
@@ -746,7 +746,7 @@ public static class AurshNetCommand
     private static int ShowInfo()
     {
         NetworkInfo.Refresh();
-        
+
         string localIp = "Unknown";
         try
         {
@@ -775,7 +775,7 @@ public static class AurshNetCommand
         Console.WriteLine($"{Ansi.FgBrightBlue}Local IP:{Ansi.Reset}     {localIp}");
         Console.WriteLine($"{Ansi.FgBrightBlue}Receiver:{Ansi.Reset}     Port 15333 {(NetworkInfo.IsConnected ? "Active" : "Waiting")}");
         Console.WriteLine(Ansi.FgBrightMagenta + "---------------------------" + Ansi.Reset);
-        
+
         return 0;
     }
 
@@ -861,7 +861,7 @@ public static class AurshNetCommand
             {
                 Console.WriteLine($"IP {ip} was not found in the allowed list.");
             }
-            
+
             return 0;
         }
         catch (Exception ex)

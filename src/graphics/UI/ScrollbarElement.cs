@@ -7,7 +7,7 @@ public class ScrollbarElement : UIElement
     public bool IsVertical { get; set; } = true;
     public int ContentSize { get; set; } = 1000;
     public int ViewportSize { get; set; } = 500;
-    
+
     private int _scrollPosition = 0;
     public int ScrollPosition
     {
@@ -18,7 +18,7 @@ public class ScrollbarElement : UIElement
             _scrollPosition = Math.Clamp(value, 0, maxScroll);
         }
     }
-    
+
     private bool _isDragging = false;
     private int _dragStartMouse = 0;
     private int _dragStartScroll = 0;
@@ -26,7 +26,7 @@ public class ScrollbarElement : UIElement
     public override void Render(GraphicsContext g)
     {
         g.FillRectangle(X, Y, Width, Height, new Color32(255, 40, 40, 40));
-        
+
         if (ContentSize <= ViewportSize) return;
 
         float ratio = IsVertical ? (float)ViewportSize / ContentSize : (float)ViewportSize / ContentSize;
@@ -35,7 +35,7 @@ public class ScrollbarElement : UIElement
         if (thumbSize < 10) thumbSize = 10;
 
         float scrollRatio = ContentSize > ViewportSize ? (float)ScrollPosition / (ContentSize - ViewportSize) : 0;
-        
+
         Color32 thumbColor = _isDragging ? new Color32(255, 120, 120, 120) : new Color32(255, 80, 80, 80);
 
         if (IsVertical)
@@ -73,10 +73,10 @@ public class ScrollbarElement : UIElement
                 float ratio = (float)ViewportSize / ContentSize;
                 int thumbSize = Math.Max(10, (int)(size * ratio));
                 int trackSize = size - thumbSize;
-                
+
                 int mouseDelta = (IsVertical ? e.Y : e.X) - _dragStartMouse;
                 float scrollDelta = trackSize > 0 ? ((float)mouseDelta / trackSize) * maxScroll : 0;
-                
+
                 ScrollPosition = _dragStartScroll + (int)scrollDelta;
                 e.Handled = true;
             }

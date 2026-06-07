@@ -4,7 +4,7 @@ public static class BasicFont
 {
     // A minimal 8x8 font where each byte is a row (8 rows).
     // Provides basic alphanumeric characters to allow standalone headless text rendering.
-    
+
     public static byte[] GetGlyph(char c)
     {
         switch (c)
@@ -68,7 +68,7 @@ public static class BasicFont
             case '|': return new byte[] { 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 };
             case '\'': return new byte[] { 0x18, 0x18, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00 };
             case '"': return new byte[] { 0x36, 0x36, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00 };
-            default:  return new byte[] { 0xFF, 0x81, 0x81, 0x81, 0x81, 0x81, 0xFF, 0x00 }; // Square box for unknown
+            default: return new byte[] { 0xFF, 0x81, 0x81, 0x81, 0x81, 0x81, 0xFF, 0x00 }; // Square box for unknown
         }
     }
 }

@@ -163,13 +163,20 @@ public static class BuiltinCommands
 
             AurShell.Graphics.WindowElement win = new AurShell.Graphics.WindowElement
             {
-                X = 10, Y = 10, Width = imageBuffer.Width + 20, Height = imageBuffer.Height + 50,
-                ZIndex = 1, Title = $"Image Viewer - {System.IO.Path.GetFileName(targetFile)}"
+                X = 10,
+                Y = 10,
+                Width = imageBuffer.Width + 20,
+                Height = imageBuffer.Height + 50,
+                ZIndex = 1,
+                Title = $"Image Viewer - {System.IO.Path.GetFileName(targetFile)}"
             };
 
             AurShell.Graphics.ImageElement img = new AurShell.Graphics.ImageElement
             {
-                X = 20, Y = 40, ZIndex = 2, Image = imageBuffer
+                X = 20,
+                Y = 40,
+                ZIndex = 2,
+                Image = imageBuffer
             };
 
             compositor.AddElement(win);
@@ -294,10 +301,10 @@ public static class BuiltinCommands
         if (!string.IsNullOrEmpty(targetFile) && File.Exists(targetFile))
         {
             string[] lines = Utils.FileSystem.ReadAllLinesSafe(targetFile);
-            if (lines.Length == 0) 
+            if (lines.Length == 0)
                 buffer.Add(new StringBuilder());
-            else 
-                foreach (string line in lines) 
+            else
+                foreach (string line in lines)
                     buffer.Add(new StringBuilder(line));
         }
         else
@@ -340,7 +347,7 @@ public static class BuiltinCommands
                 if (cursorRow >= scrollRow + textHeight) scrollRow = cursorRow - textHeight + 1;
 
                 int maxLineNumStrLen = buffer.Count.ToString().Length;
-                int prefixLen = maxLineNumStrLen + 4; 
+                int prefixLen = maxLineNumStrLen + 4;
                 int maxTextWidth = width - prefixLen - 1;
 
                 if (cursorCol < scrollCol) scrollCol = cursorCol;
@@ -395,7 +402,7 @@ public static class BuiltinCommands
 
                 Console.Write($"\x1b[{height};1H");
                 Console.Write(Utils.Ansi.ClearLine);
-                
+
                 if (commandMode)
                 {
                     Console.Write(Utils.Ansi.FgRgb(150, 150, 150) + " :" + Utils.Ansi.FgWhite + commandInput);
@@ -414,14 +421,14 @@ public static class BuiltinCommands
                 if (commandMode)
                 {
                     Console.Write($"\x1b[{height};{3 + commandInput.Length}H");
-                    Console.Write("\x1b[?25h"); 
+                    Console.Write("\x1b[?25h");
                 }
                 else
                 {
                     int screenRow = headerLines + (cursorRow - scrollRow) + 1;
                     int screenCol = prefixLen + (cursorCol - scrollCol) + 1;
                     Console.Write($"\x1b[{screenRow};{screenCol}H");
-                    Console.Write("\x1b[?25h"); 
+                    Console.Write("\x1b[?25h");
                 }
 
                 var key = Console.ReadKey(true);
@@ -437,7 +444,7 @@ public static class BuiltinCommands
                     {
                         commandMode = false;
                         string cmdStr = commandInput.Trim();
-                        
+
                         if (cmdStr == "q" || cmdStr == "q!")
                         {
                             running = false;
@@ -445,7 +452,7 @@ public static class BuiltinCommands
                         else if (cmdStr.StartsWith("w ") || cmdStr.StartsWith("wq ") || cmdStr == "w" || cmdStr == "wq")
                         {
                             string[] parts = cmdStr.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-                            string fileToSave = targetFile; 
+                            string fileToSave = targetFile;
 
                             if (parts.Length > 1)
                             {
@@ -462,7 +469,7 @@ public static class BuiltinCommands
                                 {
                                     System.IO.File.WriteAllLines(fileToSave, buffer.Select(b => b.ToString()));
                                     statusMessage = $"Written to {fileToSave}";
-                                    targetFile = fileToSave; 
+                                    targetFile = fileToSave;
                                     displayFile = targetFile;
                                     if (parts[0] == "wq" || parts[0] == "wq ") running = false;
                                 }
@@ -518,7 +525,7 @@ public static class BuiltinCommands
                                 string oldText = parts[1];
                                 string newText = parts[2];
                                 int totalReplaced = 0;
-                                
+
                                 foreach (var b in buffer)
                                 {
                                     string s = b.ToString();
@@ -685,12 +692,12 @@ public static class BuiltinCommands
         }
         finally
         {
-            Console.Write("\x1b[?1049l\x1b[?25h"); 
+            Console.Write("\x1b[?1049l\x1b[?25h");
         }
 
         return exitCode;
     }
-    
+
     private static string GetPlatform()
     {
         string os = string.Empty;
@@ -698,13 +705,16 @@ public static class BuiltinCommands
         if (OperatingSystem.IsWindows())
         {
             os = "Windows";
-        }else if (OperatingSystem.IsLinux())
+        }
+        else if (OperatingSystem.IsLinux())
         {
             os = "Linux";
-        }else if (OperatingSystem.IsAndroid())
+        }
+        else if (OperatingSystem.IsAndroid())
         {
             os = "Android";
-        }else if (OperatingSystem.IsMacOS())
+        }
+        else if (OperatingSystem.IsMacOS())
         {
             os = "MacOS";
         }
@@ -806,7 +816,7 @@ public static class BuiltinCommands
     private static int ExecuteLs(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         string targetPath = workingDirectory;
-        
+
         if (cmd.Args.Count >= 1)
         {
             if (Path.IsPathRooted(cmd.Args[0]))
@@ -841,7 +851,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-   
+
     private static void ExecuteCommand(string command, List<string> lines, bool isEditMode, string filePath, ref bool running, ref bool bufferModified)
     {
         var parts = command.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -859,11 +869,11 @@ public static class BuiltinCommands
                     running = false;
                 }
                 break;
-                
+
             case "q!":
                 running = false;
                 break;
-                
+
             case "w":
                 if (parts.Length >= 2)
                 {
@@ -896,7 +906,7 @@ public static class BuiltinCommands
                     Console.Error.WriteLine("No file name specified");
                 }
                 break;
-                
+
             case "wq":
                 if (parts.Length >= 2)
                 {
@@ -927,7 +937,7 @@ public static class BuiltinCommands
                     Console.Error.WriteLine("No file name specified");
                 }
                 break;
-                
+
             default:
                 Console.Error.WriteLine($"Not an editor command: {parts[0]}");
                 break;
@@ -1099,10 +1109,10 @@ public static class BuiltinCommands
                 if (selectedIndex >= scrollOffset + height) scrollOffset = selectedIndex - height + 1;
 
                 Console.Write(Utils.Ansi.SetCursorPosition(1, 1));
-                
+
                 Console.Write(Utils.Ansi.ClearLine);
                 Console.WriteLine("\n  AurSh History");
-                
+
                 Console.Write(Utils.Ansi.ClearLine);
                 Console.WriteLine(Utils.Ansi.FgBrightBlack + new string('\u2500', width) + Utils.Ansi.Reset);
 
@@ -1115,17 +1125,17 @@ public static class BuiltinCommands
                     {
                         bool isSelected = itemIdx == selectedIndex;
                         var item = filtered[itemIdx];
-                        
+
                         string numStr = (itemIdx + 1).ToString().PadLeft(3);
                         string origNumStr = item.OriginalIndex.ToString().PadLeft(3);
-                        
+
                         string prefix = $" {numStr} \u2502 {origNumStr} ";
                         string lineText = item.Line;
-                        
+
                         int maxLineLen = width - prefix.Length - 2;
                         if (maxLineLen > 0 && lineText.Length > maxLineLen)
                             lineText = lineText.Substring(0, maxLineLen - 1) + "\u2026";
-                        
+
                         if (isSelected)
                         {
                             Console.Write(Utils.Ansi.BgRgb(50, 50, 70) + Utils.Ansi.FgWhite + prefix + lineText.PadRight(maxLineLen + 2) + Utils.Ansi.Reset);
@@ -2028,7 +2038,7 @@ public static class BuiltinCommands
             }
 
             string template = string.Join(" ", cmd.Args.Skip(1));
-            if ((template.StartsWith('"') && template.EndsWith('"')) || 
+            if ((template.StartsWith('"') && template.EndsWith('"')) ||
                 (template.StartsWith('\'') && template.EndsWith('\'')))
             {
                 template = template.Substring(1, template.Length - 2);

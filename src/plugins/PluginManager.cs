@@ -120,7 +120,7 @@ public class PluginManager
 
         foreach (var cmd in plugin.RegisteredCommands.Keys)
             _commandMap.Remove(cmd);
-        
+
         foreach (var cmd in plugin.Manifest.Commands)
             _commandMap.Remove(cmd);
 
@@ -558,7 +558,7 @@ aursh.print(""[plugin] {name} loaded"")
         }
 
         bool isFSharp = filePath.EndsWith(".fsx", StringComparison.OrdinalIgnoreCase);
-        
+
         try
         {
             if (isFSharp)
@@ -573,7 +573,7 @@ aursh.print(""[plugin] {name} loaded"")
 
                 using var proc = System.Diagnostics.Process.Start(psi);
                 if (proc == null) return 1;
-                
+
                 string output = proc.StandardOutput.ReadToEnd();
                 string error = proc.StandardError.ReadToEnd();
                 proc.WaitForExit();
@@ -596,7 +596,7 @@ aursh.print(""[plugin] {name} loaded"")
                 var tokens = lexer.Tokenize();
                 var parser = new LuaParser(tokens);
                 parser.ParseBlock();
-                
+
                 Console.WriteLine($"Syntax OK: {filePath}");
                 return 0;
             }

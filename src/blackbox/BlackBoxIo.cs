@@ -251,7 +251,7 @@ public static class BlackBoxIo
                     }
 
                     lineBuf.WriteByte(b);
-                    
+
                     // Update partial line so the renderer can show it immediately (prompts, etc.)
                     string partialRaw = StripTrailingCr(Encoding.UTF8.GetString(lineBuf.GetBuffer(), 0, (int)lineBuf.Length));
                     string pPrefix = ansiTracker.GetStatePrefix();
@@ -537,13 +537,13 @@ public static class BlackBoxIo
                         inputBuilder.Clear();
                         cursor = 0;
                         session.UpdateInput("", 0);
-                        
-                        try 
-                        { 
-                            await stdin.WriteLineAsync(line).ConfigureAwait(false); 
+
+                        try
+                        {
+                            await stdin.WriteLineAsync(line).ConfigureAwait(false);
                             session.Buffer.Append(line, LineKind.StdinEcho);
                             liveRenderer.ForceUpdate(session, session.TerminalOut);
-                        } 
+                        }
                         catch { return; }
                     }
                     else if (key.Key == System.ConsoleKey.Backspace)

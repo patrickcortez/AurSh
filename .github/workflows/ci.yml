@@ -55,7 +55,7 @@ jobs:
         sed -i 's/^#\?SandboxUser.*/SandboxUser = root/' /etc/pacman.conf
 
     - name: Install dependencies
-      run: pacman -Sy --noconfirm python icu
+      run: pacman -Sy --noconfirm python icu sdl2
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -64,6 +64,15 @@ jobs:
 
     - name: Build
       run: make build
+
+    - name: Diagnose binary
+      run: |
+        echo "=== Checking binary exists ==="
+        ls -la bin/aursh* || true
+        echo "=== Checking linked libraries ==="
+        ldd bin/aursh 2>&1 || true
+        echo "=== Attempting direct run ==="
+        ./bin/aursh -c "echo ok" 2>&1 || true
 
     - name: Test
       run: make test

@@ -83,8 +83,27 @@ It saves the association rule to the configuration. When the shell's `Parser` se
 - `aursh-context`: Manages persistent disk-backed variables (see Contexts documentation).
 - `aursh-net`: A cross-platform Wi-Fi manager and P2P file sender (see AurshNet documentation).
 - `aursh-reload`: Instantly reloads the shell's configuration and plugins without restarting the terminal.
-- `aursh-update`: Reaches out to the remote repository and updates the shell to the latest version.
 - `aursh-about`: Displays system info, version, and architecture details.
+
+### `aursh-update`
+
+**What it does**
+Reaches out to the remote repository and updates the shell to the latest version. It safely stashes any uncommitted local changes you might have made in the shell's source directory so that updates never fail due to conflicts.
+
+**Example Usage**
+```bash
+# Update the shell to the latest version
+sudo aursh-update
+
+# Check if an update is available without installing
+aursh-update check
+
+# Switch the update channel
+aursh-update change beta
+```
+
+**How it works internally**
+It runs a standalone binary (to allow elevated execution without elevating the entire shell). It resolves the installation directory, executes `git stash --quiet` to safely hide local modifications, and pulls the newest commits. Finally, it triggers a rebuild using `make` or `.NET SDK` to compile the fresh code.
 
 ---
 

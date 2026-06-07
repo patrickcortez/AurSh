@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu
+            os: ubuntu-latest
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+          - name: Arch Linux
+            os: ubuntu-latest
+            container: archlinux:latest
+          - name: Termux
+            os: ubuntu-latest
+            container: ghcr.io/termux/termux-docker:latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies (Arch Linux)
+      if: matrix.name == 'Arch Linux'
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm make python dotnet-sdk dotnet-runtime gcc
+
+    - name: Install dependencies (Termux)
+      if: matrix.name == 'Termux'
+      run: |
+        pkg update -y
+        pkg install -y make python dotnet-sdk-8 clang
+
+    - name: Setup .NET
+      if: matrix.name != 'Arch Linux' && matrix.name != 'Termux'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install Windows Dependencies
+      if: matrix.name == 'Windows'
+      run: choco install make -y
+
+    - name: Build
+      run: make build
+
+    - name: Install (User Directory)
+      run: make install-user
+
+    - name: Test
+      run: make test

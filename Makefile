@@ -116,7 +116,7 @@ endif
 
 # Targets
 
-.PHONY: all build release publish install install-user uninstall clean run info help setfont deps
+.PHONY: all build release publish install install-user uninstall clean run test info help setfont deps
 
 all: build
 
@@ -406,6 +406,15 @@ ifeq ($(WIN_ENV),native)
 else
 	@echo "[run] Launching aursh..."
 	@cd $(BIN_DIR) && ./$(EXE)
+endif
+
+test: build
+ifeq ($(WIN_ENV),native)
+	@echo [test] Running tests...
+	@python tests/test.py
+else
+	@echo "[test] Running tests..."
+	@python3 tests/test.py
 endif
 
 clean:

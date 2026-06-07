@@ -1,0 +1,28 @@
+name: Lint
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Format Check (AurShell)
+      run: dotnet format src/AurShell.csproj --verify-no-changes
+
+    - name: Format Check (AurShUpdate)
+      run: dotnet format src/aursh-update/AurShUpdate.csproj --verify-no-changes
+
+    - name: Format Check (Contexts)
+      run: dotnet format src/Contexts/Contexts.csproj --verify-no-changes

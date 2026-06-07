@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Install dependencies
+      run: sudo apt-get install -y make
+      
+    - name: Publish Binaries
+      run: make publish
+      
+    - name: Archive Binaries
+      run: |
+        mkdir -p dist
+        cp -r publish/* dist/
+        cd dist && zip -r ../aurshell-release.zip .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: aurshell-release.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

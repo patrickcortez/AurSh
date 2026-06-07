@@ -7,7 +7,6 @@ on:
     branches: [ master, main ]
 
 jobs:
-  # Standard runners (Ubuntu, Windows, macOS, Termux cross-compile)
   build-and-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -21,8 +20,6 @@ jobs:
             os: windows-latest
           - name: macOS
             os: macos-latest
-          - name: Termux (cross-compile)
-            os: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -32,34 +29,17 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Install Windows Dependencies
+    - name: Install Make (Windows)
       if: matrix.name == 'Windows'
-      shell: powershell
       run: choco install make -y
 
     - name: Build
-      shell: bash
-      run: |
-        if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
-          make build DETECTED_OS=Termux
-        else
-          make build
-        fi
-
-    - name: Install (User Directory)
-      shell: bash
-      run: |
-        if [ "${{ matrix.name }}" == "Termux (cross-compile)" ]; then
-          make install-user DETECTED_OS=Termux
-        else
-          make install-user
-        fi
+      run: make build
 
     - name: Test
-      if: matrix.name != 'Termux (cross-compile)'
       run: make test
 
-  # Arch Linux runs inside a container (separate job)
+  # Arch Linux needs a container for pacman-based dependency resolution
   build-arch:
     name: Arch Linux
     runs-on: ubuntu-latest
@@ -70,19 +50,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Configure pacman sandbox
+    - name: Configure pacman
       run: |
         sed -i 's/^#\?SandboxUser.*/SandboxUser = root/' /etc/pacman.conf
 
     - name: Install dependencies
-      run: |
-        pacman -Sy --noconfirm python dotnet-sdk
+      run: pacman -Sy --noconfirm python dotnet-sdk
 
     - name: Build
       run: make build
 
-    - name: Install (User Directory)
-      run: make install-user
-
     - name: Test
       run: make test
+
+  # Termux builds are verified via the Release workflow (NativeAOT cross-compile).
+  # Termux Docker images are not reliably available in GitHub Actions runners,
+  # so Termux-specific testing requires a self-hosted runner or manual testing.

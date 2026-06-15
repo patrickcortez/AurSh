@@ -607,6 +607,36 @@ public class InputHandler
                 return true;
         }
 
+        if (trimmed.EndsWith("then") || trimmed.EndsWith("do"))
+            return true;
+
+        int ifDepth = 0;
+        int loopDepth = 0;
+        int caseDepth = 0;
+        int braceDepth = 0;
+
+        string[] lines = input.Split(new[] { '\n', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            string l = line.Trim();
+            if (l.StartsWith("if ") || l == "if") ifDepth++;
+            if (l == "fi") ifDepth--;
+            
+            if (l.StartsWith("for ") || l == "for") loopDepth++;
+            if (l.StartsWith("while ") || l == "while") loopDepth++;
+            if (l.StartsWith("until ") || l == "until") loopDepth++;
+            if (l == "done") loopDepth--;
+
+            if (l.StartsWith("case ") || l == "case") caseDepth++;
+            if (l == "esac") caseDepth--;
+
+            if (l.Contains("{")) braceDepth++; // basic heuristic
+            if (l.Contains("}")) braceDepth--;
+        }
+
+        if (ifDepth > 0 || loopDepth > 0 || caseDepth > 0 || braceDepth > 0)
+            return true;
+
         return false;
     }
 

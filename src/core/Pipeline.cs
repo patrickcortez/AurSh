@@ -77,6 +77,12 @@ public static class Pipeline
                             originalIn = Console.In;
                             Console.SetIn(new StreamReader(stdinStream));
                             break;
+                        case RedirectType.HereString:
+                            stdinStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
+                            originalIn = Console.In;
+                            Console.SetIn(new StreamReader(stdinStream));
+                            break;
+
                         case RedirectType.Err:
                             stderrStream = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
                             if (stderrStream == null) return 1;
@@ -224,7 +230,7 @@ public static class Pipeline
 
         FileStream? stdoutFile = null;
         FileStream? stderrFile = null;
-        FileStream? stdinFile = null;
+        Stream? stdinFile = null;
         bool redirectStdout = false;
         bool redirectStderr = false;
         bool redirectStdin = false;
@@ -250,6 +256,11 @@ public static class Pipeline
                 case RedirectType.In:
                     stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
                     if (stdinFile == null) return 1;
+                    psi.RedirectStandardInput = true;
+                    redirectStdin = true;
+                    break;
+                case RedirectType.HereString:
+                    stdinFile = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
                     psi.RedirectStandardInput = true;
                     redirectStdin = true;
                     break;
@@ -302,6 +313,7 @@ public static class Pipeline
             if (background)
             {
                 int jobId = env.Jobs.Add(process, cmd.Name + (cmd.Args.Count > 0 ? " " + string.Join(" ", cmd.Args) : ""));
+                env.BackgroundPid = process.Id;
                 Console.WriteLine($"[{jobId}] {process.Id}");
                 return 0;
             }
@@ -452,8 +464,8 @@ public static class Pipeline
         }
 
         var processes = new Process?[count];
-        var fileStreams = new List<FileStream>();
-        var redirInfos = new (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut)[count];
+        var fileStreams = new List<Stream>();
+        var redirInfos = new (FileStream? stdout, FileStream? stderr, Stream? stdin, bool errToOut)[count];
 
         async System.Threading.Tasks.Task PumpStreamResilientAsync(Stream source, Stream? destination, object? writeLock = null)
         {
@@ -1002,12 +1014,12 @@ public static class Pipeline
         return psi;
     }
 
-    private static (FileStream? stdout, FileStream? stderr, FileStream? stdin, bool errToOut) ApplyRedirections(
-        CommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<FileStream> streams)
+    private static (FileStream? stdout, FileStream? stderr, Stream? stdin, bool errToOut) ApplyRedirections(
+        CommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<Stream> streams)
     {
         FileStream? stdoutFile = null;
         FileStream? stderrFile = null;
-        FileStream? stdinFile = null;
+        Stream? stdinFile = null;
         bool errToOut = false;
 
         foreach (var redir in cmd.Redirections)
@@ -1030,6 +1042,11 @@ public static class Pipeline
                 case RedirectType.In:
                     stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
                     if (stdinFile == null) continue;
+                    psi.RedirectStandardInput = true;
+                    streams.Add(stdinFile);
+                    break;
+                case RedirectType.HereString:
+                    stdinFile = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
                     psi.RedirectStandardInput = true;
                     streams.Add(stdinFile);
                     break;
@@ -1129,7 +1146,7 @@ public static class Pipeline
 
         FileStream? stdoutFile = null;
         FileStream? stderrFile = null;
-        FileStream? stdinFile = null;
+        Stream? stdinFile = null;
         bool redirectStdout = false;
         bool redirectStderr = false;
         bool redirectStdin = false;
@@ -1155,6 +1172,11 @@ public static class Pipeline
                 case RedirectType.In:
                     stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
                     if (stdinFile == null) return 1;
+                    psi.RedirectStandardInput = true;
+                    redirectStdin = true;
+                    break;
+                case RedirectType.HereString:
+                    stdinFile = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
                     psi.RedirectStandardInput = true;
                     redirectStdin = true;
                     break;

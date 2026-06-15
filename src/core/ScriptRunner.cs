@@ -11,6 +11,10 @@ public class ScriptRunner
     private string _scriptName = "";
     private bool _returnRequested;
     private int _returnCode;
+    private bool _breakRequested;
+    private int _breakDepth;
+    private bool _continueRequested;
+    private int _continueDepth;
 
     private class FunctionDef
     {
@@ -91,6 +95,9 @@ public class ScriptRunner
         if (line.StartsWith("if ") || line == "if")
             return ExecuteIf(lines, ref index);
 
+        if (line.StartsWith("case ") || line == "case")
+            return ExecuteCase(lines, ref index);
+
         if (line.StartsWith("for ") || line == "for")
             return ExecuteFor(lines, ref index);
 
@@ -119,8 +126,57 @@ public class ScriptRunner
             return _returnCode;
         }
 
-        if (line == "break" || line == "continue")
+        if (line == "break" || line.StartsWith("break "))
         {
+            _breakDepth = 1;
+            if (line.StartsWith("break "))
+            {
+                string depthStr = line.Substring(6).Trim();
+                if (int.TryParse(depthStr, out int d) && d > 0)
+                {
+                    _breakDepth = d;
+                }
+            }
+            _breakRequested = true;
+            index++;
+            return 0;
+        }
+
+        if (line == "continue" || line.StartsWith("continue "))
+        {
+            _continueDepth = 1;
+            if (line.StartsWith("continue "))
+            {
+                string depthStr = line.Substring(9).Trim();
+                if (int.TryParse(depthStr, out int d) && d > 0)
+                {
+                    _continueDepth = d;
+                }
+            }
+            _continueRequested = true;
+            index++;
+            return 0;
+        }
+
+        if (line == "shift" || line.StartsWith("shift "))
+        {
+            int n = 1;
+            if (line.StartsWith("shift "))
+            {
+                int.TryParse(line.Substring(6).Trim(), out n);
+            }
+            if (n > 0)
+            {
+                if (n <= _scriptArgs.Length)
+                {
+                    _scriptArgs = _scriptArgs.Skip(n).ToArray();
+                }
+                else
+                {
+                    _scriptArgs = Array.Empty<string>();
+                }
+                SetPositionalParams(_scriptArgs);
+            }
             index++;
             return 0;
         }
@@ -205,6 +261,11 @@ public class ScriptRunner
                     index++;
                     continue;
                 }
+                if (current.StartsWith("then "))
+                {
+                    lines[index] = current.Substring(5).Trim();
+                    current = lines[index];
+                }
             }
 
             if (currentElifBlock != null)
@@ -275,11 +336,20 @@ public class ScriptRunner
         {
             string current = lines[index].Trim();
 
-            if (!passedDo && (current == "do" || current.StartsWith("do;")))
+            if (!passedDo)
             {
-                passedDo = true;
-                index++;
-                continue;
+                if (current == "do" || current.StartsWith("do;"))
+                {
+                    passedDo = true;
+                    index++;
+                    continue;
+                }
+                if (current.StartsWith("do "))
+                {
+                    passedDo = true;
+                    lines[index] = current.Substring(3).Trim();
+                    current = lines[index];
+                }
             }
 
             if (current.StartsWith("for ") || current.StartsWith("while ") || current.StartsWith("until "))
@@ -308,6 +378,22 @@ public class ScriptRunner
 
             _env.Set(varName, value);
             result = ExecuteBlock(body);
+
+            if (_continueRequested)
+            {
+                _continueDepth--;
+                _continueRequested = _continueDepth > 0;
+                if (_continueRequested)
+                    break;
+                continue;
+            }
+
+            if (_breakRequested)
+            {
+                _breakDepth--;
+                _breakRequested = _breakDepth > 0;
+                break;
+            }
         }
 
         return result;
@@ -329,11 +415,20 @@ public class ScriptRunner
         {
             string current = lines[index].Trim();
 
-            if (!passedDo && (current == "do" || current.StartsWith("do;")))
+            if (!passedDo)
             {
-                passedDo = true;
-                index++;
-                continue;
+                if (current == "do" || current.StartsWith("do;"))
+                {
+                    passedDo = true;
+                    index++;
+                    continue;
+                }
+                if (current.StartsWith("do "))
+                {
+                    passedDo = true;
+                    lines[index] = current.Substring(3).Trim();
+                    current = lines[index];
+                }
             }
 
             if (current.StartsWith("for ") || current.StartsWith("while ") || current.StartsWith("until "))
@@ -364,6 +459,22 @@ public class ScriptRunner
 
             result = ExecuteBlock(body);
             iteration++;
+
+            if (_continueRequested)
+            {
+                _continueDepth--;
+                _continueRequested = _continueDepth > 0;
+                if (_continueRequested)
+                    break;
+                continue;
+            }
+
+            if (_breakRequested)
+            {
+                _breakDepth--;
+                _breakRequested = _breakDepth > 0;
+                break;
+            }
         }
 
         return result;
@@ -384,11 +495,20 @@ public class ScriptRunner
         {
             string current = lines[index].Trim();
 
-            if (!passedDo && (current == "do" || current.StartsWith("do;")))
+            if (!passedDo)
             {
-                passedDo = true;
-                index++;
-                continue;
+                if (current == "do" || current.StartsWith("do;"))
+                {
+                    passedDo = true;
+                    index++;
+                    continue;
+                }
+                if (current.StartsWith("do "))
+                {
+                    passedDo = true;
+                    lines[index] = current.Substring(3).Trim();
+                    current = lines[index];
+                }
             }
 
             if (current.StartsWith("for ") || current.StartsWith("while ") || current.StartsWith("until "))
@@ -419,9 +539,131 @@ public class ScriptRunner
 
             result = ExecuteBlock(body);
             iteration++;
+
+            if (_continueRequested)
+            {
+                _continueDepth--;
+                _continueRequested = _continueDepth > 0;
+                if (_continueRequested)
+                    break;
+                continue;
+            }
+
+            if (_breakRequested)
+            {
+                _breakDepth--;
+                _breakRequested = _breakDepth > 0;
+                break;
+            }
         }
 
         return result;
+    }
+
+    private int ExecuteCase(List<string> lines, ref int index)
+    {
+        string line = lines[index].Trim();
+        index++;
+
+        string value = "";
+        int caseIdx = line.IndexOf("case ");
+        int inIdx = line.LastIndexOf(" in");
+        if (caseIdx >= 0 && inIdx > caseIdx)
+        {
+            string rawValue = _env.Expand(ExpandPositionalParams(line.Substring(caseIdx + 5, inIdx - caseIdx - 5).Trim()));
+            var valParts = SplitCommandLine(rawValue);
+            value = valParts.Length > 0 ? valParts[0] : "";
+        }
+
+        bool matched = false;
+        int result = 0;
+        int depth = 0;
+
+        while (index < lines.Count)
+        {
+            string current = lines[index].Trim();
+
+            if (current == "esac")
+            {
+                if (depth == 0)
+                {
+                    index++;
+                    break;
+                }
+            }
+
+            if (depth == 0 && current.EndsWith(")") && !current.StartsWith("function") && !current.Contains("()"))
+            {
+                string patternStr = current.Substring(0, current.Length - 1).Trim();
+                if (patternStr.StartsWith("("))
+                    patternStr = patternStr.Substring(1).Trim();
+
+                bool isMatch = false;
+                if (!matched)
+                {
+                    string[] patterns = patternStr.Split('|', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string p in patterns)
+                    {
+                        string rawPat = _env.Expand(ExpandPositionalParams(p.Trim()));
+                        var patParts = SplitCommandLine(rawPat);
+                        string pat = patParts.Length > 0 ? patParts[0] : "";
+
+                        if (pat == "*" || IsWildcardMatch(value, pat))
+                        {
+                            isMatch = true;
+                            break;
+                        }
+                    }
+                }
+
+                index++;
+                List<string> block = new();
+                int blockDepth = 0;
+
+                while (index < lines.Count)
+                {
+                    string inner = lines[index].Trim();
+                    if (inner.StartsWith("case ")) blockDepth++;
+                    else if (inner == "esac")
+                    {
+                        if (blockDepth > 0) blockDepth--;
+                        else break;
+                    }
+                    else if (inner == ";;")
+                    {
+                        if (blockDepth == 0)
+                        {
+                            index++;
+                            break;
+                        }
+                    }
+
+                    block.Add(lines[index]);
+                    index++;
+                }
+
+                if (isMatch && !matched)
+                {
+                    matched = true;
+                    result = ExecuteBlock(block);
+                }
+                continue;
+            }
+
+            index++;
+        }
+
+        return result;
+    }
+
+    private bool IsWildcardMatch(string value, string pattern)
+    {
+        string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        try {
+            return System.Text.RegularExpressions.Regex.IsMatch(value, regexPattern);
+        } catch { return false; }
     }
 
     private int ExecuteBlock(List<string> block)
@@ -433,6 +675,9 @@ public class ScriptRunner
         {
             if (_returnRequested)
                 return _returnCode;
+
+            if (_breakRequested || _continueRequested)
+                return lastResult;
 
             lastResult = ExecuteLine(block, ref blockIndex);
             _env.LastExitCode = lastResult;
@@ -451,8 +696,18 @@ public class ScriptRunner
 
         _scriptArgs = funcArgs;
         SetPositionalParams(funcArgs);
-
-        int result = ExecuteBlock(func.Body);
+        
+        _env.PushScope();
+        _env.SetLocal("FUNCNAME", func.Name);
+        int result = 0;
+        try
+        {
+            result = ExecuteBlock(func.Body);
+        }
+        finally
+        {
+            _env.PopScope();
+        }
 
         _scriptArgs = savedArgs;
         _scriptName = savedName;
@@ -605,57 +860,114 @@ public class ScriptRunner
         if (parts.Length == 0)
             return false;
 
-        if (parts.Length == 1)
-            return !string.IsNullOrEmpty(parts[0]);
+        int pos = 0;
+        return ParseTestOr(parts, ref pos);
+    }
 
-        if (parts.Length == 2)
+    private bool ParseTestOr(string[] parts, ref int pos)
+    {
+        bool result = ParseTestAnd(parts, ref pos);
+        while (pos < parts.Length && (parts[pos] == "||" || parts[pos] == "-o"))
         {
-            string op = parts[0];
-            string operand = parts[1];
+            pos++;
+            bool right = ParseTestAnd(parts, ref pos);
+            result = result || right;
+        }
+        return result;
+    }
 
-            return op switch
-            {
-                "-z" => string.IsNullOrEmpty(operand),
-                "-n" => !string.IsNullOrEmpty(operand),
-                "-f" => File.Exists(operand),
-                "-d" => Directory.Exists(operand),
-                "-e" => File.Exists(operand) || Directory.Exists(operand),
-                "-r" => File.Exists(operand),
-                "-w" => File.Exists(operand),
-                "-x" => File.Exists(operand),
-                "-s" => File.Exists(operand) && new FileInfo(operand).Length > 0,
-                "!" => string.IsNullOrEmpty(operand),
-                _ => false
-            };
+    private bool ParseTestAnd(string[] parts, ref int pos)
+    {
+        bool result = ParseTestPrimary(parts, ref pos);
+        while (pos < parts.Length && (parts[pos] == "&&" || parts[pos] == "-a"))
+        {
+            pos++;
+            bool right = ParseTestPrimary(parts, ref pos);
+            result = result && right;
+        }
+        return result;
+    }
+
+    private bool ParseTestPrimary(string[] parts, ref int pos)
+    {
+        if (pos >= parts.Length) return false;
+
+        if (pos + 1 < parts.Length && IsBinaryTestOp(parts[pos + 1]))
+        {
+            string left = parts[pos];
+            string op = parts[pos + 1];
+            string right = pos + 2 < parts.Length ? parts[pos + 2] : "";
+            pos += 3;
+            return EvaluateBinaryTestOp(left, op, right);
         }
 
-        if (parts.Length == 3)
+        if (parts[pos] == "!")
         {
-            string left = parts[0];
-            string op = parts[1];
-            string right = parts[2];
-
-            return op switch
-            {
-                "=" or "==" => left == right,
-                "!=" => left != right,
-                "-eq" => IntCompare(left, right, (a, b) => a == b),
-                "-ne" => IntCompare(left, right, (a, b) => a != b),
-                "-lt" => IntCompare(left, right, (a, b) => a < b),
-                "-le" => IntCompare(left, right, (a, b) => a <= b),
-                "-gt" => IntCompare(left, right, (a, b) => a > b),
-                "-ge" => IntCompare(left, right, (a, b) => a >= b),
-                _ => false
-            };
+            pos++;
+            return !ParseTestPrimary(parts, ref pos);
         }
 
-        if (parts.Length == 4 && parts[0] == "!")
+        if (parts[pos] == "(")
         {
-            string innerExpr = string.Join(" ", parts.Skip(1));
-            return !EvaluateTestExpression(innerExpr);
+            pos++;
+            bool result = ParseTestOr(parts, ref pos);
+            if (pos < parts.Length && parts[pos] == ")") pos++;
+            return result;
         }
 
-        return false;
+        if (IsUnaryTestOp(parts[pos]))
+        {
+            string op = parts[pos];
+            string operand = pos + 1 < parts.Length ? parts[pos + 1] : "";
+            pos += 2;
+            return EvaluateUnaryTestOp(op, operand);
+        }
+
+        string val = parts[pos];
+        pos++;
+        return !string.IsNullOrEmpty(val);
+    }
+
+    private bool IsBinaryTestOp(string op) => 
+        op == "=" || op == "==" || op == "!=" || 
+        op == "-eq" || op == "-ne" || op == "-lt" || 
+        op == "-le" || op == "-gt" || op == "-ge";
+
+    private bool IsUnaryTestOp(string op) =>
+        op == "-z" || op == "-n" || op == "-f" || op == "-d" || 
+        op == "-e" || op == "-r" || op == "-w" || op == "-x" || op == "-s";
+
+    private bool EvaluateBinaryTestOp(string left, string op, string right)
+    {
+        return op switch
+        {
+            "=" or "==" => left == right,
+            "!=" => left != right,
+            "-eq" => IntCompare(left, right, (a, b) => a == b),
+            "-ne" => IntCompare(left, right, (a, b) => a != b),
+            "-lt" => IntCompare(left, right, (a, b) => a < b),
+            "-le" => IntCompare(left, right, (a, b) => a <= b),
+            "-gt" => IntCompare(left, right, (a, b) => a > b),
+            "-ge" => IntCompare(left, right, (a, b) => a >= b),
+            _ => false
+        };
+    }
+
+    private bool EvaluateUnaryTestOp(string op, string operand)
+    {
+        return op switch
+        {
+            "-z" => string.IsNullOrEmpty(operand),
+            "-n" => !string.IsNullOrEmpty(operand),
+            "-f" => File.Exists(operand),
+            "-d" => Directory.Exists(operand),
+            "-e" => File.Exists(operand) || Directory.Exists(operand),
+            "-r" => File.Exists(operand),
+            "-w" => File.Exists(operand),
+            "-x" => File.Exists(operand),
+            "-s" => File.Exists(operand) && new FileInfo(operand).Length > 0,
+            _ => false
+        };
     }
 
     private string ExpandPositionalParams(string line)
@@ -663,9 +975,42 @@ public class ScriptRunner
         var sb = new StringBuilder();
         for (int i = 0; i < line.Length; i++)
         {
+            if (line[i] == '`')
+            {
+                int close = line.IndexOf('`', i + 1);
+                if (close > i)
+                {
+                    string subcmd = line.Substring(i + 1, close - i - 1);
+                    var (exit, output) = _executor.ExecuteCapture(subcmd);
+                    sb.Append(output.TrimEnd('\r', '\n'));
+                    i = close;
+                    continue;
+                }
+            }
+
             if (line[i] == '$' && i + 1 < line.Length)
             {
                 char next = line[i + 1];
+
+                if (next == '(')
+                {
+                    int depth = 1;
+                    int j = i + 2;
+                    while (j < line.Length && depth > 0)
+                    {
+                        if (line[j] == '(') depth++;
+                        else if (line[j] == ')') depth--;
+                        if (depth > 0) j++;
+                    }
+                    if (depth == 0)
+                    {
+                        string subcmd = line.Substring(i + 2, j - i - 2);
+                        var (exit, output) = _executor.ExecuteCapture(subcmd);
+                        sb.Append(output.TrimEnd('\r', '\n'));
+                        i = j;
+                        continue;
+                    }
+                }
 
                 if (next == '@')
                 {
@@ -885,7 +1230,7 @@ public class ScriptRunner
             else if (c == '"' && !inSingle)
                 inDouble = !inDouble;
 
-            if (c == '\n' && !inSingle && !inDouble)
+            if ((c == '\n' || c == ';') && !inSingle && !inDouble)
             {
                 lines.Add(current.ToString());
                 current.Clear();

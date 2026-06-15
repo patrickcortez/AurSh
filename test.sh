@@ -1,0 +1,9 @@
+var='hello world'
+echo ${var#*l}
+echo ${var##*l}
+echo ${var%l*}
+echo ${var%%l*}
+echo ${var/o/O}
+echo ${var//o/O}
+echo ${var^^}
+echo ${var,,}

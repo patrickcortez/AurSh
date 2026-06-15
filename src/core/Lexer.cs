@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AurShell.Core;
 
@@ -16,6 +17,8 @@ public enum TokenType
     RedirectErr,
     RedirectErrAppend,
     RedirectErrToOut,
+    HereDoc,
+    HereString,
     Newline,
     EOF
 }
@@ -154,8 +157,29 @@ public class Lexer
 
             if (c == '<')
             {
-                tokens.Add(new Token(TokenType.RedirectIn, "<"));
                 _pos++;
+                if (_pos < _input.Length && _input[_pos] == '<')
+                {
+                    _pos++;
+                    if (_pos < _input.Length && _input[_pos] == '<')
+                    {
+                        _pos++;
+                        tokens.Add(new Token(TokenType.HereString, "<<<"));
+                    }
+                    else if (_pos < _input.Length && _input[_pos] == '-')
+                    {
+                        _pos++;
+                        tokens.Add(new Token(TokenType.HereDoc, "<<-"));
+                    }
+                    else
+                    {
+                        tokens.Add(new Token(TokenType.HereDoc, "<<"));
+                    }
+                }
+                else
+                {
+                    tokens.Add(new Token(TokenType.RedirectIn, "<"));
+                }
                 continue;
             }
 
@@ -245,6 +269,15 @@ public class Lexer
 
             if (c == '$')
             {
+                if (_pos + 2 < _input.Length && _input[_pos + 1] == '(' && _input[_pos + 2] == '(')
+                {
+                    string arithExpanded = ExpandArithmetic();
+                    sb.Append(arithExpanded);
+                    rawSb.Append(arithExpanded);
+                    wasSingleQuoted = false;
+                    continue;
+                }
+
                 if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
                     string sub = ReadSubCommand();
@@ -361,6 +394,12 @@ public class Lexer
 
             if (c == '$')
             {
+                if (_pos + 2 < _input.Length && _input[_pos + 1] == '(' && _input[_pos + 2] == '(')
+                {
+                    sb.Append(ExpandArithmetic());
+                    continue;
+                }
+
                 if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
                     sb.Append(ReadSubCommand());
@@ -378,6 +417,26 @@ public class Lexer
             _pos++;
 
         return sb.ToString();
+    }
+
+    private string ExpandArithmetic()
+    {
+        _pos += 3; // skip $((
+        int start = _pos;
+        int depth = 2; // we passed two ((
+        
+        while (_pos < _input.Length && depth > 0)
+        {
+            if (_input[_pos] == '(') depth++;
+            else if (_input[_pos] == ')') depth--;
+            
+            if (depth > 0) _pos++;
+        }
+        
+        string mathExpr = _input.Substring(start, _pos - start);
+        if (_pos < _input.Length) _pos++; // skip last )
+        
+        return MathEvaluator.Evaluate(mathExpr, _env).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private string ExpandInline()
@@ -406,6 +465,12 @@ public class Lexer
         {
             _pos++;
             return _env.ShellPid.ToString();
+        }
+
+        if (c == '!')
+        {
+            _pos++;
+            return _env.BackgroundPid.ToString();
         }
 
         if (c == '{')
@@ -473,6 +538,21 @@ public class Lexer
         if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && IsPowerShellBracedVariable(content))
             return "${" + content + "}";
 
+        if (content.StartsWith("#"))
+        {
+            string varName = content.Substring(1);
+            if (varName.EndsWith("[@]") || varName.EndsWith("[*]"))
+            {
+                string arrName = varName.Substring(0, varName.Length - 3);
+                int length = _env.GetArrayLength(arrName);
+                if (length == 0 && _env.GetAssocArray(arrName) != null)
+                    length = _env.GetAssocArray(arrName)!.Count;
+                return length.ToString();
+            }
+            string? v = _env.Get(varName);
+            return v != null ? v.Length.ToString() : "0";
+        }
+
         int colonDash = content.IndexOf(":-", StringComparison.Ordinal);
         if (colonDash >= 0)
         {
@@ -527,7 +607,94 @@ public class Lexer
             return _env.GetObjectField(objName, field) ?? "";
         }
 
+        // String Manipulation Expansions
+        if (content.Contains("//"))
+        {
+            var parts = content.Split(new[] { "//" }, 2, StringSplitOptions.None);
+            string name = parts[0];
+            var subParts = parts[1].Split(new[] { '/' }, 2);
+            string pattern = subParts[0];
+            string replacement = subParts.Length > 1 ? subParts[1] : "";
+            string? val = _env.Get(name) ?? "";
+            return Regex.Replace(val, GlobToRegex(pattern, true), replacement);
+        }
+        else if (content.Contains("/"))
+        {
+            var parts = content.Split(new[] { '/' }, 3);
+            string name = parts[0];
+            string pattern = parts[1];
+            string replacement = parts.Length > 2 ? parts[2] : "";
+            string? val = _env.Get(name) ?? "";
+            return new Regex(GlobToRegex(pattern, true)).Replace(val, replacement, 1);
+        }
+
+        if (content.Contains("##"))
+        {
+            var parts = content.Split(new[] { "##" }, 2, StringSplitOptions.None);
+            string name = parts[0];
+            string pattern = parts[1];
+            string? val = _env.Get(name) ?? "";
+            return Regex.Replace(val, "^" + GlobToRegex(pattern, true), "");
+        }
+        else if (content.Contains("#"))
+        {
+            var parts = content.Split(new[] { '#' }, 2);
+            string name = parts[0];
+            string pattern = parts[1];
+            string? val = _env.Get(name) ?? "";
+            return Regex.Replace(val, "^" + GlobToRegex(pattern, false), "");
+        }
+
+        if (content.Contains("%%"))
+        {
+            var parts = content.Split(new[] { "%%" }, 2, StringSplitOptions.None);
+            string name = parts[0];
+            string pattern = parts[1];
+            string? val = _env.Get(name) ?? "";
+            return Regex.Replace(val, GlobToRegex(pattern, true) + "$", "");
+        }
+        else if (content.Contains("%"))
+        {
+            var parts = content.Split(new[] { '%' }, 2);
+            string name = parts[0];
+            string pattern = parts[1];
+            string? val = _env.Get(name) ?? "";
+            return Regex.Replace(val, GlobToRegex(pattern, false) + "$", "", RegexOptions.RightToLeft);
+        }
+
+        if (content.EndsWith("^^"))
+        {
+            string name = content.Substring(0, content.Length - 2);
+            return (_env.Get(name) ?? "").ToUpperInvariant();
+        }
+        else if (content.EndsWith("^"))
+        {
+            string name = content.Substring(0, content.Length - 1);
+            string? val = _env.Get(name) ?? "";
+            if (val.Length > 0) return char.ToUpperInvariant(val[0]) + val.Substring(1);
+            return val;
+        }
+
+        if (content.EndsWith(",,"))
+        {
+            string name = content.Substring(0, content.Length - 2);
+            return (_env.Get(name) ?? "").ToLowerInvariant();
+        }
+        else if (content.EndsWith(","))
+        {
+            string name = content.Substring(0, content.Length - 1);
+            string? val = _env.Get(name) ?? "";
+            if (val.Length > 0) return char.ToLowerInvariant(val[0]) + val.Substring(1);
+            return val;
+        }
+
         return _env.Get(content) ?? "";
+    }
+
+    private static string GlobToRegex(string glob, bool greedy)
+    {
+        string escaped = Regex.Escape(glob).Replace("\\?", ".");
+        return greedy ? escaped.Replace("\\*", ".*") : escaped.Replace("\\*", ".*?");
     }
 
     private static bool IsPowerShellBracedVariable(string content)

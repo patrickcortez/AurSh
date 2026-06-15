@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -27,6 +27,9 @@ public static class BuiltinCommands
         {
             "cd" => ExecuteCd(cmd, env, ref workingDirectory),
             "export" => ExecuteExport(cmd, env),
+            "local" => ExecuteLocal(cmd, env),
+            "declare" => ExecuteDeclare(cmd, env),
+            "readonly" => ExecuteReadonly(cmd, env),
             "unset" => ExecuteUnset(cmd, env),
             "exit" => ExecuteExit(cmd),
             "history" or "aursh-history" => ExecuteHistory(cmd, env, workingDirectory),
@@ -2601,5 +2604,98 @@ public static class BuiltinCommands
         }
 
         return SshTui.Run(workingDirectory);
+    }
+    private static int ExecuteLocal(CommandNode cmd, ShellEnvironment env)
+    {
+        foreach (string arg in cmd.Args)
+        {
+            int eq = arg.IndexOf('=');
+            if (eq > 0)
+            {
+                string name = arg.Substring(0, eq).Trim();
+                string val = arg.Substring(eq + 1).Trim();
+                if ((val.StartsWith('"') && val.EndsWith('"')) || (val.StartsWith('\'') && val.EndsWith('\'')))
+                    val = val.Substring(1, val.Length - 2);
+
+                env.SetLocal(name, env.Expand(val));
+            }
+            else
+            {
+                env.SetLocal(arg, "");
+            }
+        }
+        return 0;
+    }
+
+    private static int ExecuteDeclare(CommandNode cmd, ShellEnvironment env)
+    {
+        bool isIndexed = false;
+        bool isAssoc = false;
+        bool isReadonly = false;
+        int i = 0;
+        while (i < cmd.Args.Count && cmd.Args[i].StartsWith("-"))
+        {
+            string flag = cmd.Args[i];
+            if (flag.Contains("a")) isIndexed = true;
+            if (flag.Contains("A")) isAssoc = true;
+            if (flag.Contains("r")) isReadonly = true;
+            i++;
+        }
+
+        for (; i < cmd.Args.Count; i++)
+        {
+            string arg = cmd.Args[i];
+            int eq = arg.IndexOf('=');
+            string name = eq > 0 ? arg.Substring(0, eq).Trim() : arg;
+            string val = eq > 0 ? arg.Substring(eq + 1).Trim() : "";
+
+            if ((val.StartsWith('"') && val.EndsWith('"')) || (val.StartsWith('\'') && val.EndsWith('\'')))
+                val = val.Substring(1, val.Length - 2);
+
+            if (isAssoc)
+            {
+                if (env.GetAssocArray(name) == null)
+                    env.SetAssocArray(name, new Dictionary<string, string>(StringComparer.Ordinal));
+            }
+            else if (isIndexed)
+            {
+                if (env.GetArray(name) == null)
+                    env.SetArray(name, new List<string>());
+            }
+
+            if (eq > 0)
+            {
+                env.Set(name, env.Expand(val));
+            }
+
+            if (isReadonly)
+            {
+                env.MarkReadonly(name);
+            }
+        }
+        return 0;
+    }
+
+    private static int ExecuteReadonly(CommandNode cmd, ShellEnvironment env)
+    {
+        foreach (string arg in cmd.Args)
+        {
+            int eq = arg.IndexOf('=');
+            if (eq > 0)
+            {
+                string name = arg.Substring(0, eq).Trim();
+                string val = arg.Substring(eq + 1).Trim();
+                if ((val.StartsWith('"') && val.EndsWith('"')) || (val.StartsWith('\'') && val.EndsWith('\'')))
+                    val = val.Substring(1, val.Length - 2);
+
+                env.Set(name, env.Expand(val));
+                env.MarkReadonly(name);
+            }
+            else
+            {
+                env.MarkReadonly(arg);
+            }
+        }
+        return 0;
     }
 }

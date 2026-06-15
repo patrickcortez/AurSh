@@ -7,7 +7,9 @@ public enum RedirectType
     In,
     Err,
     ErrAppend,
-    ErrToOut
+    ErrToOut,
+    HereDoc,
+    HereString
 }
 
 public class Redirection
@@ -217,6 +219,8 @@ public class Parser
             TokenType.RedirectErr => RedirectType.Err,
             TokenType.RedirectErrAppend => RedirectType.ErrAppend,
             TokenType.RedirectErrToOut => RedirectType.ErrToOut,
+            TokenType.HereDoc => RedirectType.HereDoc,
+            TokenType.HereString => RedirectType.HereString,
             _ => RedirectType.Out
         };
 
@@ -229,7 +233,9 @@ public class Parser
         type == TokenType.RedirectIn ||
         type == TokenType.RedirectErr ||
         type == TokenType.RedirectErrAppend ||
-        type == TokenType.RedirectErrToOut;
+        type == TokenType.RedirectErrToOut ||
+        type == TokenType.HereDoc ||
+        type == TokenType.HereString;
 
     private void SkipNewlines()
     {

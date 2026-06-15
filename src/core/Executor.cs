@@ -45,9 +45,15 @@ public class Executor
             return 1;
         }
 
-        if (input.Contains('\n'))
+        if (input.Contains('\n') || 
+            input.TrimStart().StartsWith("if ") || 
+            input.TrimStart().StartsWith("for ") || 
+            input.TrimStart().StartsWith("while ") || 
+            input.TrimStart().StartsWith("until ") || 
+            input.TrimStart().StartsWith("case "))
         {
-            return ExecuteMultilineAsNativeScript(input);
+            var runner = new ScriptRunner(_env, this);
+            return runner.RunString(input);
         }
 
         string trimmedInput = input.Trim();
@@ -351,6 +357,40 @@ public class Executor
 
     private bool TryParseArithmeticOrAssignment(string input)
     {
+        var arrayInitMatch = System.Text.RegularExpressions.Regex.Match(input, @"^([a-zA-Z_][a-zA-Z0-9_]*)=\((.*)\)$");
+        if (arrayInitMatch.Success)
+        {
+            string varName = arrayInitMatch.Groups[1].Value;
+            string elements = arrayInitMatch.Groups[2].Value;
+            var lexer = new Lexer(elements, _env);
+            var tokens = lexer.Tokenize();
+            var values = tokens.Where(t => t.Type == TokenType.Word).Select(t => t.Value).ToList();
+            _env.SetArray(varName, values);
+            return true;
+        }
+
+        var arrayAssignMatch = System.Text.RegularExpressions.Regex.Match(input, @"^([a-zA-Z_][a-zA-Z0-9_]*)\[(.*)\]=(.*)$");
+        if (arrayAssignMatch.Success)
+        {
+            string varName = arrayAssignMatch.Groups[1].Value;
+            string key = arrayAssignMatch.Groups[2].Value;
+            string value = arrayAssignMatch.Groups[3].Value;
+            
+            var lexer = new Lexer(value, _env);
+            var tokens = lexer.Tokenize();
+            string expandedValue = string.Join("", tokens.Where(t => t.Type == TokenType.Word).Select(t => t.Value));
+
+            if (int.TryParse(key, out int idx) && idx >= 0)
+            {
+                _env.SetArrayElement(varName, idx, expandedValue);
+            }
+            else
+            {
+                _env.SetAssocElement(varName, key, expandedValue);
+            }
+            return true;
+        }
+
         var assignMatch = System.Text.RegularExpressions.Regex.Match(input, @"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$");
         if (assignMatch.Success)
         {
@@ -419,30 +459,6 @@ public class Executor
 
     private double EvaluateMath(string expression)
     {
-        expression = expression.Replace(" ", "");
-        var tokens = System.Text.RegularExpressions.Regex.Split(expression, @"([\+\-\*/])").Where(s => !string.IsNullOrEmpty(s)).ToList();
-
-        if (tokens.Count > 1 && (tokens[0] == "-" || tokens[0] == "+"))
-        {
-            tokens[1] = tokens[0] + tokens[1];
-            tokens.RemoveAt(0);
-        }
-
-        if (tokens.Count == 0) return 0;
-        if (!double.TryParse(tokens[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double result)) return 0;
-
-        for (int i = 1; i < tokens.Count - 1; i += 2)
-        {
-            string op = tokens[i];
-            if (!double.TryParse(tokens[i + 1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double next)) next = 0;
-            switch (op)
-            {
-                case "+": result += next; break;
-                case "-": result -= next; break;
-                case "*": result *= next; break;
-                case "/": if (next != 0) result /= next; break;
-            }
-        }
-        return result;
+        return MathEvaluator.Evaluate(expression, _env);
     }
 }

@@ -6,8 +6,14 @@ namespace AurShell.Core;
 public class ShellEnvironment
 {
     private readonly Dictionary<string, string> _variables = new(StringComparer.Ordinal);
+    private readonly Stack<Dictionary<string, string>> _localScopes = new();
     private readonly Dictionary<string, Dictionary<string, string>> _objects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _aliases = new(StringComparer.Ordinal);
+    
+    private readonly Dictionary<string, List<string>> _arrays = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, string>> _assocArrays = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _readonlyVars = new(StringComparer.Ordinal);
+    
     private int _lastExitCode;
 
     public int LastExitCode
@@ -17,6 +23,8 @@ public class ShellEnvironment
     }
 
     public int ShellPid => System.Environment.ProcessId;
+
+    public int BackgroundPid { get; set; } = 0;
 
     public JobTable Jobs { get; } = new();
 
@@ -32,6 +40,50 @@ public class ShellEnvironment
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
     public IReadOnlyDictionary<string, string> Aliases => _aliases;
 
+    public void PushScope()
+    {
+        _localScopes.Push(new Dictionary<string, string>(StringComparer.Ordinal));
+    }
+
+    public void PopScope()
+    {
+        if (_localScopes.Count > 0)
+            _localScopes.Pop();
+    }
+
+    public bool IsReadonly(string name)
+    {
+        return _readonlyVars.Contains(name);
+    }
+
+    public void MarkReadonly(string name)
+    {
+        _readonlyVars.Add(name);
+    }
+
+    private bool CheckReadonly(string name)
+    {
+        if (IsReadonly(name))
+        {
+            Console.Error.WriteLine($"aursh: {name}: readonly variable");
+            return true;
+        }
+        return false;
+    }
+
+    public void SetLocal(string name, string value)
+    {
+        if (CheckReadonly(name)) return;
+        if (_localScopes.Count > 0)
+        {
+            _localScopes.Peek()[name] = value;
+        }
+        else
+        {
+            _variables[name] = value;
+        }
+    }
+
     public void ImportFromSystem()
     {
         var sysEnv = System.Environment.GetEnvironmentVariables();
@@ -46,21 +98,146 @@ public class ShellEnvironment
 
     public void Set(string name, string value)
     {
+        if (CheckReadonly(name)) return;
+        foreach (var scope in _localScopes)
+        {
+            if (scope.ContainsKey(name))
+            {
+                scope[name] = value;
+                return;
+            }
+        }
         _variables[name] = value;
     }
 
     public string? Get(string name)
     {
-        if (_variables.TryGetValue(name, out string? val))
-            return val;
+        if (name.EndsWith("]"))
+        {
+            int openBracket = name.IndexOf('[');
+            if (openBracket > 0)
+            {
+                string arrName = name.Substring(0, openBracket);
+                string key = name.Substring(openBracket + 1, name.Length - openBracket - 2);
+
+                if (key == "@" || key == "*")
+                {
+                    if (_arrays.TryGetValue(arrName, out var a)) return string.Join(" ", a);
+                    if (_assocArrays.TryGetValue(arrName, out var m)) return string.Join(" ", m.Values);
+                    return null;
+                }
+
+                if (_assocArrays.TryGetValue(arrName, out var dict))
+                {
+                    return dict.TryGetValue(key, out string? val) ? val : null;
+                }
+
+                if (_arrays.TryGetValue(arrName, out var list))
+                {
+                    if (int.TryParse(key, out int idx) && idx >= 0 && idx < list.Count)
+                        return list[idx];
+                    return null;
+                }
+                return null;
+            }
+        }
+
+        foreach (var scope in _localScopes)
+        {
+            if (scope.TryGetValue(name, out string? val))
+                return val;
+        }
+        
+        if (_variables.TryGetValue(name, out string? globalVal))
+            return globalVal;
+            
         return System.Environment.GetEnvironmentVariable(name);
     }
 
     public bool Unset(string name)
     {
-        bool removed = _variables.Remove(name);
+        if (CheckReadonly(name)) return false;
+        bool removed = false;
+        foreach (var scope in _localScopes)
+        {
+            if (scope.Remove(name))
+                removed = true;
+        }
+        
+        if (_variables.Remove(name))
+            removed = true;
+            
         _objects.Remove(name);
+        _arrays.Remove(name);
+        _assocArrays.Remove(name);
         return removed;
+    }
+
+    public void SetArray(string name, List<string> values)
+    {
+        if (CheckReadonly(name)) return;
+        _arrays[name] = new List<string>(values);
+    }
+
+    public List<string>? GetArray(string name)
+    {
+        return _arrays.TryGetValue(name, out var arr) ? arr : null;
+    }
+
+    public void SetArrayElement(string name, int index, string value)
+    {
+        if (CheckReadonly(name)) return;
+        if (!_arrays.TryGetValue(name, out var arr))
+        {
+            arr = new List<string>();
+            _arrays[name] = arr;
+        }
+        while (arr.Count <= index)
+            arr.Add("");
+        arr[index] = value;
+    }
+
+    public string? GetArrayElement(string name, int index)
+    {
+        if (_arrays.TryGetValue(name, out var arr) && index >= 0 && index < arr.Count)
+            return arr[index];
+        return null;
+    }
+
+    public int GetArrayLength(string name)
+    {
+        if (_arrays.TryGetValue(name, out var arr))
+            return arr.Count;
+        return 0;
+    }
+
+    public void SetAssocArray(string name, Dictionary<string, string> values)
+    {
+        if (CheckReadonly(name)) return;
+        _assocArrays[name] = new Dictionary<string, string>(values, StringComparer.Ordinal);
+    }
+
+    public Dictionary<string, string>? GetAssocArray(string name)
+    {
+        return _assocArrays.TryGetValue(name, out var dict) ? dict : null;
+    }
+
+    public void SetAssocElement(string name, string key, string value)
+    {
+        if (CheckReadonly(name)) return;
+        if (!_assocArrays.TryGetValue(name, out var dict))
+        {
+            dict = new Dictionary<string, string>(StringComparer.Ordinal);
+            _assocArrays[name] = dict;
+        }
+        dict[key] = value;
+    }
+
+    public string? GetAssocElement(string name, string key)
+    {
+        if (_assocArrays.TryGetValue(name, out var dict) && dict.TryGetValue(key, out var val))
+            return val;
+        return null;
     }
 
     public void ExportToSystem(string name)
@@ -214,8 +391,19 @@ public class ShellEnvironment
         var clone = new ShellEnvironment();
         foreach (var kv in _variables)
             clone._variables[kv.Key] = kv.Value;
+
+        foreach (var scope in _localScopes.Reverse())
+        {
+            foreach (var kv in scope)
+                clone._variables[kv.Key] = kv.Value;
+        }
+
         foreach (var kv in _objects)
             clone._objects[kv.Key] = new Dictionary<string, string>(kv.Value, StringComparer.Ordinal);
+        foreach (var kv in _arrays)
+            clone._arrays[kv.Key] = new List<string>(kv.Value);
+        foreach (var kv in _assocArrays)
+            clone._assocArrays[kv.Key] = new Dictionary<string, string>(kv.Value, StringComparer.Ordinal);
         foreach (var kv in _aliases)
             clone._aliases[kv.Key] = kv.Value;
         clone._lastExitCode = _lastExitCode;
@@ -241,8 +429,35 @@ public class ShellEnvironment
             return ShellPid.ToString();
         }
 
+        if (input[i] == '!')
+        {
+            i++;
+            return BackgroundPid.ToString();
+        }
+
         if (input[i] == '{')
             return ExpandBracedVariable(input, ref i);
+
+        if (input[i] == '(' && i + 1 < input.Length && input[i + 1] == '(')
+        {
+            i += 2;
+            int start = i;
+            int depth = 2;
+            while (i < input.Length && depth > 0)
+            {
+                if (input[i] == '(') depth++;
+                else if (input[i] == ')') depth--;
+                if (depth > 0) i++;
+            }
+            if (depth == 0)
+            {
+                string mathExpr = input.Substring(start, i - start - 1);
+                i++; // skip last )
+                return MathEvaluator.Evaluate(mathExpr, this).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            // If unbalanced, fallback
+            i = start - 2;
+        }
 
         var nameBuf = new StringBuilder();
 
@@ -294,6 +509,20 @@ public class ShellEnvironment
 
         string content = input.Substring(start, i - start);
         i++;
+
+        if (content.StartsWith("#"))
+        {
+            string varName = content.Substring(1);
+            if (varName.EndsWith("[@]") || varName.EndsWith("[*]"))
+            {
+                string arrName = varName.Substring(0, varName.Length - 3);
+                if (_arrays.TryGetValue(arrName, out var a)) return a.Count.ToString();
+                if (_assocArrays.TryGetValue(arrName, out var m)) return m.Count.ToString();
+                return "0";
+            }
+            string? v = Get(varName);
+            return v != null ? v.Length.ToString() : "0";
+        }
 
         int colonDash = content.IndexOf(":-", StringComparison.Ordinal);
         if (colonDash >= 0)

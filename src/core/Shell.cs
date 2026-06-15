@@ -60,6 +60,7 @@ public class Shell
         Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
+        LoadBusyBoxAliases();
         LoadPlugins();
         AurshNetTransfer.StartReceiverDaemon();
     }
@@ -91,10 +92,46 @@ public class Shell
         Utils.VsCodeIntegration.EnsureProfileConfigured();
         RcLoader.CreateDefaultRc(Utils.Platform.RcFilePath);
         LoadRc();
+        LoadBusyBoxAliases();
         LoadPlugins();
         AurshNetTransfer.StartReceiverDaemon();
     }
 
+
+    private void LoadBusyBoxAliases()
+    {
+        try
+        {
+            if (File.Exists(Utils.Platform.BusyBoxPath))
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = Utils.Platform.BusyBoxPath,
+                    Arguments = "--list",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(psi);
+                if (process != null)
+                {
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    string[] commands = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string cmd in commands)
+                    {
+                        if (!string.IsNullOrWhiteSpace(cmd) && !BuiltinCommands.IsBuiltin(cmd))
+                        {
+                            _env.SetAlias(cmd, $"\"{Utils.Platform.BusyBoxPath}\" {cmd}");
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+    }
 
     public void Run()
     {

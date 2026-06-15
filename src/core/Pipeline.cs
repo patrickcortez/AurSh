@@ -181,14 +181,39 @@ public static class Pipeline
     {
         if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
         {
-            var tempCmd = new CommandNode { Name = assocCmd };
-            foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-            return ExecuteViaShell(tempCmd, env, workingDirectory, background);
+            var parts = assocCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                string? resolvedAssocExe = ResolveCommand(parts[0], workingDirectory);
+                if (resolvedAssocExe == null)
+                {
+                    Console.Error.WriteLine($"aursh: {parts[0]}: command not found");
+                    return 127;
+                }
+                var tempCmd = new CommandNode { Name = resolvedAssocExe };
+                for (int i = 1; i < parts.Length; i++) tempCmd.Args.Add(parts[i]);
+                foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+                
+                var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
+                var process = Process.Start(assocPsi);
+                if (process != null)
+                {
+                    if (!background) process.WaitForExit();
+                    return background ? 0 : process.ExitCode;
+                }
+            }
+            return 126;
         }
+
+        // Resolve alias (e.g. BusyBox) before PATH lookup
+        ResolveAlias(cmd, env);
 
         string? executable = ResolveCommand(cmd.Name, workingDirectory);
         if (executable == null)
-            return ExecuteViaShell(cmd, env, workingDirectory, background);
+        {
+            Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
+            return 127;
+        }
 
         string actualExecutable = executable;
         IList<string> actualArgs = cmd.Args;
@@ -423,45 +448,7 @@ public static class Pipeline
         }
         bool routePipelineToBox = pipelineBox != null && pipelineSession != null;
 
-        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && count > 1)
-        {
-            bool allShellDelegated = true;
-            for (int i = 0; i < count; i++)
-            {
-                var cmd = commands[i];
-                if (BuiltinCommands.IsBuiltin(cmd.Name))
-                {
-                    allShellDelegated = false;
-                    break;
-                }
-                if (env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
-                {
-                    allShellDelegated = false;
-                    break;
-                }
-                if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out _))
-                {
-                    allShellDelegated = false;
-                    break;
-                }
-                string? exe = ResolveCommand(cmd.Name, workingDirectory);
-                if (exe != null)
-                {
-                    string exeLower = exe.ToLowerInvariant();
-                    bool isPowerShellExe = exeLower.EndsWith("powershell.exe") || exeLower.EndsWith("pwsh.exe");
-                    if (!isPowerShellExe)
-                    {
-                        allShellDelegated = false;
-                        break;
-                    }
-                }
-            }
-
-            if (allShellDelegated)
-            {
-                return ExecuteCoalescedPipeline(pipeline, env, workingDirectory);
-            }
-        }
+        // Coalesced pipeline delegation to OS shell removed to enforce independent system shell behavior
 
         var processes = new Process?[count];
         var fileStreams = new List<Stream>();
@@ -595,7 +582,6 @@ public static class Pipeline
                             writer?.Flush();
                             stdoutFileStream?.Dispose();
                             stderrFileStream?.Dispose();
-                            try { tempPipe.DisposeLocalCopyOfClientHandle(); } catch { }
                             tempPipe.Close();
                         }
                     });
@@ -603,8 +589,14 @@ public static class Pipeline
                     if (i + 1 < count)
                     {
                         var nextCmd = commands[i + 1];
+                        ResolveAlias(nextCmd, env);
                         bool isNextBuiltin = BuiltinCommands.IsBuiltin(nextCmd.Name);
                         string? nextExe = ResolveCommand(nextCmd.Name, workingDirectory);
+
+                        if (nextExe == null && env.PluginManager != null && env.PluginManager.IsPluginCommand(nextCmd.Name))
+                        {
+                            nextExe = env.PluginManager.GetPluginBinaryPath(nextCmd.Name);
+                        }
 
                         if (!isNextBuiltin && nextExe == null && !TryGetAssociationShellCommand(nextCmd, env, workingDirectory, out _))
                         {
@@ -618,7 +610,7 @@ public static class Pipeline
                             return 127;
                         }
 
-                        var nextPsi = CreateProcessStartInfo(nextExe ?? Utils.Platform.DefaultShell, nextCmd, env, workingDirectory);
+                        var nextPsi = CreateProcessStartInfo(nextExe!, nextCmd, env, workingDirectory);
                         nextPsi.RedirectStandardInput = true;
 
                         if (i + 1 != count - 1)
@@ -656,24 +648,39 @@ public static class Pipeline
 
                 if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
                 {
-                    var tempCmd = new CommandNode { Name = assocCmd };
-                    foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-                    var assocPsi = CreateShellDelegatedStartInfo(tempCmd, env, workingDirectory);
-
-                    if (!isFirst) assocPsi.RedirectStandardInput = true;
-                    if (!isLast || routePipelineToBox) assocPsi.RedirectStandardOutput = true;
-                    if (routePipelineToBox) assocPsi.RedirectStandardError = true;
-
-                    redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
-
-                    processes[i] = Process.Start(assocPsi);
-                    if (processes[i] == null)
+                    var parts = assocCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0)
                     {
-                        Console.Error.WriteLine($"aursh: {cmd.Name}: failed to start associated process");
-                        return 126;
+                        string? resolvedAssocExe = ResolveCommand(parts[0], workingDirectory);
+                        if (resolvedAssocExe == null)
+                        {
+                            Console.Error.WriteLine($"aursh: {parts[0]}: command not found");
+                            return 127;
+                        }
+                        var tempCmd = new CommandNode { Name = resolvedAssocExe };
+                        for (int argIdx = 1; argIdx < parts.Length; argIdx++) tempCmd.Args.Add(parts[argIdx]);
+                        foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+                        
+                        var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
+
+                        if (!isFirst) assocPsi.RedirectStandardInput = true;
+                        if (!isLast || routePipelineToBox) assocPsi.RedirectStandardOutput = true;
+                        if (routePipelineToBox) assocPsi.RedirectStandardError = true;
+
+                        redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
+
+                        processes[i] = Process.Start(assocPsi);
+                        if (processes[i] == null)
+                        {
+                            Console.Error.WriteLine($"aursh: {parts[0]}: failed to start associated process");
+                            return 126;
+                        }
+                        continue;
                     }
-                    continue;
                 }
+
+                // Resolve alias (e.g. BusyBox) before PATH lookup
+                ResolveAlias(cmd, env);
 
                 string? executable = ResolveCommand(cmd.Name, workingDirectory);
                 if (executable == null && env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
@@ -683,22 +690,8 @@ public static class Pipeline
 
                 if (executable == null)
                 {
-                    executable = Utils.Platform.DefaultShell;
-                    var shellPsi = CreateShellDelegatedStartInfo(cmd, env, workingDirectory);
-
-                    if (!isFirst) shellPsi.RedirectStandardInput = true;
-                    if (!isLast || routePipelineToBox) shellPsi.RedirectStandardOutput = true;
-                    if (routePipelineToBox) shellPsi.RedirectStandardError = true;
-
-                    redirInfos[i] = ApplyRedirections(cmd, shellPsi, workingDirectory, fileStreams);
-
-                    processes[i] = Process.Start(shellPsi);
-                    if (processes[i] == null)
-                    {
-                        Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
-                        return 127;
-                    }
-                    continue;
+                    Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
+                    return 127;
                 }
 
                 var psi = CreateProcessStartInfo(executable, cmd, env, workingDirectory);
@@ -897,102 +890,6 @@ public static class Pipeline
         }
     }
 
-    private static int ExecuteCoalescedPipeline(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
-    {
-        var fullSb = new System.Text.StringBuilder();
-
-        for (int i = 0; i < pipeline.Commands.Count; i++)
-        {
-            var cmd = pipeline.Commands[i];
-            if (i > 0)
-                fullSb.Append(" | ");
-
-            fullSb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
-            foreach (string rawArg in cmd.RawExpandedArgs)
-            {
-                fullSb.Append(' ');
-                fullSb.Append(rawArg);
-            }
-
-            foreach (var redir in cmd.Redirections)
-            {
-                switch (redir.Type)
-                {
-                    case RedirectType.Out:
-                        fullSb.Append(" > ");
-                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
-                        break;
-                    case RedirectType.Append:
-                        fullSb.Append(" >> ");
-                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
-                        break;
-                    case RedirectType.In:
-                        fullSb.Append(" < ");
-                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
-                        break;
-                    case RedirectType.Err:
-                        fullSb.Append(" 2> ");
-                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
-                        break;
-                    case RedirectType.ErrAppend:
-                        fullSb.Append(" 2>> ");
-                        fullSb.Append(QuoteForShell(ResolveRedirectionTarget(redir.Target, workingDirectory)));
-                        break;
-                    case RedirectType.ErrToOut:
-                        fullSb.Append(" 2>&1");
-                        break;
-                }
-            }
-        }
-
-        string fullCommand = fullSb.ToString();
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = Utils.Platform.DefaultShell,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            CreateNoWindow = false
-        };
-
-        Utils.Platform.AddShellCommandArguments(psi, fullCommand);
-
-        foreach (var kv in env.Variables)
-            psi.Environment[kv.Key] = kv.Value;
-
-        try
-        {
-            using var process = Process.Start(psi);
-            if (process == null)
-            {
-                Console.Error.WriteLine($"aursh: failed to start shell for pipeline");
-                return 126;
-            }
-
-            if (pipeline.Background)
-            {
-                string cmdDesc = string.Join(" | ", pipeline.Commands.Select(c => c.Name));
-                int jobId = env.Jobs.Add(process, cmdDesc);
-                Console.WriteLine($"[{jobId}] {process.Id}");
-                return 0;
-            }
-
-            process.WaitForExit();
-            return process.ExitCode;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"aursh: pipeline execution failed: {ex.Message}");
-            return 126;
-        }
-    }
-
-    private static string QuoteForShell(string value)
-    {
-        if (value.Contains(' ') || value.Contains('"') || value.Contains('\''))
-            return "\"" + value.Replace("\"", "\\\"") + "\"";
-        return value;
-    }
 
     private static ProcessStartInfo CreateProcessStartInfo(
         string executable, CommandNode cmd, ShellEnvironment env, string workingDirectory)
@@ -1119,211 +1016,43 @@ public static class Pipeline
         return Utils.Platform.FindExecutableInPath(name);
     }
 
-    private static int ExecuteViaShell(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
+    /// <summary>
+    /// Resolves alias for a CommandNode before external execution.
+    /// If the command name has an alias, the alias is expanded into
+    /// the command name and any alias args are prepended to the command args.
+    /// </summary>
+    private static void ResolveAlias(CommandNode cmd, ShellEnvironment env)
     {
-        var sb = new System.Text.StringBuilder();
-        sb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
-        foreach (string rawArg in cmd.RawExpandedArgs)
+        string? alias = env.GetAlias(cmd.Name);
+        if (alias == null)
         {
-            sb.Append(' ');
-            sb.Append(rawArg);
+            return;
         }
 
-        string fullCommand = sb.ToString();
-
-        var psi = new ProcessStartInfo
+        string[] parts = alias.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
         {
-            FileName = Utils.Platform.DefaultShell,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            CreateNoWindow = false
-        };
-
-        Utils.Platform.AddShellCommandArguments(psi, fullCommand);
-
-        foreach (var kv in env.Variables)
-            psi.Environment[kv.Key] = kv.Value;
-
-        FileStream? stdoutFile = null;
-        FileStream? stderrFile = null;
-        Stream? stdinFile = null;
-        bool redirectStdout = false;
-        bool redirectStderr = false;
-        bool redirectStdin = false;
-        bool errToOut = false;
-
-        foreach (var redir in cmd.Redirections)
-        {
-            string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
-            switch (redir.Type)
-            {
-                case RedirectType.Out:
-                    stdoutFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
-                    if (stdoutFile == null) return 1;
-                    psi.RedirectStandardOutput = true;
-                    redirectStdout = true;
-                    break;
-                case RedirectType.Append:
-                    stdoutFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
-                    if (stdoutFile == null) return 1;
-                    psi.RedirectStandardOutput = true;
-                    redirectStdout = true;
-                    break;
-                case RedirectType.In:
-                    stdinFile = SafeOpenFileStream(target, FileMode.Open, FileAccess.Read);
-                    if (stdinFile == null) return 1;
-                    psi.RedirectStandardInput = true;
-                    redirectStdin = true;
-                    break;
-                case RedirectType.HereString:
-                    stdinFile = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
-                    psi.RedirectStandardInput = true;
-                    redirectStdin = true;
-                    break;
-                case RedirectType.Err:
-                    stderrFile = SafeOpenFileStream(target, FileMode.Create, FileAccess.Write);
-                    if (stderrFile == null) return 1;
-                    psi.RedirectStandardError = true;
-                    redirectStderr = true;
-                    break;
-                case RedirectType.ErrAppend:
-                    stderrFile = SafeOpenFileStream(target, FileMode.Append, FileAccess.Write);
-                    if (stderrFile == null) return 1;
-                    psi.RedirectStandardError = true;
-                    redirectStderr = true;
-                    break;
-                case RedirectType.ErrToOut:
-                    psi.RedirectStandardError = true;
-                    errToOut = true;
-                    break;
-            }
+            return;
         }
 
-        bool shellRouteToBox = ShouldRouteToBlackBox(cmd, out var shellBoxOwner, out var shellBoxSession);
-        var shellBoxFlags = new BoxRedirectFlags
+        // Save original args before modifying
+        var originalArgs = new List<string>(cmd.Args);
+
+        // Strip surrounding quotes from executable path (BusyBox aliases use them)
+        cmd.Name = parts[0].Trim('"');
+        cmd.Args.Clear();
+
+        // Add alias args (e.g. for "busybox.exe head" -> alias arg is "head")
+        for (int i = 1; i < parts.Length; i++)
         {
-            StdoutRedirected = redirectStdout,
-            StderrRedirected = redirectStderr || errToOut,
-            StdinRedirected = redirectStdin
-        };
-        if (shellRouteToBox)
-        {
-            BlackBoxIo.PrepareForBox(psi, shellBoxFlags);
+            cmd.Args.Add(parts[i]);
         }
 
-        try
+        // Append original command args after alias args
+        foreach (string arg in originalArgs)
         {
-            using var process = Process.Start(psi);
-            if (process == null)
-            {
-                Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
-                return 127;
-            }
-
-            if (redirectStdin && stdinFile != null)
-            {
-                stdinFile.CopyTo(process.StandardInput.BaseStream);
-                process.StandardInput.Close();
-            }
-
-            if (background)
-            {
-                int jobId = env.Jobs.Add(process, cmd.Name + (cmd.Args.Count > 0 ? " " + string.Join(" ", cmd.Args) : ""));
-                Console.WriteLine($"[{jobId}] {process.Id}");
-                return 0;
-            }
-
-            var tasks = new List<System.Threading.Tasks.Task>();
-
-            if (errToOut && stdoutFile != null)
-            {
-                var fileLock = new object();
-                tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile, fileLock));
-                tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stdoutFile, fileLock));
-            }
-            else
-            {
-                if (redirectStdout && stdoutFile != null)
-                {
-                    tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile));
-                }
-
-                if (errToOut && stdoutFile == null)
-                {
-                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, Console.OpenStandardOutput()));
-                }
-                else if (redirectStderr && stderrFile != null)
-                {
-                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stderrFile));
-                }
-            }
-
-            System.Threading.CancellationTokenSource? shellBoxCancel = null;
-            System.Threading.Tasks.Task? shellBoxTask = null;
-            if (shellRouteToBox)
-            {
-                shellBoxCancel = new System.Threading.CancellationTokenSource();
-                shellBoxTask = BlackBoxIo.PumpAsync(
-                    process,
-                    shellBoxSession,
-                    shellBoxFlags,
-                    shellBoxOwner,
-                    stageIndex: null,
-                    stdoutForward: null,
-                    cancellation: shellBoxCancel.Token);
-            }
-
-            System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
-            process.WaitForExit();
-
-            if (shellBoxTask != null)
-            {
-                try { shellBoxTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
-                shellBoxCancel?.Cancel();
-                try { shellBoxTask.Wait(System.TimeSpan.FromMilliseconds(200)); } catch { }
-                shellBoxCancel?.Dispose();
-            }
-
-            return process.ExitCode;
+            cmd.Args.Add(arg);
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"aursh: {cmd.Name}: {ex.Message}");
-            return 127;
-        }
-        finally
-        {
-            stdoutFile?.Dispose();
-            stderrFile?.Dispose();
-            stdinFile?.Dispose();
-        }
-    }
-
-    private static ProcessStartInfo CreateShellDelegatedStartInfo(
-        CommandNode cmd, ShellEnvironment env, string workingDirectory)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.Append(string.IsNullOrEmpty(cmd.RawExpandedName) ? cmd.Name : cmd.RawExpandedName);
-        foreach (string rawArg in cmd.RawExpandedArgs)
-        {
-            sb.Append(' ');
-            sb.Append(rawArg);
-        }
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = Utils.Platform.DefaultShell,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            CreateNoWindow = false
-        };
-
-        Utils.Platform.AddShellCommandArguments(psi, sb.ToString());
-
-        foreach (var kv in env.Variables)
-            psi.Environment[kv.Key] = kv.Value;
-
-        return psi;
     }
 
     private static bool TryGetAssociationShellCommand(CommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)

@@ -51,6 +51,12 @@
     <None Remove="Contexts/**/*" />
     <EmbeddedResource Remove="Contexts/**/*" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\busybox_win.exe" />
+    <EmbeddedResource Include="Resources\busybox_linux_x86_64" />
+  </ItemGroup>
+  
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.37.0" />
     <PackageReference Include="Silk.NET.SDL" Version="2.23.0" />

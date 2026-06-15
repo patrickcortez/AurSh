@@ -210,13 +210,14 @@ public class RcLoader
         switch (os)
         {
             case Utils.OperatingSystemType.Windows:
-                sb.AppendLine("alias ls='dir'");
-                sb.AppendLine("alias ll='dir'");
+                sb.AppendLine("alias ll='ls -la --color=auto'");
+                sb.AppendLine("alias la='ls -a --color=auto'");
                 sb.AppendLine("alias cls='clear'");
                 sb.AppendLine("alias ..='cd ..'");
                 sb.AppendLine("alias ...='cd ../..'");
                 sb.AppendLine("alias home='cd ~'");
                 sb.AppendLine("alias open='explorer'");
+                sb.AppendLine("alias grep='grep --color=auto'");
                 sb.AppendLine("alias sudo-shell='sudo aursh -c'");
                 break;
 

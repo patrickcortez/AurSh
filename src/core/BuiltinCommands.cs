@@ -99,15 +99,7 @@ public static class BuiltinCommands
         Console.WriteLine($"Version {version}");
         Console.WriteLine();
         Console.WriteLine("These shell commands are defined internally. Type `help` to see this list.");
-        Console.WriteLine("External commands will be executed via standard OS execution.");
-        if (Platform.CurrentOS == OperatingSystemType.Windows)
-        {
-            Console.WriteLine("Note: Any commands or syntax not understood natively by AurShell will be delegated to PowerShell.");
-        }
-        else
-        {
-            Console.WriteLine($"Note: Any commands or syntax not understood natively by AurShell will be delegated to {Platform.DefaultShell}.");
-        }
+        Console.WriteLine("External commands are resolved from PATH. Core UNIX utilities are provided by the bundled BusyBox toolkit.");
         Console.WriteLine();
 
         var sortedBuiltins = Builtins.OrderBy(b => b).ToList();

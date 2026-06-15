@@ -348,6 +348,10 @@ public static class Platform
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
+        
+        string binDir = Path.Combine(HomeDirectory, ".aursh", "bin");
+        Directory.CreateDirectory(binDir);
+        ExtractBusyBox(binDir);
 
         string aurshDir = Path.Combine(HomeDirectory, ".aursh");
 
@@ -363,6 +367,38 @@ public static class Platform
             VerifyImportantConfigIntegrity();
         }
     }
+
+    private static void ExtractBusyBox(string binDir)
+    {
+        string busyboxPath = Path.Combine(binDir, CurrentOS == OperatingSystemType.Windows ? "busybox.exe" : "busybox");
+        
+        if (!File.Exists(busyboxPath))
+        {
+            string resourceName = CurrentOS == OperatingSystemType.Windows ? "AurShell.Resources.busybox_win.exe" : "AurShell.Resources.busybox_linux_x86_64";
+            using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+            if (stream != null)
+            {
+                using var fs = new FileStream(busyboxPath, FileMode.Create, FileAccess.Write);
+                stream.CopyTo(fs);
+            }
+            else
+            {
+                Console.Error.WriteLine($"aursh: warning: bundled busybox resource '{resourceName}' not found!");
+            }
+        }
+        
+        if (CurrentOS != OperatingSystemType.Windows && File.Exists(busyboxPath))
+        {
+            try
+            {
+                var chmodInfo = new System.Diagnostics.ProcessStartInfo("chmod", $"+x \"{busyboxPath}\"") { CreateNoWindow = true };
+                System.Diagnostics.Process.Start(chmodInfo)?.WaitForExit();
+            }
+            catch { }
+        }
+    }
+
+    public static string BusyBoxPath => Path.Combine(HomeDirectory, ".aursh", "bin", CurrentOS == OperatingSystemType.Windows ? "busybox.exe" : "busybox");
 
     public static bool VerifyImportantConfigIntegrity()
     {

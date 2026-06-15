@@ -138,6 +138,32 @@ while [ $count -lt 10 ]; do
 done
 ```
 
+## Functions and Scoping
+
+**What it does**
+You can define reusable blocks of code using functions. Functions accept POSIX positional arguments dynamically and support safe, local variable scoping to avoid polluting the global environment. The `return` command can cleanly halt function execution and assign a return code.
+
+**Example Usage**
+```bash
+# Define a function
+function greet() {
+    # 'local' ensures the variable disappears when the function ends
+    local name=$1
+    if [ -z "$name" ]; then
+        echo "Error: Name required"
+        return 1
+    fi
+    echo "Hello, $name! You passed $# arguments."
+    return 0
+}
+
+# Call the function
+greet "AurSh User"
+```
+
+**How it works internally**
+When the `ScriptRunner` encounters a function definition, it pre-scans and saves the block into a dictionary without executing it. When you call the function, the runner pushes a new scope via `_env.PushScope()`, assigns `$1`, `$2`, `$@` and `$#` based on the passed arguments, executes the function body, handles any `_returnRequested` signals via the `return` builtin, and finally cleans up by calling `_env.PopScope()`.
+
 ## File Associations
 
 **What it does**

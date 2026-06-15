@@ -4,7 +4,7 @@ namespace AurShell.Core;
 
 public static class Banner
 {
-    private const string Version = "2.0.0";
+    private const string Version = "3.0.0";
 
     // Block-character letter forms for "AurSh" using Unicode block elements.
     // Each letter is 8 columns wide, 6 rows tall, joined by 2-space gaps.

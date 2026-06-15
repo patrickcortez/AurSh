@@ -59,7 +59,7 @@ public static class Watchdog
                 writer.WriteLine("==================================================");
                 writer.WriteLine($"Source:       {source}");
                 writer.WriteLine($"OS:           {Platform.OsName} ({Platform.CurrentOS})");
-                writer.WriteLine($"Version:      2.0.0");
+                writer.WriteLine($"Version:      3.0.0");
                 writer.WriteLine($"Exception:    {ex.GetType().FullName}");
                 writer.WriteLine($"Message:      {ex.Message}");
                 writer.WriteLine("--------------------------------------------------");

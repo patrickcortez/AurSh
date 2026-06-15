@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly", "help"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -60,6 +60,7 @@ public static class BuiltinCommands
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
             "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
             "aursh-ssh" => ExecuteSsh(cmd, env, workingDirectory),
+            "help" => ExecuteHelp(),
             _ => ExecuteFallback(cmd)
         };
     }
@@ -90,6 +91,45 @@ public static class BuiltinCommands
             return onPath;
 
         return null;
+    }
+
+    private static int ExecuteHelp()
+    {
+        Console.WriteLine($"AurShell Help");
+        Console.WriteLine($"Version {version}");
+        Console.WriteLine();
+        Console.WriteLine("These shell commands are defined internally. Type `help` to see this list.");
+        Console.WriteLine("External commands will be executed via standard OS execution.");
+        if (Platform.CurrentOS == OperatingSystemType.Windows)
+        {
+            Console.WriteLine("Note: Any commands or syntax not understood natively by AurShell will be delegated to PowerShell.");
+        }
+        else
+        {
+            Console.WriteLine($"Note: Any commands or syntax not understood natively by AurShell will be delegated to {Platform.DefaultShell}.");
+        }
+        Console.WriteLine();
+        
+        var sortedBuiltins = Builtins.OrderBy(b => b).ToList();
+        
+        Console.WriteLine("Built-in Commands:");
+        int cols = 4;
+        int rowCount = (int)Math.Ceiling((double)sortedBuiltins.Count / cols);
+        
+        for (int row = 0; row < rowCount; row++)
+        {
+            for (int col = 0; col < cols; col++)
+            {
+                int index = col * rowCount + row;
+                if (index < sortedBuiltins.Count)
+                {
+                    Console.Write(sortedBuiltins[index].PadRight(18));
+                }
+            }
+            Console.WriteLine();
+        }
+
+        return 0;
     }
 
     private static int ExecuteAurshView(CommandNode cmd, ShellEnvironment env, string workingDirectory)

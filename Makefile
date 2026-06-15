@@ -11,7 +11,7 @@ UPDATE_APP_NAME := aursh-update
 CONTEXT_APP_NAME := aursh-context
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
-VERSION := 2.0.0
+VERSION := 3.0.0
 ENSURE_DEPS := scripts/linux-termux-macos/ensure-deps.sh
 
 # OS and Architecture Detection

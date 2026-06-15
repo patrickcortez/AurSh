@@ -454,18 +454,18 @@ public class Lexer
         _pos += 3; // skip $((
         int start = _pos;
         int depth = 2; // we passed two ((
-        
+
         while (_pos < _input.Length && depth > 0)
         {
             if (_input[_pos] == '(') depth++;
             else if (_input[_pos] == ')') depth--;
-            
+
             if (depth > 0) _pos++;
         }
-        
+
         string mathExpr = _input.Substring(start, _pos - start);
         if (_pos < _input.Length) _pos++; // skip last )
-        
+
         return MathEvaluator.Evaluate(mathExpr, _env).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 

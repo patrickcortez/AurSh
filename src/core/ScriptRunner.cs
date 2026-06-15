@@ -661,9 +661,11 @@ public class ScriptRunner
         string regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
             .Replace("\\*", ".*")
             .Replace("\\?", ".") + "$";
-        try {
+        try
+        {
             return System.Text.RegularExpressions.Regex.IsMatch(value, regexPattern);
-        } catch { return false; }
+        }
+        catch { return false; }
     }
 
     private int ExecuteBlock(List<string> block)
@@ -696,7 +698,7 @@ public class ScriptRunner
 
         _scriptArgs = funcArgs;
         SetPositionalParams(funcArgs);
-        
+
         _env.PushScope();
         _env.SetLocal("FUNCNAME", func.Name);
         int result = 0;
@@ -928,13 +930,13 @@ public class ScriptRunner
         return !string.IsNullOrEmpty(val);
     }
 
-    private bool IsBinaryTestOp(string op) => 
-        op == "=" || op == "==" || op == "!=" || 
-        op == "-eq" || op == "-ne" || op == "-lt" || 
+    private bool IsBinaryTestOp(string op) =>
+        op == "=" || op == "==" || op == "!=" ||
+        op == "-eq" || op == "-ne" || op == "-lt" ||
         op == "-le" || op == "-gt" || op == "-ge";
 
     private bool IsUnaryTestOp(string op) =>
-        op == "-z" || op == "-n" || op == "-f" || op == "-d" || 
+        op == "-z" || op == "-n" || op == "-f" || op == "-d" ||
         op == "-e" || op == "-r" || op == "-w" || op == "-x" || op == "-s";
 
     private bool EvaluateBinaryTestOp(string left, string op, string right)

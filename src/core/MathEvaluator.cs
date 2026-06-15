@@ -9,7 +9,7 @@ public static class MathEvaluator
     public static double Evaluate(string expression, ShellEnvironment env)
     {
         if (string.IsNullOrWhiteSpace(expression)) return 0;
-        
+
         var tokens = Tokenize(expression);
         int pos = 0;
         return ParseTernary(tokens, ref pos, env);
@@ -23,7 +23,7 @@ public static class MathEvaluator
         {
             char c = expr[i];
             if (char.IsWhiteSpace(c)) { i++; continue; }
-            
+
             if (char.IsDigit(c) || c == '.')
             {
                 int start = i;
@@ -31,7 +31,7 @@ public static class MathEvaluator
                 tokens.Add(expr.Substring(start, i - start));
                 continue;
             }
-            
+
             if (char.IsLetter(c) || c == '_' || c == '$')
             {
                 int start = i;

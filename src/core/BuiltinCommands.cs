@@ -109,13 +109,13 @@ public static class BuiltinCommands
             Console.WriteLine($"Note: Any commands or syntax not understood natively by AurShell will be delegated to {Platform.DefaultShell}.");
         }
         Console.WriteLine();
-        
+
         var sortedBuiltins = Builtins.OrderBy(b => b).ToList();
-        
+
         Console.WriteLine("Built-in Commands:");
         int cols = 4;
         int rowCount = (int)Math.Ceiling((double)sortedBuiltins.Count / cols);
-        
+
         for (int row = 0; row < rowCount; row++)
         {
             for (int col = 0; col < cols; col++)

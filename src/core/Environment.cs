@@ -9,11 +9,11 @@ public class ShellEnvironment
     private readonly Stack<Dictionary<string, string>> _localScopes = new();
     private readonly Dictionary<string, Dictionary<string, string>> _objects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _aliases = new(StringComparer.Ordinal);
-    
+
     private readonly Dictionary<string, List<string>> _arrays = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _assocArrays = new(StringComparer.Ordinal);
     private readonly HashSet<string> _readonlyVars = new(StringComparer.Ordinal);
-    
+
     private int _lastExitCode;
 
     public int LastExitCode
@@ -147,10 +147,10 @@ public class ShellEnvironment
             if (scope.TryGetValue(name, out string? val))
                 return val;
         }
-        
+
         if (_variables.TryGetValue(name, out string? globalVal))
             return globalVal;
-            
+
         return System.Environment.GetEnvironmentVariable(name);
     }
 
@@ -163,10 +163,10 @@ public class ShellEnvironment
             if (scope.Remove(name))
                 removed = true;
         }
-        
+
         if (_variables.Remove(name))
             removed = true;
-            
+
         _objects.Remove(name);
         _arrays.Remove(name);
         _assocArrays.Remove(name);

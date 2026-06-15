@@ -45,11 +45,11 @@ public class Executor
             return 1;
         }
 
-        if (input.Contains('\n') || 
-            input.TrimStart().StartsWith("if ") || 
-            input.TrimStart().StartsWith("for ") || 
-            input.TrimStart().StartsWith("while ") || 
-            input.TrimStart().StartsWith("until ") || 
+        if (input.Contains('\n') ||
+            input.TrimStart().StartsWith("if ") ||
+            input.TrimStart().StartsWith("for ") ||
+            input.TrimStart().StartsWith("while ") ||
+            input.TrimStart().StartsWith("until ") ||
             input.TrimStart().StartsWith("case "))
         {
             var runner = new ScriptRunner(_env, this);
@@ -375,7 +375,7 @@ public class Executor
             string varName = arrayAssignMatch.Groups[1].Value;
             string key = arrayAssignMatch.Groups[2].Value;
             string value = arrayAssignMatch.Groups[3].Value;
-            
+
             var lexer = new Lexer(value, _env);
             var tokens = lexer.Tokenize();
             string expandedValue = string.Join("", tokens.Where(t => t.Type == TokenType.Word).Select(t => t.Value));

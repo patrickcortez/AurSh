@@ -621,7 +621,7 @@ public class InputHandler
             string l = line.Trim();
             if (l.StartsWith("if ") || l == "if") ifDepth++;
             if (l == "fi") ifDepth--;
-            
+
             if (l.StartsWith("for ") || l == "for") loopDepth++;
             if (l.StartsWith("while ") || l == "while") loopDepth++;
             if (l.StartsWith("until ") || l == "until") loopDepth++;

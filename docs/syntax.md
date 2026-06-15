@@ -178,6 +178,25 @@ x=$(( x + 1 ))
 **How it works internally**
 The shell intercepts `$(( ))` syntax during parsing and forwards the raw expression to the internal `MathEvaluator.cs`, which processes standard mathematical operations seamlessly in C# without shelling out to external utilities like `expr`.
 
+## Command Substitution
+
+**What it does**
+AurSh supports native command substitution using both `$()` and classic backticks ``` `cmd` ```. This allows you to execute a command and capture its output, substituting it directly into another command.
+
+**Example Usage**
+```bash
+# Using $()
+current_dir=$(pwd)
+echo "I am currently in $current_dir"
+
+# Using classic backticks
+files=`ls -l`
+echo "Directory contents: $files"
+```
+
+**How it works internally**
+When the `Lexer` or `ScriptRunner` parses your commands, `Utility.ResolveSubCommand` steps in, creates an isolated internal `Executor`, and calls `ExecuteCapture`. It runs the sub-command silently, strips the trailing newlines, and injects the output string directly back into your command's tokens natively without launching an external shell!
+
 ## Functions and Scoping
 
 **What it does**

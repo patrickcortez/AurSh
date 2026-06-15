@@ -14,6 +14,20 @@ internal static class Utility
         int i = 0;
         while (i < input.Length)
         {
+            if (input[i] == '`')
+            {
+                int close = input.IndexOf('`', i + 1);
+                if (close > i)
+                {
+                    string command = input.Substring(i + 1, close - i - 1);
+                    Executor ex = new Executor(env, workingDirectory);
+                    var (_, output) = ex.ExecuteCapture(command);
+                    result.Append(output);
+                    i = close + 1;
+                    continue;
+                }
+            }
+
             if (input[i] == '$' && i + 1 < input.Length && input[i + 1] == '(')
             {
                 int start = i + 2;

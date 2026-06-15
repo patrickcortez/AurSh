@@ -255,6 +255,15 @@ public class Lexer
                 continue;
             }
 
+            if (c == '`')
+            {
+                string inside = ReadBackticked();
+                sb.Append(inside);
+                rawSb.Append(inside);
+                wasSingleQuoted = false;
+                continue;
+            }
+
             if (c == '"')
             {
                 wasSingleQuoted = false;
@@ -368,6 +377,27 @@ public class Lexer
 
         if (_pos < _input.Length)
             _pos++;
+
+        return sb.ToString();
+    }
+
+    private string ReadBackticked()
+    {
+        _pos++;
+        var sb = new StringBuilder();
+        sb.Append('`');
+
+        while (_pos < _input.Length && _input[_pos] != '`')
+        {
+            sb.Append(_input[_pos]);
+            _pos++;
+        }
+
+        if (_pos < _input.Length)
+        {
+            sb.Append('`');
+            _pos++;
+        }
 
         return sb.ToString();
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace AurShell.UpdateTool;
 
@@ -23,6 +24,8 @@ internal static class Program
 
     public static int Main(string[] args)
     {
+        TryEnableAnsiSupport();
+
         try
         {
             if (args.Length == 0)
@@ -337,7 +340,8 @@ internal static class Program
 
             string[] spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
             int spinIndex = 0;
-            
+            int prevLen = 0;
+
             try { Console.CursorVisible = false; } catch { }
 
             while (!proc.WaitForExit(100))
@@ -346,19 +350,25 @@ internal static class Program
                 {
                     string pctStr = string.IsNullOrEmpty(percentage) ? "" : $" [{percentage}]";
                     string statusStr = string.IsNullOrEmpty(currentStatus) ? "" : $" - {currentStatus}";
-                    
-                    string printStr = $"\r\x1b[K{spinner[spinIndex]} {description}{pctStr}{statusStr}";
+
+                    string content = $"{spinner[spinIndex]} {description}{pctStr}{statusStr}";
                     int maxLen = 80;
                     try { maxLen = Console.WindowWidth - 1; } catch { }
-                    if (printStr.Length > maxLen && maxLen > 0)
-                        printStr = printStr.Substring(0, maxLen);
-                        
-                    Console.Write(printStr);
+                    if (content.Length > maxLen && maxLen > 0)
+                    {
+                        content = content.Substring(0, maxLen);
+                    }
+
+                    // Pad with spaces to overwrite any leftover chars from a longer previous line
+                    int pad = prevLen > content.Length ? prevLen - content.Length : 0;
+                    Console.Write($"\r{content}{new string(' ', pad)}");
+                    prevLen = content.Length;
                 }
                 spinIndex = (spinIndex + 1) % spinner.Length;
             }
 
-            Console.Write("\r\x1b[K");
+            // Clear the spinner line
+            Console.Write($"\r{new string(' ', prevLen)}\r");
             try { Console.CursorVisible = true; } catch { }
 
             if (proc.ExitCode != 0)
@@ -371,7 +381,7 @@ internal static class Program
             }
             else
             {
-                Console.WriteLine($"\x1b[32m✔\x1b[0m {description}");
+                Console.WriteLine($"\x1b[32m✔\x1b[0m{description}");
             }
 
             return proc.ExitCode;
@@ -379,7 +389,8 @@ internal static class Program
         catch (Exception ex)
         {
             try { Console.CursorVisible = true; } catch { }
-            Console.WriteLine($"\r\x1b[K\x1b[31m[ERROR]\x1b[0m {exe}: {ex.Message}");
+            Console.Write($"\r{new string(' ', 80)}\r");
+            Console.WriteLine($"\x1b[31m[ERROR]\x1b[0m {exe}: {ex.Message}");
             return 127;
         }
     }
@@ -561,4 +572,50 @@ internal static class Program
     /// of whether it is run with elevated privileges (sudo/Admin) or not.
     /// </summary>
     private static string ConfigDirectory => AppContext.BaseDirectory;
+
+    // ───────────────────────────── ANSI support ─────────────────────────
+
+    private const int STD_OUTPUT_HANDLE = -11;
+    private const uint ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetStdHandle(int nStdHandle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+
+    /// <summary>
+    /// Enable ANSI escape processing on Windows stdout for colored output.
+    /// No-op on non-Windows platforms.
+    /// </summary>
+    private static void TryEnableAnsiSupport()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return;
+        }
+
+        try
+        {
+            IntPtr handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            if (handle == IntPtr.Zero || handle == new IntPtr(-1))
+            {
+                return;
+            }
+
+            if (!GetConsoleMode(handle, out uint mode))
+            {
+                return;
+            }
+
+            SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        }
+        catch
+        {
+            // Not critical — colored output will just show raw escape codes
+        }
+    }
 }

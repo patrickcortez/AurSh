@@ -9,10 +9,10 @@
 <p align="center">
  <img height="256" width="256" alt="image" src="https://github.com/patrickcortez/AurSh/blob/master/Assets/Images/aura-icon.png" />
 </p>
-A cross compatible shell developed in C# by Tezzz, is a system shell
+A cross compatible self contained .Net shell developed in C# by Tezzz, and is a system shell
 similar to most shells like bash, zsh and fish.
 
-This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android).
+This is basically a rewrite of Linuxify, my old project. But cross compatible between different Operating Systems: e.g. Linux, Windows, MacOS and Termux(Android) and uses Busy box internally for commands/tools.
 
 It has a two line prompt with modern looking UI like PowerLevel10k thats verbose by nature and it has its own plug-in sytem using lua or F# scripts to allow you to extend the shell with custom behavior. The plugin system has passive and active plugins allowing you to make new commands,modify the UI or create new behaviors for the shell.
 

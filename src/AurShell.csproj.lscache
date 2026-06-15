@@ -14,9 +14,9 @@ lastDtbSucceeded
 
 [properties]
 AssemblyName=aursh
-CommandLineArgsForDesignTimeEvaluation=-langversion:12.0 -define:TRACE
+CommandLineArgsForDesignTimeEvaluation=-langversion:13.0 -define:TRACE
 CompilerGeneratedFilesOutputPath=
-MaxSupportedLangVersion=12.0
+MaxSupportedLangVersion=13.0
 ProjectAssetsFile=<PATH>obj/project.assets.json
 RootNamespace=AurShell
 RunAnalyzers=
@@ -50,7 +50,7 @@ TemporaryDependencyNodeTargetIdentifier=net8.0
 /warnaserror-
 /utf8output
 /deterministic+
-/langversion:12.0
+/langversion:13.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]

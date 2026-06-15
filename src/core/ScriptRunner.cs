@@ -255,6 +255,18 @@ public class ScriptRunner
                     index++;
                     continue;
                 }
+                if (current.StartsWith("else "))
+                {
+                    if (currentElifCondition != null && currentElifBlock != null)
+                    {
+                        elifBlocks.Add((currentElifCondition, currentElifBlock));
+                        currentElifCondition = null;
+                        currentElifBlock = null;
+                    }
+                    inElse = true;
+                    lines[index] = current.Substring(5).Trim();
+                    current = lines[index];
+                }
 
                 if (current == "then")
                 {

@@ -128,5 +128,9 @@ source ./env.sh
 **How it works internally**
 These commands are handled by the `BuiltinCommands.cs` router. Instead of launching a new operating system process, they directly invoke C# methods that manipulate the `ShellEnvironment` dictionary (for variables like `export`), the `workingDirectory` reference (for `cd`), or process handles (for `jobs`, `fg`, and `kill`).
 
+**Variable Attributes**
+- `readonly` or `declare -r`: Locks a variable so it cannot be modified or unset. This is integrated directly into the Abstract Syntax Tree, preventing any subsequent assignments from succeeding.
+- `declare -A`: Explicitly declares a variable as an Associative Array.
+
 **Supported POSIX Built-ins:**
-`cd`, `export`, `unset`, `exit`, `history`, `clear`, `echo`, `pwd`, `type`, `alias`, `unalias`, `source`, `set`, `env`, `true`, `false`, `shift`, `read`, `test`, `return`, `jobs`, `fg`, `kill`.
+`cd`, `export`, `unset`, `exit`, `history`, `clear`, `echo`, `pwd`, `type`, `alias`, `unalias`, `source`, `set`, `env`, `true`, `false`, `shift`, `read`, `test`, `return`, `jobs`, `fg`, `kill`, `readonly`, `declare`.

@@ -66,10 +66,10 @@ You can chain multiple commands together using standard operators.
     echo "First"; echo "Second"
     ```
 
-## Variables and Expansion
+## Variables, Arrays and Expansion
 
 **What it does**
-You can store and retrieve data in variables, and access special shell states (like exit codes).
+You can store and retrieve data in variables, use indexed and associative arrays, and access special shell states (like exit codes).
 
 **Example Usage**
 ```bash
@@ -84,7 +84,36 @@ echo "First argument: $1"
 # Advanced Expansion
 # Use default value 'production' if ENV is not set
 echo "Running in ${ENV:-production} mode"
+
+# Indexed Arrays
+my_array=("apple" "banana" "cherry")
+echo "First item: ${my_array[0]}"
+
+# Associative Arrays (Dictionaries)
+declare -A my_dict
+my_dict["name"]="AurSh"
+echo "Name is ${my_dict["name"]}"
 ```
+
+## Interactive Multi-line Commands
+
+**What it does**
+When using the interactive shell prompt, AurSh automatically detects if you've opened a block (like an `if` statement, `while` loop, `for` loop, or unclosed quote) and elegantly drops you into a multi-line continuation prompt (`>`) until the block is successfully closed.
+
+**Example Usage**
+```bash
+$ for i in 1 2 3
+> do
+>   echo "Number $i"
+> done
+Number 1
+Number 2
+Number 3
+$ 
+```
+
+**How it works internally**
+The `InputHandler` inspects your current line before execution. If it sees keywords like `if`, `while`, `for`, or unclosed brackets/quotes, it buffers your input instead of executing it. Once the terminal detects `fi`, `done`, or matching quotes, it consolidates the buffer and securely executes the whole block through the internal `ScriptRunner`.
 
 ## Control Flow (Scripting)
 

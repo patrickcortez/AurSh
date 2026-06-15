@@ -118,7 +118,7 @@ The `InputHandler` inspects your current line before execution. If it sees keywo
 ## Control Flow (Scripting)
 
 **What it does**
-AurSh supports POSIX-style logic blocks like `if/elif/else`, `for`, and `while` loops.
+AurSh supports POSIX-style logic blocks like `if/elif/else`, `case` statements, `for`, `while`, and `until` loops. You can also manipulate loop execution dynamically using `break` and `continue`.
 
 **Example Usage**
 ```bash
@@ -127,16 +127,56 @@ if [ -f "config.json" ]; then
     echo "Config found"
 fi
 
-# For Loop
+# Case Statements
+case "$1" in
+    start)
+        echo "Starting service..."
+        ;;
+    stop)
+        echo "Stopping service..."
+        ;;
+    *)
+        echo "Unknown command"
+        ;;
+esac
+
+# For Loop with continue
 for file in *.txt; do
+    if [ "$file" == "ignore.txt" ]; then
+        continue
+    fi
     echo "Processing $file"
 done
 
-# While Loop
-while [ $count -lt 10 ]; do
+# Until Loop with break
+count=0
+until [ $count -ge 10 ]; do
+    if [ $count -eq 5 ]; then
+        break
+    fi
     echo $count
+    count=$((count + 1))
 done
 ```
+
+## Math Evaluation
+
+**What it does**
+AurSh natively evaluates arithmetic expressions using double parentheses `$(( ))`. It supports basic operations (`+`, `-`, `*`, `/`, `%`) and honors standard mathematical operator precedence.
+
+**Example Usage**
+```bash
+# Simple Arithmetic
+result=$(( 5 + 10 * 2 ))
+echo "Result is $result"
+
+# Variable Incrementing
+x=5
+x=$(( x + 1 ))
+```
+
+**How it works internally**
+The shell intercepts `$(( ))` syntax during parsing and forwards the raw expression to the internal `MathEvaluator.cs`, which processes standard mathematical operations seamlessly in C# without shelling out to external utilities like `expr`.
 
 ## Functions and Scoping
 

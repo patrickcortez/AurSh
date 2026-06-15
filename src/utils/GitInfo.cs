@@ -13,6 +13,11 @@ public class GitInfo
     private int _cachedStaged;
     private int _cachedModified;
     private int _cachedUntracked;
+    private int _cachedConflicted;
+    private int _cachedDeleted;
+    private int _cachedRenamed;
+    private int _cachedStash;
+    private string? _cachedActionState;
     private bool _cachedIsRepo;
     private string? _cachedRemoteUrl;
     private DateTime _cachedAt = DateTime.MinValue;
@@ -26,6 +31,11 @@ public class GitInfo
     public int StagedCount { get; private set; }
     public int ModifiedCount { get; private set; }
     public int UntrackedCount { get; private set; }
+    public int ConflictedCount { get; private set; }
+    public int DeletedCount { get; private set; }
+    public int RenamedCount { get; private set; }
+    public int StashCount { get; private set; }
+    public string ActionState { get; private set; } = "";
     public bool IsDetached { get; private set; }
     public string? RemoteUrl { get; private set; }
 
@@ -41,6 +51,11 @@ public class GitInfo
             StagedCount = _cachedStaged;
             ModifiedCount = _cachedModified;
             UntrackedCount = _cachedUntracked;
+            ConflictedCount = _cachedConflicted;
+            DeletedCount = _cachedDeleted;
+            RenamedCount = _cachedRenamed;
+            StashCount = _cachedStash;
+            ActionState = _cachedActionState ?? "";
             RemoteUrl = _cachedRemoteUrl;
             return;
         }
@@ -63,6 +78,8 @@ public class GitInfo
         ReadStatus(workingDirectory);
         ReadAheadBehind(workingDirectory);
         ReadRemoteUrl(workingDirectory);
+        ReadActionState(gitDir);
+        ReadStashCount(workingDirectory);
 
         CacheState();
     }
@@ -77,14 +94,27 @@ public class GitInfo
         sb.Append(' ');
         sb.Append(Branch);
 
-        if (IsDirty)
+        if (!string.IsNullOrEmpty(ActionState))
         {
+            sb.Append($" [{ActionState}]");
+        }
+
+        if (IsDirty || ConflictedCount > 0 || StashCount > 0 || DeletedCount > 0 || RenamedCount > 0)
+        {
+            if (ConflictedCount > 0)
+                sb.Append($" !{ConflictedCount}");
             if (StagedCount > 0)
                 sb.Append($" +{StagedCount}");
             if (ModifiedCount > 0)
                 sb.Append($" ~{ModifiedCount}");
+            if (DeletedCount > 0)
+                sb.Append($" -{DeletedCount}");
+            if (RenamedCount > 0)
+                sb.Append($" \u00bb{RenamedCount}");
             if (UntrackedCount > 0)
                 sb.Append($" ?{UntrackedCount}");
+            if (StashCount > 0)
+                sb.Append($" *{StashCount}");
         }
         else
         {
@@ -109,6 +139,11 @@ public class GitInfo
         StagedCount = 0;
         ModifiedCount = 0;
         UntrackedCount = 0;
+        ConflictedCount = 0;
+        DeletedCount = 0;
+        RenamedCount = 0;
+        StashCount = 0;
+        ActionState = "";
         IsDetached = false;
         RemoteUrl = null;
     }
@@ -123,6 +158,11 @@ public class GitInfo
         _cachedStaged = StagedCount;
         _cachedModified = ModifiedCount;
         _cachedUntracked = UntrackedCount;
+        _cachedConflicted = ConflictedCount;
+        _cachedDeleted = DeletedCount;
+        _cachedRenamed = RenamedCount;
+        _cachedStash = StashCount;
+        _cachedActionState = ActionState;
         _cachedRemoteUrl = RemoteUrl;
     }
 
@@ -140,8 +180,16 @@ public class GitInfo
         if (headContent == "HEAD")
         {
             IsDetached = true;
-            string? shortHash = RunGit("rev-parse --short HEAD", workingDirectory);
-            Branch = shortHash?.Trim() ?? "detached";
+            string? tag = RunGit("describe --tags --exact-match", workingDirectory);
+            if (tag != null && tag.Trim().Length > 0)
+            {
+                Branch = tag.Trim();
+            }
+            else
+            {
+                string? shortHash = RunGit("rev-parse --short HEAD", workingDirectory);
+                Branch = shortHash?.Trim() ?? "detached";
+            }
         }
         else
         {
@@ -160,32 +208,82 @@ public class GitInfo
         int staged = 0;
         int modified = 0;
         int untracked = 0;
+        int conflicted = 0;
+        int deleted = 0;
+        int renamed = 0;
 
         foreach (string line in lines)
         {
             if (line.Length < 2)
                 continue;
 
-            char indexStatus = line[0];
-            char workTreeStatus = line[1];
+            char x = line[0];
+            char y = line[1];
 
-            if (indexStatus == '?' && workTreeStatus == '?')
+            if (x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D'))
+            {
+                conflicted++;
+                continue;
+            }
+
+            if (x == '?' && y == '?')
             {
                 untracked++;
                 continue;
             }
 
-            if (indexStatus != ' ' && indexStatus != '?')
+            if (x == 'R' || y == 'R')
+                renamed++;
+            else if (x == 'D' || y == 'D')
+                deleted++;
+
+            if (x != ' ' && x != '?' && x != 'U' && x != 'R' && x != 'D')
                 staged++;
 
-            if (workTreeStatus != ' ' && workTreeStatus != '?')
+            if (y != ' ' && y != '?' && y != 'U' && y != 'R' && y != 'D')
                 modified++;
         }
 
         StagedCount = staged;
         ModifiedCount = modified;
         UntrackedCount = untracked;
-        IsDirty = staged > 0 || modified > 0 || untracked > 0;
+        ConflictedCount = conflicted;
+        DeletedCount = deleted;
+        RenamedCount = renamed;
+        IsDirty = staged > 0 || modified > 0 || untracked > 0 || conflicted > 0 || deleted > 0 || renamed > 0;
+    }
+
+    private void ReadStashCount(string workingDirectory)
+    {
+        string? output = RunGit("stash list", workingDirectory);
+        if (string.IsNullOrEmpty(output))
+        {
+            StashCount = 0;
+            return;
+        }
+
+        StashCount = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    private void ReadActionState(string gitDir)
+    {
+        ActionState = "";
+        try
+        {
+            if (File.Exists(Path.Combine(gitDir, "rebase-merge", "interactive"))) ActionState = "REBASE-i";
+            else if (Directory.Exists(Path.Combine(gitDir, "rebase-merge"))) ActionState = "REBASE-m";
+            else if (Directory.Exists(Path.Combine(gitDir, "rebase-apply")))
+            {
+                if (File.Exists(Path.Combine(gitDir, "rebase-apply", "rebasing"))) ActionState = "REBASE";
+                else if (File.Exists(Path.Combine(gitDir, "rebase-apply", "applying"))) ActionState = "AM";
+                else ActionState = "AM/REBASE";
+            }
+            else if (File.Exists(Path.Combine(gitDir, "MERGE_HEAD"))) ActionState = "MERGING";
+            else if (File.Exists(Path.Combine(gitDir, "CHERRY_PICK_HEAD"))) ActionState = "CHERRY-PICKING";
+            else if (File.Exists(Path.Combine(gitDir, "REVERT_HEAD"))) ActionState = "REVERTING";
+            else if (File.Exists(Path.Combine(gitDir, "BISECT_LOG"))) ActionState = "BISECTING";
+        }
+        catch { }
     }
 
     private void ReadAheadBehind(string workingDirectory)

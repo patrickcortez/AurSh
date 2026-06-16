@@ -180,6 +180,20 @@ public class ShellEnvironment
                 return val;
         }
 
+        if (name == "@" || name == "*")
+            return string.Join(" ", PositionalArguments);
+            
+        if (name == "#")
+            return PositionalArguments.Count.ToString();
+            
+        if (int.TryParse(name, out int index))
+        {
+            if (index > 0 && index <= PositionalArguments.Count)
+                return PositionalArguments[index - 1];
+            if (index == 0) return System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "aursh";
+            return "";
+        }
+
         if (_variables.TryGetValue(name, out string? globalVal))
             return globalVal;
 

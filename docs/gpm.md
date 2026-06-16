@@ -36,10 +36,14 @@ Pulls the latest changes for a specific installed repository.
 - **Example:** `gpm upgrade nushell/nushell`
 - **Behavior:** Checks if you have uncommitted or stashed changes. If the repository is clean, it navigates to the repository path and executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
 
-### 6. `gpm info <repository>`
-Fetches detailed repository information (description, stars, forks, license) directly from GitHub.
+### 6. `gpm info <owner/repository>`
+Fetches detailed repository metadata and displays the project's README.
+
 - **Example:** `gpm info nushell/nushell`
-- **Behavior:** Makes an API request to `https://api.github.com/repos/{owner}/{repo}` to retrieve metadata.
+- **Behavior:** 
+  1. Requests `https://api.github.com/repos/{owner}/{repo}` to retrieve the description, stars, forks, and license.
+  2. Requests the raw README file using the `application/vnd.github.v3.raw` HTTP header (acting similarly to a `curl` request).
+  3. Prints both the metadata and the markdown content to your terminal.
 
 ### 7. `gpm uninstall <owner/repository>`
 Uninstalls (deletes) a repository from your local machine.

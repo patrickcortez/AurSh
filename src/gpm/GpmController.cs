@@ -99,8 +99,13 @@ public static class GpmController
         }
 
         string repoIdentifier = cmd.Args[1];
+        if (!repoIdentifier.Contains('/'))
+        {
+            Console.Error.WriteLine("gpm install: repository must be in 'owner/repo' format");
+            return 1;
+        }
         
-        string repoName = repoIdentifier.Contains('/') ? repoIdentifier.Split('/')[1] : repoIdentifier;
+        string repoName = repoIdentifier.Split('/')[1];
         
         var installed = Config.GetInstalledRepos();
         if (installed.ContainsKey(repoName) || installed.ContainsKey(repoIdentifier))
@@ -149,30 +154,21 @@ public static class GpmController
             return 1;
         }
 
-        string repoName = cmd.Args[1];
-        var installed = Config.GetInstalledRepos();
-        
-        string? targetKey = null;
-        string? targetPath = null;
-        
-        foreach (var kvp in installed)
+        string repoIdentifier = cmd.Args[1];
+        if (!repoIdentifier.Contains('/'))
         {
-            if (kvp.Key.Equals(repoName, StringComparison.OrdinalIgnoreCase) || 
-                kvp.Key.EndsWith($"/{repoName}", StringComparison.OrdinalIgnoreCase))
-            {
-                targetKey = kvp.Key;
-                targetPath = kvp.Value;
-                break;
-            }
-        }
-
-        if (targetKey == null || targetPath == null)
-        {
-            Console.Error.WriteLine($"gpm: Repository '{repoName}' is not installed.");
+            Console.Error.WriteLine("gpm uninstall: repository must be in 'owner/repo' format");
             return 1;
         }
 
-        Console.WriteLine($"Uninstalling {targetKey}...");
+        var installed = Config.GetInstalledRepos();
+        if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
+        {
+            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
+            return 1;
+        }
+
+        Console.WriteLine($"Uninstalling {repoIdentifier}...");
         
         try
         {
@@ -181,13 +177,13 @@ public static class GpmController
                 DeleteDirectory(targetPath);
             }
             
-            Config.RemoveRepo(targetKey);
-            Console.WriteLine($"gpm: Successfully uninstalled {targetKey}");
+            Config.RemoveRepo(repoIdentifier);
+            Console.WriteLine($"gpm: Successfully uninstalled {repoIdentifier}");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to uninstall {repoName}: {ex.Message}");
+            Console.Error.WriteLine($"gpm: Failed to uninstall {repoIdentifier}: {ex.Message}");
             return 1;
         }
     }
@@ -200,26 +196,17 @@ public static class GpmController
             return 1;
         }
 
-        string repoName = cmd.Args[1];
-        var installed = Config.GetInstalledRepos();
-        
-        string? targetKey = null;
-        string? targetPath = null;
-        
-        foreach (var kvp in installed)
+        string repoIdentifier = cmd.Args[1];
+        if (!repoIdentifier.Contains('/'))
         {
-            if (kvp.Key.Equals(repoName, StringComparison.OrdinalIgnoreCase) || 
-                kvp.Key.EndsWith($"/{repoName}", StringComparison.OrdinalIgnoreCase))
-            {
-                targetKey = kvp.Key;
-                targetPath = kvp.Value;
-                break;
-            }
+            Console.Error.WriteLine("gpm upgrade: repository must be in 'owner/repo' format");
+            return 1;
         }
 
-        if (targetKey == null || targetPath == null)
+        var installed = Config.GetInstalledRepos();
+        if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoName}' is not installed.");
+            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
             return 1;
         }
 
@@ -229,24 +216,24 @@ public static class GpmController
             return 1;
         }
 
-        Console.WriteLine($"Upgrading {targetKey}...");
+        Console.WriteLine($"Upgrading {repoIdentifier}...");
         
         int fetchCode = RunGit(targetPath, "fetch --dry-run");
         if (fetchCode != 0)
         {
-            Console.Error.WriteLine($"gpm: Remote for {targetKey} seems unreachable or vanished. Aborting upgrade.");
+            Console.Error.WriteLine($"gpm: Remote for {repoIdentifier} seems unreachable or vanished. Aborting upgrade.");
             return 1;
         }
 
         int pullCode = RunGit(targetPath, "pull");
         if (pullCode == 0)
         {
-            Console.WriteLine($"gpm: Successfully upgraded {targetKey}");
+            Console.WriteLine($"gpm: Successfully upgraded {repoIdentifier}");
             return 0;
         }
         else
         {
-            Console.Error.WriteLine($"gpm: Failed to upgrade {targetKey}");
+            Console.Error.WriteLine($"gpm: Failed to upgrade {repoIdentifier}");
             return pullCode;
         }
     }
@@ -276,26 +263,17 @@ public static class GpmController
             return 1;
         }
 
-        string repoName = cmd.Args[1];
-        var installed = Config.GetInstalledRepos();
-        
-        string? targetKey = null;
-        string? targetPath = null;
-        
-        foreach (var kvp in installed)
+        string repoIdentifier = cmd.Args[1];
+        if (!repoIdentifier.Contains('/'))
         {
-            if (kvp.Key.Equals(repoName, StringComparison.OrdinalIgnoreCase) || 
-                kvp.Key.EndsWith($"/{repoName}", StringComparison.OrdinalIgnoreCase))
-            {
-                targetKey = kvp.Key;
-                targetPath = kvp.Value;
-                break;
-            }
+            Console.Error.WriteLine("gpm goto: repository must be in 'owner/repo' format");
+            return 1;
         }
 
-        if (targetKey == null || targetPath == null)
+        var installed = Config.GetInstalledRepos();
+        if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoName}' is not installed.");
+            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
             return 1;
         }
 
@@ -331,8 +309,14 @@ public static class GpmController
             return 1;
         }
 
-        string repoName = cmd.Args[1];
-        string? info = await Network.GetRepoInfoAsync(repoName, GetToken(env));
+        string repoIdentifier = cmd.Args[1];
+        if (!repoIdentifier.Contains('/'))
+        {
+            Console.Error.WriteLine("gpm info: repository must be in 'owner/repo' format");
+            return 1;
+        }
+
+        string? info = await Network.GetRepoInfoAsync(repoIdentifier, GetToken(env));
         if (info == null)
         {
             return 1;

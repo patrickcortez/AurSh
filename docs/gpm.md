@@ -25,14 +25,14 @@ Lists all repositories currently installed and tracked by GPM.
 - **Example:** `gpm list`
 - **Behavior:** Prints the local mapping of installed repositories and their absolute paths in the filesystem.
 
-### 4. `gpm goto <repository>`
-Immediately navigates the shell's working directory to the installed repository.
-- **Example:** `gpm goto nushell`
-- **Behavior:** Changes the shell's `PWD` (Present Working Directory) and the process environment directory to the location where the repository was cloned.
+### 4. `gpm goto <owner/repository>`
+Changes your current working directory to the specified installed repository.
+- **Example:** `gpm goto nushell/nushell`
+- **Behavior:** Searches `~/.gpm/remotes.con` for `nushell/nushell`. If found, updates the shell's `PWD` and `OLDPWD`, and executes the underlying directory change.
 
-### 5. `gpm upgrade <repository>`
-Upgrades an installed repository by fetching and pulling the latest changes from the remote.
-- **Example:** `gpm upgrade nushell`
+### 5. `gpm upgrade <owner/repository>`
+Pulls the latest changes for a specific installed repository.
+- **Example:** `gpm upgrade nushell/nushell`
 - **Behavior:** Navigates to the repository path and executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
 
 ### 6. `gpm info <repository>`
@@ -40,9 +40,9 @@ Fetches detailed repository information (description, stars, forks, license) dir
 - **Example:** `gpm info nushell/nushell`
 - **Behavior:** Makes an API request to `https://api.github.com/repos/{owner}/{repo}` to retrieve metadata.
 
-### 7. `gpm uninstall <repository>`
+### 7. `gpm uninstall <owner/repository>`
 Uninstalls (deletes) a repository from your local machine.
-- **Example:** `gpm uninstall nushell`
+- **Example:** `gpm uninstall nushell/nushell`
 - **Behavior:** Deletes the repository directory from `~/Repos/` and removes its entry from `~/.gpm/remotes.con`.
 
 ---

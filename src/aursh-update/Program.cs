@@ -195,7 +195,7 @@ internal static class Program
         if (installCode != 0)
             return Fail("installation failed.");
 
-        Console.WriteLine("\nAurShell Update complete!");
+        Console.WriteLine("\x1b[32m✔\x1b[0m AurShell Update complete!");
         return 0;
     }
 
@@ -375,10 +375,6 @@ internal static class Program
                 {
                     Console.WriteLine($"  {line}");
                 }
-            }
-            else
-            {
-                Console.WriteLine($"\x1b[32m✔\x1b[0m{description}");
             }
 
             return proc.ExitCode;

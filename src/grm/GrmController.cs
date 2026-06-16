@@ -135,7 +135,8 @@ public static class GrmController
         string remoteUrl = $"https://github.com/{repoIdentifier}.git";
         Console.WriteLine($"Installing {repoIdentifier} into {targetPath}...");
 
-        int rc = RunGit(reposDir, $"clone {remoteUrl} {repoName}");
+        string workDir = Path.GetDirectoryName(targetPath)!;
+        int rc = RunGit(workDir, $"clone {remoteUrl} \"{repoName}\"");
         if (rc == 0)
         {
             Config.AddRepo(repoIdentifier, targetPath);

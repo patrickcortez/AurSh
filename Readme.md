@@ -31,11 +31,13 @@ When using the shell, make sure you put any process/app that you have installed 
 Has:
 
 - Shell Scripting: .aur scripts
+- **AST-Driven Execution Engine**: Robust POSIX-compliant script evaluation
+- **High-Precision Linter**: Warns you about syntax errors and bugs before execution
 - A rc script: .aurc
 - Text and object Piping and redirection
 - Ghost text and auto suggestions
 - Persistent History
-- Environmental variable handling.
+- Environmental variable handling and Call Stack scoping.
 - resolves commands to native OS Commands.
 - Job control.
 - Plug-in system using lua or F# (aursh-plugin <add,list,del,init>)

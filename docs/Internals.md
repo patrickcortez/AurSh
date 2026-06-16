@@ -13,14 +13,15 @@ At its core, AurSh operates in a continuous read-eval-print loop (REPL). It read
 
 ```mermaid
 graph TD;
-    A[User Input] --> B[Parser];
-    B --> C{Is Built-in?};
-    C -- Yes --> D[Core/Builtins Router];
-    C -- No --> E[System Process Execution];
-    D --> F[Shell Environment Update];
-    E --> G[BlackBox Execution Viewport];
-    F --> H[Graphics/Prompt Redraw];
-    G --> H;
+    A[User Input] --> B[Lexer];
+    B[Lexer: Tokenization] --> C[AST Parser];
+    C[Parser: Abstract Syntax Tree] --> D[AstLinter];
+    D[Linter: Static Analysis & Warnings] --> E[AstEvaluator];
+    E --> F{Is Built-in?};
+    F -- Yes --> G[Core/Builtins Router];
+    F -- No --> H[System Process Execution];
+    G --> I[Shell Environment Update];
+    H --> J[BlackBox Execution Viewport];
 ```
 
 ---
@@ -30,10 +31,14 @@ graph TD;
 The codebase is split into distinct modules to keep things organized. Here is a simplified explanation of what each part does:
 
 ### 1. `core/` and `Program.cs`
-This is the heart of the shell. It manages the main execution loop, environmental variables, and the `ShellEnvironment` state. `Program.cs` serves as the entry point that spins up the shell process.
+This is the heart of the shell. It manages the main execution loop, environmental variables, and the `ShellEnvironment` state (including Call Stacks and Try-Catch scoping rules). `Program.cs` serves as the entry point that spins up the shell process.
 
-### 2. `Parser/`
-Before any command runs, it has to be understood. The parser takes raw text (like `echo "hello" | grep h`) and breaks it down into tokens. It handles pipes, quotes, file associations, and command substitution.
+### 2. The AST Engine (`core/Lexer.cs`, `core/Parser.cs`, `core/AstEvaluator.cs`)
+Before any command runs, it is systematically processed:
+- **Lexer**: Converts raw text into structured Tokens, correctly identifying quotes, nested subcommands, and redirections.
+- **AST Parser**: Builds a hierarchical Abstract Syntax Tree (AST), understanding the relationships between `if` statements, pipelines, loops, and commands.
+- **AstLinter**: A static analysis pass that warns the user about syntax mistakes (like unquoted variables or missing spaces in conditions) before they run.
+- **AstEvaluator**: The execution engine that safely traverses the tree, executing pipelines concurrently and mapping function arguments.
 
 ### 3. `graphics/`
 AurSh is built to be visually pleasing. This folder contains all the logic for drawing the modern two-line prompt, handling ANSI escape sequences, colors, and building visual elements for the TUI native tools (like `aursh-ls` and `aursh-cat`).

@@ -17,10 +17,10 @@ cat output.log | grep "Error" > errors.txt
 ```
 
 **How it works internally**
-1. When you enter a command, AurSh's internal `Parser` reads the raw string and breaks it down into individual tokens (words, pipes, strings).
-2. It expands any `$VARIABLES` or `~` home directory paths.
-3. If it detects control flow (`if`, `for`, `while`), it passes execution to the `ScriptRunner` which manages scoping and block logic.
-4. It finally hands the commands to the `Executor` to spin up native processes or internal built-ins, wiring up standard input/output through the pipeline operators.
+1. When you enter a command, AurSh's internal `Lexer` reads the raw string and breaks it down into individual tokens (words, pipes, strings).
+2. The `Parser` builds a hierarchical Abstract Syntax Tree (AST), identifying pipelines, loops, and conditional blocks.
+3. The `AstLinter` scans the AST for syntax errors (like missing spaces or unquoted variables) and warns you before execution.
+4. Finally, the `AstEvaluator` securely executes the AST, managing function scoping, variables, and Native OS processes.
 
 ---
 
@@ -113,7 +113,7 @@ $
 ```
 
 **How it works internally**
-The `InputHandler` inspects your current line before execution. If it sees keywords like `if`, `while`, `for`, or unclosed brackets/quotes, it buffers your input instead of executing it. Once the terminal detects `fi`, `done`, or matching quotes, it consolidates the buffer and securely executes the whole block through the internal `ScriptRunner`.
+The `InputHandler` inspects your current line before execution. If it sees keywords like `if`, `while`, `for`, or unclosed brackets/quotes, it buffers your input instead of executing it. Once the terminal detects `fi`, `done`, or matching quotes, it consolidates the buffer and securely executes the whole block through the internal `Parser` and `AstEvaluator`.
 
 ## Control Flow (Scripting)
 
@@ -195,7 +195,7 @@ echo "Directory contents: $files"
 ```
 
 **How it works internally**
-When the `Lexer` or `ScriptRunner` parses your commands, `Utility.ResolveSubCommand` steps in, creates an isolated internal `Executor`, and calls `ExecuteCapture`. It runs the sub-command silently, strips the trailing newlines, and injects the output string directly back into your command's tokens natively without launching an external shell!
+When the `Lexer` processes your commands, `ReadSubCommand` isolates the block. The `AstEvaluator` intercepts it, creates an isolated sub-environment, executes the sub-command silently, strips the trailing newlines, and injects the output string directly back into your command's tokens natively without launching an external shell!
 
 ## Functions and Scoping
 
@@ -221,7 +221,7 @@ greet "AurSh User"
 ```
 
 **How it works internally**
-When the `ScriptRunner` encounters a function definition, it pre-scans and saves the block into a dictionary without executing it. When you call the function, the runner pushes a new scope via `_env.PushScope()`, assigns `$1`, `$2`, `$@` and `$#` based on the passed arguments, executes the function body, handles any `_returnRequested` signals via the `return` builtin, and finally cleans up by calling `_env.PopScope()`.
+When the `AstEvaluator` encounters a function definition, it saves the AST block into the environment without executing it. When you call the function, the evaluator pushes a new Call Stack Frame and Scope via `_env.PushScope()`, assigns `$1`, `$2`, `$@` and `$#` based on the passed arguments, executes the function body, handles any `return` signals, and finally safely cleans up by popping the scope.
 
 ## File Associations
 

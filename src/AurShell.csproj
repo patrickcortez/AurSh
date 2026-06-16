@@ -55,13 +55,16 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\busybox_win.exe" />
     <EmbeddedResource Include="Resources\busybox_linux_x86_64" />
+    <EmbeddedResource Include="Resources\music_ui.zip" />
   </ItemGroup>
   
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Markdig" Version="0.37.0" />
     <PackageReference Include="Silk.NET.SDL" Version="2.23.0" />
     <PackageReference Include="StbImageSharp" Version="2.30.15" />
     <PackageReference Include="Svg.Skia" Version="5.0.0" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
 </Project>

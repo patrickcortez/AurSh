@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly", "help", "grm"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-music", "aursh-ssh", "local", "declare", "readonly", "help", "grm"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -59,6 +59,7 @@ public static class BuiltinCommands
             "aursh-context" => ExecuteContext(cmd),
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
             "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
+            "aursh-music" => ExecuteAurshMusic(cmd),
             "aursh-ssh" => ExecuteSsh(cmd, env, workingDirectory),
             "help" => ExecuteHelp(),
             "grm" => AurShell.Grm.GrmController.Execute(cmd, env, ref workingDirectory),
@@ -92,6 +93,26 @@ public static class BuiltinCommands
             return onPath;
 
         return null;
+    }
+
+    private static int ExecuteAurshMusic(CommandNode cmd)
+    {
+        if (cmd.Args.Count == 0 || cmd.Args[0] != "start")
+        {
+            Console.Error.WriteLine("aursh-music: usage: aursh-music start");
+            return 1;
+        }
+
+        try
+        {
+            AurShell.Music.MusicServer.Start(new string[0]);
+            return 0;
+        }
+        catch (System.Exception ex)
+        {
+            Console.Error.WriteLine($"aursh-music: error: {ex.Message}");
+            return 1;
+        }
     }
 
     private static int ExecuteHelp()

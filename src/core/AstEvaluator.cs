@@ -163,9 +163,25 @@ public class AstEvaluator
             var funcBody = _env.GetFunction(cmd.Name);
             if (funcBody != null)
             {
-                // Execute function body.
-                // Positional arguments would normally be pushed here, but we will keep it simple for now.
-                return Visit(funcBody);
+                _env.PushFrame(new StackFrame(cmd.Name, cmd.Line, cmd.Column, FrameType.Function));
+                _env.PushScope();
+                int exitCode = 1;
+                try
+                {
+                    exitCode = Visit(funcBody);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: error in function '{cmd.Name}': {ex.Message}");
+                    _env.PrintCallStack();
+                }
+                finally
+                {
+                    _env.PopScope();
+                    _env.PopFrame();
+                    _returnRequested = false; // Reset return flag after function exit
+                }
+                return exitCode;
             }
         }
 
@@ -175,8 +191,22 @@ public class AstEvaluator
     private int Visit(SubshellNode node)
     {
         var clonedEnv = _env.Clone();
+        clonedEnv.PushFrame(new StackFrame("subshell", node.Line, node.Column, FrameType.Subshell));
         var subEval = new AstEvaluator(clonedEnv, _executor, _workingDirectory);
-        int exitCode = subEval.Visit(node.Body);
+        int exitCode = 1;
+        try
+        {
+            exitCode = subEval.Visit(node.Body);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: error in subshell: {ex.Message}");
+            clonedEnv.PrintCallStack();
+        }
+        finally
+        {
+            clonedEnv.PopFrame();
+        }
         _env.LastExitCode = exitCode;
         return exitCode;
     }

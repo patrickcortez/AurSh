@@ -124,7 +124,7 @@ public class Executor
                             resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
                         }
                     }
-                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
+                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                 }
                 catch (Exception ex)
                 {

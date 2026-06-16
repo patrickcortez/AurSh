@@ -30,20 +30,24 @@ public class Token
 {
     public TokenType Type { get; }
     public string Value { get; }
+    public int Line { get; }
+    public int Column { get; }
     public bool WasQuoted { get; }
     public bool WasSingleQuoted { get; }
     public string RawExpandedValue { get; }
 
-    public Token(TokenType type, string value, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
+    public Token(TokenType type, string value, int line, int column, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
     {
         Type = type;
         Value = value;
+        Line = line;
+        Column = column;
         WasQuoted = wasQuoted;
         WasSingleQuoted = wasSingleQuoted;
         RawExpandedValue = rawExpandedValue ?? value;
     }
 
-    public override string ToString() => $"[{Type}: {Value}]";
+    public override string ToString() => $"[{Line}:{Column} {Type}: {Value}]";
 }
 
 public class Lexer
@@ -51,12 +55,32 @@ public class Lexer
     private readonly string _input;
     private readonly ShellEnvironment _env;
     private int _pos;
+    private readonly List<int> _lineStarts;
 
     public Lexer(string input, ShellEnvironment env)
     {
         _input = input;
         _env = env;
         _pos = 0;
+        _lineStarts = new List<int> { 0 };
+        for (int i = 0; i < input.Length; i++)
+        {
+            if (input[i] == '\n') _lineStarts.Add(i + 1);
+        }
+    }
+
+    private (int line, int col) GetPosition(int pos)
+    {
+        int line = _lineStarts.BinarySearch(pos);
+        if (line < 0) line = ~line - 1;
+        int col = pos - _lineStarts[line] + 1;
+        return (line + 1, col); // 1-indexed
+    }
+
+    private Token CreateToken(TokenType type, string value, int startPos, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
+    {
+        var (line, col) = GetPosition(startPos);
+        return new Token(type, value, line, col, wasQuoted, wasSingleQuoted, rawExpandedValue);
     }
 
     public List<Token> Tokenize()
@@ -69,6 +93,7 @@ public class Lexer
         {
             SkipWhitespace();
 
+            int startPos = _pos;
             if (_pos >= _input.Length)
                 break;
 
@@ -83,7 +108,7 @@ public class Lexer
 
             if (c == '\n')
             {
-                tokens.Add(new Token(TokenType.Newline, "\n"));
+                tokens.Add(CreateToken(TokenType.Newline, "\n", startPos));
                 _pos++;
                 isFirstWord = true;
                 expandedAliases.Clear();
@@ -95,12 +120,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == ';')
                 {
-                    tokens.Add(new Token(TokenType.DoubleSemicolon, ";;"));
+                    tokens.Add(CreateToken(TokenType.DoubleSemicolon, ";;", startPos));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.Semicolon, ";"));
+                    tokens.Add(CreateToken(TokenType.Semicolon, ";", startPos));
                 }
                 isFirstWord = true;
                 expandedAliases.Clear();
@@ -112,12 +137,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == '|')
                 {
-                    tokens.Add(new Token(TokenType.Or, "||"));
+                    tokens.Add(CreateToken(TokenType.Or, "||", startPos));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.Pipe, "|"));
+                    tokens.Add(CreateToken(TokenType.Pipe, "|", startPos));
                 }
                 isFirstWord = true;
                 expandedAliases.Clear();
@@ -129,12 +154,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == '&')
                 {
-                    tokens.Add(new Token(TokenType.And, "&&"));
+                    tokens.Add(CreateToken(TokenType.And, "&&", startPos));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.Background, "&"));
+                    tokens.Add(CreateToken(TokenType.Background, "&", startPos));
                 }
                 isFirstWord = true;
                 expandedAliases.Clear();
@@ -146,17 +171,17 @@ public class Lexer
                 _pos += 2;
                 if (_pos < _input.Length && _input[_pos] == '>')
                 {
-                    tokens.Add(new Token(TokenType.RedirectErrAppend, "2>>"));
+                    tokens.Add(CreateToken(TokenType.RedirectErrAppend, "2>>", startPos));
                     _pos++;
                 }
                 else if (_pos + 1 < _input.Length && _input[_pos] == '&' && _input[_pos + 1] == '1')
                 {
-                    tokens.Add(new Token(TokenType.RedirectErrToOut, "2>&1"));
+                    tokens.Add(CreateToken(TokenType.RedirectErrToOut, "2>&1", startPos));
                     _pos += 2;
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.RedirectErr, "2>"));
+                    tokens.Add(CreateToken(TokenType.RedirectErr, "2>", startPos));
                 }
                 continue;
             }
@@ -166,12 +191,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == '>')
                 {
-                    tokens.Add(new Token(TokenType.RedirectAppend, ">>"));
+                    tokens.Add(CreateToken(TokenType.RedirectAppend, ">>", startPos));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.RedirectOut, ">"));
+                    tokens.Add(CreateToken(TokenType.RedirectOut, ">", startPos));
                 }
                 continue;
             }
@@ -185,28 +210,28 @@ public class Lexer
                     if (_pos < _input.Length && _input[_pos] == '<')
                     {
                         _pos++;
-                        tokens.Add(new Token(TokenType.HereString, "<<<"));
+                        tokens.Add(CreateToken(TokenType.HereString, "<<<", startPos));
                     }
                     else if (_pos < _input.Length && _input[_pos] == '-')
                     {
                         _pos++;
-                        tokens.Add(new Token(TokenType.HereDoc, "<<-"));
+                        tokens.Add(CreateToken(TokenType.HereDoc, "<<-", startPos));
                     }
                     else
                     {
-                        tokens.Add(new Token(TokenType.HereDoc, "<<"));
+                        tokens.Add(CreateToken(TokenType.HereDoc, "<<", startPos));
                     }
                 }
                 else
                 {
-                    tokens.Add(new Token(TokenType.RedirectIn, "<"));
+                    tokens.Add(CreateToken(TokenType.RedirectIn, "<", startPos));
                 }
                 continue;
             }
 
             if (c == '(')
             {
-                tokens.Add(new Token(TokenType.LeftParen, "("));
+                tokens.Add(CreateToken(TokenType.LeftParen, "(", startPos));
                 _pos++;
                 isFirstWord = true;
                 expandedAliases.Clear();
@@ -215,12 +240,12 @@ public class Lexer
 
             if (c == ')')
             {
-                tokens.Add(new Token(TokenType.RightParen, ")"));
+                tokens.Add(CreateToken(TokenType.RightParen, ")", startPos));
                 _pos++;
                 continue;
             }
 
-            Token wordToken = ReadWord();
+            Token wordToken = ReadWord(startPos);
             if (isFirstWord && !wordToken.WasQuoted)
             {
                 string? alias = _env.GetAlias(wordToken.Value);
@@ -241,7 +266,7 @@ public class Lexer
             isFirstWord = false;
         }
 
-        tokens.Add(new Token(TokenType.EOF, ""));
+        tokens.Add(CreateToken(TokenType.EOF, "", _pos));
         return tokens;
     }
 
@@ -251,7 +276,7 @@ public class Lexer
             _pos++;
     }
 
-    private Token ReadWord()
+    private Token ReadWord(int startPos)
     {
         var sb = new StringBuilder();
         var rawSb = new StringBuilder();
@@ -387,7 +412,7 @@ public class Lexer
             wasSingleQuoted = false;
         }
 
-        return new Token(TokenType.Word, sb.ToString(), wasQuoted, wasSingleQuoted, rawSb.ToString());
+        return CreateToken(TokenType.Word, sb.ToString(), startPos, wasQuoted, wasSingleQuoted, rawSb.ToString());
     }
 
     private string ReadSubCommand()

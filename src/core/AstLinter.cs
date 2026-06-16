@@ -3,10 +3,32 @@ using System.Collections.Generic;
 
 namespace AurShell.Core;
 
+public enum Severity
+{
+    Warning,
+    Error,
+    Info
+}
+
 public class LinterWarning
 {
+    public int Line { get; }
+    public int Column { get; }
     public string Message { get; }
-    public LinterWarning(string message) => Message = message;
+    public Severity Severity { get; }
+
+    public LinterWarning(int line, int column, string message, Severity severity = Severity.Warning)
+    {
+        Line = line;
+        Column = column;
+        Message = message;
+        Severity = severity;
+    }
+
+    public override string ToString()
+    {
+        return $"[Line {Line}, Col {Column}] {Severity}: {Message}";
+    }
 }
 
 public class AstLinter
@@ -94,14 +116,14 @@ public class AstLinter
         {
             if (_loopDepth == 0)
             {
-                _warnings.Add(new LinterWarning($"'{cmd.Name}' used outside of a loop context."));
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"'{cmd.Name}' used outside of a loop context.", Severity.Error));
             }
         }
         else if (cmd.Name == "return")
         {
             if (_functionDepth == 0)
             {
-                _warnings.Add(new LinterWarning($"'return' used outside of a function context."));
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"'return' used outside of a function context.", Severity.Error));
             }
         }
 
@@ -110,7 +132,7 @@ public class AstLinter
         {
             if (arg.Contains("$") && !arg.StartsWith("\"") && !arg.StartsWith("'"))
             {
-                _warnings.Add(new LinterWarning($"Unquoted variable expansion in argument '{arg}' may be subject to word splitting."));
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"Unquoted variable expansion in argument '{arg}' may be subject to word splitting.", Severity.Warning));
             }
         }
     }

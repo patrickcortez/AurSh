@@ -26,11 +26,15 @@ public class Redirection
 
 public interface ICommandNode
 {
+    int Line { get; set; }
+    int Column { get; set; }
     List<Redirection> Redirections { get; }
 }
 
 public class SimpleCommandNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string Name { get; set; } = "";
     public string RawExpandedName { get; set; } = "";
     public List<string> Args { get; } = new();
@@ -52,6 +56,8 @@ public class SimpleCommandNode : ICommandNode
 
 public class IfNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
     public ListNode ThenBlock { get; set; } = new();
     public List<(ListNode condition, ListNode block)> ElifBlocks { get; } = new();
@@ -61,6 +67,8 @@ public class IfNode : ICommandNode
 
 public class WhileNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
     public ListNode Body { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -68,6 +76,8 @@ public class WhileNode : ICommandNode
 
 public class UntilNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
     public ListNode Body { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -75,6 +85,8 @@ public class UntilNode : ICommandNode
 
 public class ForNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string VariableName { get; set; } = "";
     public List<string> IteratorValues { get; } = new();
     public ListNode Body { get; set; } = new();
@@ -83,6 +95,8 @@ public class ForNode : ICommandNode
 
 public class CaseNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string Value { get; set; } = "";
     public List<(List<string> Patterns, ListNode Body)> Cases { get; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -90,18 +104,24 @@ public class CaseNode : ICommandNode
 
 public class BlockNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public ListNode Body { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
 }
 
 public class SubshellNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public ListNode Body { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
 }
 
 public class FunctionNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string Name { get; set; } = "";
     public BlockNode Body { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -109,6 +129,8 @@ public class FunctionNode : ICommandNode
 
 public class AssignmentNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string VariableName { get; set; } = "";
     public string Value { get; set; } = "";
     public string RawExpandedValue { get; set; } = "";
@@ -117,6 +139,8 @@ public class AssignmentNode : ICommandNode
 
 public class ArrayAssignmentNode : ICommandNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public string VariableName { get; set; } = "";
     public List<string> Values { get; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -131,6 +155,8 @@ public enum ListOperator
 
 public class PipelineNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public List<ICommandNode> Commands { get; } = new();
     public bool Background { get; set; }
 }
@@ -149,6 +175,8 @@ public class ListEntry
 
 public class ListNode
 {
+    public int Line { get; set; }
+    public int Column { get; set; }
     public List<ListEntry> Entries { get; } = new();
 }
 
@@ -163,6 +191,30 @@ public class Parser
         _pos = 0;
     }
 
+    private T InitNode<T>(T node)
+    {
+        var current = Current;
+        if (current != null)
+        {
+            if (node is ICommandNode cmdNode)
+            {
+                cmdNode.Line = current.Line;
+                cmdNode.Column = current.Column;
+            }
+            else if (node is ListNode listNode)
+            {
+                listNode.Line = current.Line;
+                listNode.Column = current.Column;
+            }
+            else if (node is PipelineNode pipeNode)
+            {
+                pipeNode.Line = current.Line;
+                pipeNode.Column = current.Column;
+            }
+        }
+        return node;
+    }
+
     public ListNode Parse()
     {
         return ParseListUntilKeyword();
@@ -170,7 +222,7 @@ public class Parser
 
     private ListNode ParseListUntilKeyword(params string[] stopWords)
     {
-        var list = new ListNode();
+        var list = InitNode(new ListNode());
         SkipNewlines();
 
         while (Current.Type != TokenType.EOF)
@@ -219,7 +271,7 @@ public class Parser
 
     private PipelineNode? ParsePipeline()
     {
-        var pipeline = new PipelineNode();
+        var pipeline = InitNode(new PipelineNode());
 
         var cmd = ParseCommand();
         if (cmd == null)
@@ -263,26 +315,33 @@ public class Parser
             if (Current.Value == "{") return ParseBlock();
             
             if (Current.Value == "function" && Next.Type == TokenType.Word)
-                return ParseFunction(true);
+                return ParseFunction();
         }
 
         if (Current.Type == TokenType.Word && Next.Type == TokenType.LeftParen && LookAhead(2).Type == TokenType.RightParen)
         {
-            return ParseFunction(false);
+            return ParseFunction();
         }
 
         if (Current.Type == TokenType.Word && Current.Value.Contains("=") && !Current.WasQuoted)
         {
             if (IsValidAssignment(Current.Value))
             {
+                int equalsIdx = Current.Value.IndexOf('=');
+                string name = Current.Value.Substring(0, equalsIdx);
                 if (Current.Value.EndsWith("=") && Next.Type == TokenType.LeftParen)
-                    return ParseArrayAssignment();
+                    return ParseArrayAssignment(name);
                 else
-                    return ParseAssignment();
+                    return ParseAssignment(name);
             }
         }
 
-        var cmd = new SimpleCommandNode();
+        return ParseSimpleCommand();
+    }
+
+    private SimpleCommandNode? ParseSimpleCommand()
+    {
+        var cmd = InitNode(new SimpleCommandNode());
         bool hasContent = false;
 
         while (Current.Type == TokenType.Word)
@@ -315,9 +374,9 @@ public class Parser
         return hasContent ? cmd : null;
     }
 
-    private IfNode ParseIf()
+    private IfNode? ParseIf()
     {
-        var node = new IfNode();
+        var node = InitNode(new IfNode());
         Advance(); // consume 'if'
         
         node.Condition = ParseListUntilKeyword("then");
@@ -349,9 +408,9 @@ public class Parser
         return node;
     }
 
-    private SubshellNode ParseSubshell()
+    private SubshellNode? ParseSubshell()
     {
-        var node = new SubshellNode();
+        var node = InitNode(new SubshellNode());
         Advance(); // consume '('
         node.Body = ParseListUntilKeyword(")");
         if (Current.Type == TokenType.RightParen) Advance();
@@ -359,22 +418,29 @@ public class Parser
         return node;
     }
 
-    private FunctionNode ParseFunction(bool usesFunctionKeyword)
+    private FunctionNode? ParseFunction(string? name = null)
     {
-        var node = new FunctionNode();
+        var node = InitNode(new FunctionNode());
         
-        if (usesFunctionKeyword)
+        if (name == null)
         {
-            Advance(); // consume 'function'
-            node.Name = Current.Value;
-            Advance(); // consume name
+            if (Current.Value == "function")
+            {
+                Advance(); // consume 'function'
+                node.Name = Current.Value;
+                Advance(); // consume name
+            }
+            else
+            {
+                node.Name = Current.Value;
+                Advance(); // consume name
+                Advance(); // consume '('
+                Advance(); // consume ')'
+            }
         }
         else
         {
-            node.Name = Current.Value;
-            Advance(); // consume name
-            Advance(); // consume '('
-            Advance(); // consume ')'
+            node.Name = name;
         }
 
         SkipNewlines();
@@ -402,11 +468,11 @@ public class Parser
         return true;
     }
 
-    private AssignmentNode ParseAssignment()
+    private AssignmentNode? ParseAssignment(string name)
     {
-        var node = new AssignmentNode();
+        var node = InitNode(new AssignmentNode());
         int equalsIdx = Current.Value.IndexOf('=');
-        node.VariableName = Current.Value.Substring(0, equalsIdx);
+        node.VariableName = name;
         node.Value = Current.Value.Substring(equalsIdx + 1);
         node.RawExpandedValue = Current.RawExpandedValue.Substring(equalsIdx + 1); // rough approximation
         Advance();
@@ -415,11 +481,10 @@ public class Parser
         return node;
     }
 
-    private ArrayAssignmentNode ParseArrayAssignment()
+    private ArrayAssignmentNode? ParseArrayAssignment(string name)
     {
-        var node = new ArrayAssignmentNode();
-        int equalsIdx = Current.Value.IndexOf('=');
-        node.VariableName = Current.Value.Substring(0, equalsIdx);
+        var node = InitNode(new ArrayAssignmentNode());
+        node.VariableName = name;
         Advance(); // consume 'var='
         Advance(); // consume '('
         
@@ -437,9 +502,9 @@ public class Parser
         return node;
     }
 
-    private WhileNode ParseWhile()
+    private WhileNode? ParseWhile()
     {
-        var node = new WhileNode();
+        var node = InitNode(new WhileNode());
         Advance(); // consume 'while'
         node.Condition = ParseListUntilKeyword("do");
         if (Current.Type == TokenType.Word && Current.Value == "do" && !Current.WasQuoted) Advance();
@@ -449,9 +514,9 @@ public class Parser
         return node;
     }
 
-    private UntilNode ParseUntil()
+    private UntilNode? ParseUntil()
     {
-        var node = new UntilNode();
+        var node = InitNode(new UntilNode());
         Advance(); // consume 'until'
         node.Condition = ParseListUntilKeyword("do");
         if (Current.Type == TokenType.Word && Current.Value == "do" && !Current.WasQuoted) Advance();
@@ -461,9 +526,9 @@ public class Parser
         return node;
     }
 
-    private ForNode ParseFor()
+    private ForNode? ParseFor()
     {
-        var node = new ForNode();
+        var node = InitNode(new ForNode());
         Advance(); // consume 'for'
         if (Current.Type == TokenType.Word)
         {
@@ -495,9 +560,9 @@ public class Parser
         return node;
     }
 
-    private CaseNode ParseCase()
+    private CaseNode? ParseCase()
     {
-        var node = new CaseNode();
+        var node = InitNode(new CaseNode());
         Advance(); // consume 'case'
         
         if (Current.Type == TokenType.Word)
@@ -548,9 +613,9 @@ public class Parser
         return node;
     }
 
-    private BlockNode ParseBlock()
+    private BlockNode? ParseBlock()
     {
-        var node = new BlockNode();
+        var node = InitNode(new BlockNode());
         Advance(); // consume '{'
         node.Body = ParseListUntilKeyword("}");
         if (Current.Type == TokenType.Word && Current.Value == "}" && !Current.WasQuoted) Advance();
@@ -604,9 +669,9 @@ public class Parser
             _pos++;
     }
 
-    private Token Current => _pos < _tokens.Count ? _tokens[_pos] : new Token(TokenType.EOF, "");
-    private Token Next => _pos + 1 < _tokens.Count ? _tokens[_pos + 1] : new Token(TokenType.EOF, "");
-    private Token LookAhead(int k) => _pos + k < _tokens.Count ? _tokens[_pos + k] : new Token(TokenType.EOF, "");
+    private Token Current => _pos < _tokens.Count ? _tokens[_pos] : new Token(TokenType.EOF, "", 0, 0);
+    private Token Next => _pos + 1 < _tokens.Count ? _tokens[_pos + 1] : new Token(TokenType.EOF, "", 0, 0);
+    private Token LookAhead(int k) => _pos + k < _tokens.Count ? _tokens[_pos + k] : new Token(TokenType.EOF, "", 0, 0);
 
     private void Advance()
     {

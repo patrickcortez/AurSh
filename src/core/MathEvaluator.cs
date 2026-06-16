@@ -10,9 +10,23 @@ public static class MathEvaluator
     {
         if (string.IsNullOrWhiteSpace(expression)) return 0;
 
-        var tokens = Tokenize(expression);
-        int pos = 0;
-        return ParseTernary(tokens, ref pos, env);
+        env.PushFrame(new StackFrame("math evaluation", 0, 0, FrameType.Arithmetic));
+        try
+        {
+            var tokens = Tokenize(expression);
+            int pos = 0;
+            return ParseTernary(tokens, ref pos, env);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: arithmetic syntax error: {ex.Message}");
+            env.PrintCallStack();
+            return 0; // return 0 gracefully on evaluation failure
+        }
+        finally
+        {
+            env.PopFrame();
+        }
     }
 
     private static List<string> Tokenize(string expr)

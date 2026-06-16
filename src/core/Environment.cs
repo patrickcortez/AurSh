@@ -17,6 +17,8 @@ public class ShellEnvironment
 
     private int _lastExitCode;
 
+    public Stack<StackFrame> CallStack { get; } = new();
+    
     public int LastExitCode
     {
         get => _lastExitCode;
@@ -56,6 +58,29 @@ public class ShellEnvironment
     {
         if (_localScopes.Count > 0)
             _localScopes.Pop();
+    }
+
+    public void PushFrame(StackFrame frame)
+    {
+        if (CallStack.Count > 1000)
+            throw new Exception("aursh: max recursion depth exceeded");
+        CallStack.Push(frame);
+    }
+
+    public void PopFrame()
+    {
+        if (CallStack.Count > 0)
+            CallStack.Pop();
+    }
+
+    public void PrintCallStack()
+    {
+        if (CallStack.Count == 0) return;
+        Console.Error.WriteLine("Call Stack (most recent call first):");
+        foreach (var frame in CallStack)
+        {
+            Console.Error.WriteLine($"  {frame}");
+        }
     }
 
     public bool IsReadonly(string name)

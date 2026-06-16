@@ -62,7 +62,7 @@ the command-line.
 - `aursh-context` : A disk backed object like that can hold multiple attributes to structurize and organize variables. `aursh-context <new,del,list,insert,remove,update> <args...>`
 - `aursh-net` : A network tool for connecting,disconnecting and recieving/sending data through the command-line.
 - `aursh-ssh` : A TUI interface for managing SSH keys and remote hosts.
-- `gpm` : A Git Package Manager that queries Github for remote repositories.
+- `grm` : A Git Repository Manager that queries Github for remote repositories.
 
 ---
 

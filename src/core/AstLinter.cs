@@ -126,6 +126,17 @@ public class AstLinter
                 _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"'return' used outside of a function context.", Severity.Error));
             }
         }
+        else if (cmd.Name == "[")
+        {
+            if (cmd.Args.Count == 0 || !cmd.Args[^1].EndsWith("]"))
+            {
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"The '[' command requires a closing ']'.", Severity.Error));
+            }
+            else if (cmd.Args[^1] != "]")
+            {
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"Missing space before closing ']'. The '[' command requires exactly ']' as the final argument, not '{cmd.Args[^1]}'.", Severity.Error));
+            }
+        }
 
         // Warn on unquoted variables that might undergo word splitting
         foreach (var arg in cmd.Args)

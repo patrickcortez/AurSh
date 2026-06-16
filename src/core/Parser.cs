@@ -628,14 +628,20 @@ public class Parser
         TokenType redirectType = Current.Type;
         Advance();
 
-        if (Current.Type != TokenType.Word)
-        {
-            Console.Error.WriteLine("aursh: syntax error near unexpected token");
-            return;
-        }
+        string target = "";
 
-        string target = Current.Value;
-        Advance();
+        // 2>&1 does not require a target word
+        if (redirectType != TokenType.RedirectErrToOut)
+        {
+            if (Current.Type != TokenType.Word)
+            {
+                Console.Error.WriteLine("aursh: syntax error near unexpected token");
+                return;
+            }
+
+            target = Current.Value;
+            Advance();
+        }
 
         RedirectType type = redirectType switch
         {

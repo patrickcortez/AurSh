@@ -90,6 +90,11 @@ public class AstEvaluator
                 {
                     return Visit(cmd);
                 }
+                catch (System.IO.IOException ex) when (ex.Message.Contains("broken", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Simulated SIGPIPE
+                    return 141; 
+                }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"aursh: pipeline error: {ex.Message}");
@@ -165,6 +170,14 @@ public class AstEvaluator
             {
                 _env.PushFrame(new StackFrame(cmd.Name, cmd.Line, cmd.Column, FrameType.Function));
                 _env.PushScope();
+                for (int i = 0; i < cmd.Args.Count; i++)
+                {
+                    _env.SetLocal((i + 1).ToString(), cmd.Args[i]);
+                }
+                _env.SetLocal("#", cmd.Args.Count.ToString());
+                _env.SetLocal("@", string.Join(" ", cmd.Args));
+                _env.SetLocal("*", string.Join(" ", cmd.Args));
+                
                 int exitCode = 1;
                 try
                 {

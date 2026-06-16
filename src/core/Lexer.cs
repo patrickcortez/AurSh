@@ -423,11 +423,35 @@ public class Lexer
         sb.Append("$(");
 
         int depth = 1;
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        bool escaped = false;
+
         while (_pos < _input.Length && depth > 0)
         {
             char c = _input[_pos];
-            if (c == '(') depth++;
-            else if (c == ')') depth--;
+
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (c == '\\')
+            {
+                escaped = true;
+            }
+            else if (c == '\'' && !inDoubleQuote)
+            {
+                inSingleQuote = !inSingleQuote;
+            }
+            else if (c == '"' && !inSingleQuote)
+            {
+                inDoubleQuote = !inDoubleQuote;
+            }
+            else if (!inSingleQuote && !inDoubleQuote)
+            {
+                if (c == '(') depth++;
+                else if (c == ')') depth--;
+            }
 
             if (depth > 0)
             {

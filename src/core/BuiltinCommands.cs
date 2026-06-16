@@ -1680,16 +1680,22 @@ public static class BuiltinCommands
 
     private static int ExecuteTest(SimpleCommandNode cmd)
     {
-        if (cmd.Args.Count == 0)
+        var args = cmd.Args.ToList();
+        if (cmd.Name == "[" && args.Count > 0 && args.Last() == "]")
+        {
+            args.RemoveAt(args.Count - 1);
+        }
+
+        if (args.Count == 0)
             return 1;
 
-        if (cmd.Args.Count == 1)
-            return string.IsNullOrEmpty(cmd.Args[0]) ? 1 : 0;
+        if (args.Count == 1)
+            return string.IsNullOrEmpty(args[0]) ? 1 : 0;
 
-        if (cmd.Args.Count == 2)
+        if (args.Count == 2)
         {
-            string op = cmd.Args[0];
-            string operand = cmd.Args[1];
+            string op = args[0];
+            string operand = args[1];
 
             return op switch
             {
@@ -1707,11 +1713,11 @@ public static class BuiltinCommands
             };
         }
 
-        if (cmd.Args.Count == 3)
+        if (args.Count == 3)
         {
-            string left = cmd.Args[0];
-            string op = cmd.Args[1];
-            string right = cmd.Args[2];
+            string left = args[0];
+            string op = args[1];
+            string right = args[2];
 
             return op switch
             {

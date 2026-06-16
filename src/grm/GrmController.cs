@@ -302,11 +302,31 @@ public static class GrmController
             }
 
             int finalRc = 0;
+            int upgradedCount = 0;
+            int upToDateCount = 0;
+            var upToDateRepos = new System.Collections.Generic.List<string>();
+
             foreach (var kvp in repos)
             {
                 int rc = UpgradeRepo(kvp.Key, kvp.Value);
-                if (rc != 0) finalRc = rc;
+                if (rc == 0) upgradedCount++;
+                else if (rc == 2)
+                {
+                    upToDateCount++;
+                    upToDateRepos.Add(kvp.Key);
+                }
+                else finalRc = 1;
             }
+
+            if (upgradedCount == 0 && finalRc == 0 && upToDateCount > 0)
+            {
+                Console.WriteLine("\ngrm: All installed repositories are up to date.");
+            }
+            else if (upToDateCount > 0)
+            {
+                Console.WriteLine($"\ngrm: The following repositories were already up to date: {string.Join(", ", upToDateRepos)}");
+            }
+
             return finalRc;
         }
 
@@ -357,16 +377,32 @@ public static class GrmController
             return 1;
         }
 
-        int pullCode = RunGit(targetPath, "pull");
+        var (pullCode, pullOutput) = RunGitOutput(targetPath, "pull");
         if (pullCode == 0)
         {
-            Console.WriteLine($"grm: Successfully upgraded {repoIdentifier}");
-            return 0;
+            if (pullOutput.Contains("Already up to date."))
+            {
+                Console.WriteLine($"grm: {repoIdentifier} is already up to date.");
+                return 2;
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(pullOutput))
+                {
+                    Console.Write(pullOutput);
+                }
+                Console.WriteLine($"grm: Successfully upgraded {repoIdentifier}");
+                return 0;
+            }
         }
         else
         {
+            if (!string.IsNullOrWhiteSpace(pullOutput))
+            {
+                Console.Error.Write(pullOutput);
+            }
             Console.Error.WriteLine($"grm: Failed to upgrade {repoIdentifier}");
-            return pullCode;
+            return pullCode == 0 ? 1 : pullCode;
         }
     }
 

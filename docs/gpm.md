@@ -13,12 +13,13 @@ Searches GitHub for repositories matching the query.
 - **Example:** `gpm search nushell`
 - **Behavior:** Queries the GitHub API and returns the top 10 matching repositories (in `username/repo` format).
 
-### 2. `gpm install <repository>`
-Installs (clones) a repository to your local machine.
+### 2. `gpm install <owner/repository>`
+Clones a GitHub repository locally into your `~/Repos/` directory and registers it.
 - **Example:** `gpm install nushell/nushell`
-- **Behavior:** 
-  - Clones the target repository into `~/Repos/<repo-name>`.
-  - Registers the repository into GPM's tracking file at `~/.gpm/remotes.con`.
+- **Behavior:**
+  1. Checks if the repository is already installed.
+  2. Runs `git clone https://github.com/nushell/nushell.git ~/Repos/nushell/nushell`.
+  3. Saves the mapping `nushell/nushell -> ~/Repos/nushell/nushell` into `~/.gpm/remotes.con`.
 
 ### 3. `gpm list`
 Lists all repositories currently installed and tracked by GPM.
@@ -33,7 +34,7 @@ Changes your current working directory to the specified installed repository.
 ### 5. `gpm upgrade <owner/repository>`
 Pulls the latest changes for a specific installed repository.
 - **Example:** `gpm upgrade nushell/nushell`
-- **Behavior:** Navigates to the repository path and executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
+- **Behavior:** Checks if you have uncommitted or stashed changes. If the repository is clean, it navigates to the repository path and executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
 
 ### 6. `gpm info <repository>`
 Fetches detailed repository information (description, stars, forks, license) directly from GitHub.
@@ -43,7 +44,7 @@ Fetches detailed repository information (description, stars, forks, license) dir
 ### 7. `gpm uninstall <owner/repository>`
 Uninstalls (deletes) a repository from your local machine.
 - **Example:** `gpm uninstall nushell/nushell`
-- **Behavior:** Deletes the repository directory from `~/Repos/` and removes its entry from `~/.gpm/remotes.con`.
+- **Behavior:** Deletes the repository directory from `~/Repos/owner/repository` and removes its entry from `~/.gpm/remotes.con`.
 
 ---
 

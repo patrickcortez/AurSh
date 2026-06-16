@@ -105,24 +105,27 @@ public static class GpmController
             return 1;
         }
         
+        string owner = repoIdentifier.Split('/')[0];
         string repoName = repoIdentifier.Split('/')[1];
         
         var installed = Config.GetInstalledRepos();
-        if (installed.ContainsKey(repoName) || installed.ContainsKey(repoIdentifier))
+        if (installed.ContainsKey(repoIdentifier))
         {
-            Console.WriteLine($"gpm: Repository '{repoIdentifier}' already exists locally.");
-            return 0;
+            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is already installed.");
+            return 1;
         }
 
         string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string reposDir = Path.Combine(homeDir, "Repos");
+        string targetPath = Path.Combine(reposDir, owner, repoName);
+
+        Console.WriteLine($"Installing {repoIdentifier}...");
         
-        if (!Directory.Exists(reposDir))
+        if (!Directory.Exists(Path.GetDirectoryName(targetPath)))
         {
-            Directory.CreateDirectory(reposDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
         }
 
-        string targetPath = Path.Combine(reposDir, repoName);
         if (Directory.Exists(targetPath))
         {
             Console.Error.WriteLine($"gpm: Target directory '{targetPath}' already exists but is not tracked by GPM.");
@@ -213,6 +216,19 @@ public static class GpmController
         if (!Directory.Exists(targetPath))
         {
             Console.Error.WriteLine($"gpm: Repository directory '{targetPath}' is missing. Cannot upgrade.");
+            return 1;
+        }
+
+        var (statusExit, statusOutput) = RunGitOutput(targetPath, "status --porcelain");
+        if (statusExit != 0)
+        {
+            Console.Error.WriteLine($"gpm: Failed to check repository status for {repoIdentifier}");
+            return 1;
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusOutput))
+        {
+            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' has uncommitted changes. Please commit or stash them before upgrading.");
             return 1;
         }
 
@@ -345,6 +361,30 @@ public static class GpmController
         {
             Console.Error.WriteLine($"gpm: Failed to execute git: {ex.Message}");
             return 127;
+        }
+    }
+
+    private static (int exitCode, string output) RunGitOutput(string workingDir, string args)
+    {
+        var psi = new ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = workingDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true
+        };
+
+        try
+        {
+            using var proc = Process.Start(psi);
+            if (proc == null) return (127, string.Empty);
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            return (proc.ExitCode, output);
+        }
+        catch
+        {
+            return (127, string.Empty);
         }
     }
 

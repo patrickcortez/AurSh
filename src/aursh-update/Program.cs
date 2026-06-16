@@ -340,7 +340,6 @@ internal static class Program
 
             string[] spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
             int spinIndex = 0;
-            int prevLen = 0;
 
             try { Console.CursorVisible = false; } catch { }
 
@@ -359,16 +358,14 @@ internal static class Program
                         content = content.Substring(0, maxLen);
                     }
 
-                    // Pad with spaces to overwrite any leftover chars from a longer previous line
-                    int pad = prevLen > content.Length ? prevLen - content.Length : 0;
-                    Console.Write($"\r{content}{new string(' ', pad)}");
-                    prevLen = content.Length;
+                    // Use ANSI sequence to clear the line before writing
+                    Console.Write($"\x1b[2K\r{content}");
                 }
                 spinIndex = (spinIndex + 1) % spinner.Length;
             }
 
             // Clear the spinner line
-            Console.Write($"\r{new string(' ', prevLen)}\r");
+            Console.Write("\x1b[2K\r");
             try { Console.CursorVisible = true; } catch { }
 
             if (proc.ExitCode != 0)

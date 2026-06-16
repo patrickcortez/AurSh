@@ -1,0 +1,1 @@
+using System; class P { static void Main() { foreach(var f in System.IO.Directory.GetFiles(@"C:\Users\Cortez\Music", "*.*")) { try { var t = TagLib.File.Create(f); Console.WriteLine(f + ": " + t.Tag.Title); } catch(Exception e) { Console.WriteLine(f + ": " + e.Message); } } } }

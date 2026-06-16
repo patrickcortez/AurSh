@@ -1,17 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './App.css';
-import type { Track, Status, UserData, ViewState } from './types';
+import type { Track, Status, UserData } from './types';
 import { Sidebar } from './components/Sidebar';
 import { MainView } from './components/MainView';
 import { PlayerBar } from './components/PlayerBar';
+import { TopBar } from './components/TopBar';
+import { RightSidebar } from './components/RightSidebar';
 
 function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [configInput, setConfigInput] = useState('');
   
-  const [currentView, setCurrentView] = useState<ViewState>('Home');
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -47,32 +47,6 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleConfigSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await fetch('/api/config', {
-        method: 'POST',
-        body: configInput
-      });
-      fetchStatusAndTracks();
-    } catch (err) {
-      console.error('Failed to set config:', err);
-    }
-  };
-
-  const handleCreatePlaylist = async () => {
-    const name = window.prompt('Enter playlist name:');
-    if (name) {
-      try {
-        const res = await fetch('/api/playlist', { method: 'POST', body: name });
-        const newUserData = await res.json();
-        setUserData(newUserData);
-      } catch (err) {
-        console.error('Failed to create playlist:', err);
-      }
-    }
-  };
-
   const toggleLike = async () => {
     if (!currentTrack) return;
     try {
@@ -94,7 +68,7 @@ function App() {
   };
 
   const togglePlay = () => {
-    if (audioRef.current) {
+    if (audioRef.current && currentTrack) {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
@@ -173,37 +147,24 @@ function App() {
   const isLiked = currentTrack ? (userData?.likedTracks.includes(currentTrack.id) || false) : false;
 
   return (
-    <div className="layout">
-      <Sidebar 
-        currentView={currentView} 
-        setCurrentView={setCurrentView} 
-        onCreatePlaylist={handleCreatePlaylist} 
-      />
+    <div className="app-container">
+      <TopBar />
 
-      <div className="main-area">
-        <div className="topbar">
-          <div className="nav-arrows">
-            <button>&lt;</button>
-            <button>&gt;</button>
-          </div>
-          <div className="profile">User</div>
-        </div>
+      <div className="middle-row">
+        <Sidebar 
+          tracks={tracks}
+          playTrack={playTrack}
+        />
         
-        <div className="content-scroll">
-          <div className="header-bg"></div>
-          <div className="content-inner">
-            <MainView 
-              status={status}
-              tracks={tracks}
-              userData={userData}
-              currentView={currentView}
-              onConfigSubmit={handleConfigSubmit}
-              configInput={configInput}
-              setConfigInput={setConfigInput}
-              playTrack={playTrack}
-            />
-          </div>
-        </div>
+        <MainView 
+          status={status}
+          tracks={tracks}
+          playTrack={playTrack}
+        />
+
+        <RightSidebar 
+          currentTrack={currentTrack}
+        />
       </div>
 
       <PlayerBar 

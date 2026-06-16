@@ -16,3 +16,5 @@ CSharpTest
 MarkdigTest
 tests/assets/*
 .antigravitycli
+src/music-ui/node_modules/
+src/music-ui/dist/

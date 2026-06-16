@@ -18,6 +18,7 @@ public class StatusResponse
     public int TrackCount { get; set; }
 }
 
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(System.Collections.Generic.List<TrackInfo>))]
 [JsonSerializable(typeof(StatusResponse))]
 [JsonSerializable(typeof(UserData))]
@@ -46,6 +47,7 @@ public static class MusicServer
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, MusicJsonContext.Default);
+            options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         });
 
         // Add CORS

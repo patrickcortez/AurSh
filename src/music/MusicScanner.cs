@@ -138,9 +138,9 @@ public class MusicScanner
 
                 Tracks.Add(track);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore files that can't be read
+                Console.WriteLine($"[Music] Error reading {file}: {ex.Message}");
             }
         }
 

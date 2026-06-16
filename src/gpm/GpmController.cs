@@ -29,6 +29,7 @@ public static class GpmController
                 case "uninstall": return Uninstall(cmd);
                 case "upgrade": return Upgrade(cmd);
                 case "list": return List();
+                case "goto": return Goto(cmd, ref workingDirectory);
                 default:
                     PrintHelp();
                     return 1;
@@ -50,6 +51,7 @@ public static class GpmController
         Console.WriteLine("  uninstall <repo>  Delete an installed repository.");
         Console.WriteLine("  upgrade <repo>    Pull the latest changes for an installed repository.");
         Console.WriteLine("  list              List all installed repositories.");
+        Console.WriteLine("  goto <repo>       Change the current directory to the repository.");
     }
 
     private static async Task<int> SearchAsync(CommandNode cmd)
@@ -253,6 +255,57 @@ public static class GpmController
         {
             Console.WriteLine($"  {kvp.Key} => {kvp.Value}");
         }
+        return 0;
+    }
+
+    private static int Goto(CommandNode cmd, ref string workingDirectory)
+    {
+        if (cmd.Args.Count < 2)
+        {
+            Console.Error.WriteLine("gpm goto: missing repository name");
+            return 1;
+        }
+
+        string repoName = cmd.Args[1];
+        var installed = Config.GetInstalledRepos();
+        
+        string? targetKey = null;
+        string? targetPath = null;
+        
+        foreach (var kvp in installed)
+        {
+            if (kvp.Key.Equals(repoName, StringComparison.OrdinalIgnoreCase) || 
+                kvp.Key.EndsWith($"/{repoName}", StringComparison.OrdinalIgnoreCase))
+            {
+                targetKey = kvp.Key;
+                targetPath = kvp.Value;
+                break;
+            }
+        }
+
+        if (targetKey == null || targetPath == null)
+        {
+            Console.Error.WriteLine($"gpm: Repository '{repoName}' is not installed.");
+            return 1;
+        }
+
+        if (!Directory.Exists(targetPath))
+        {
+            Console.Error.WriteLine($"gpm: Repository directory '{targetPath}' is missing.");
+            return 1;
+        }
+
+        workingDirectory = targetPath;
+        try 
+        {
+            Environment.CurrentDirectory = targetPath;
+        } 
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"gpm: Failed to change directory: {ex.Message}");
+            return 1;
+        }
+        
         return 0;
     }
 

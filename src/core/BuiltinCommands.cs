@@ -795,6 +795,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-context : {Ansi.FgBrightBlue}Create, Modify or Delete Contexts.
                                 - {Ansi.FgBrightCyan}aursh-net : {Ansi.FgBrightBlue}A network tool for connecting,disconnecting and recieving/sending data through the command-line.
                                 - {Ansi.FgBrightCyan}aursh-ssh : {Ansi.FgBrightBlue}TUI interface for managing SSH keys and remote hosts.
+                                - {Ansi.FgBrightCyan}grm : {Ansi.FgBrightBlue}Git Repo Manager for installing repositories from GitHub.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

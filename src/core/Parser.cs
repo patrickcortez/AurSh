@@ -227,7 +227,7 @@ public class Parser
 
         while (Current.Type != TokenType.EOF)
         {
-            if (Current.Type == TokenType.Word && !Current.WasQuoted && stopWords.Contains(Current.Value))
+            if (!Current.WasQuoted && stopWords.Contains(Current.Value))
             {
                 break;
             }
@@ -235,6 +235,11 @@ public class Parser
             var pipeline = ParsePipeline();
             if (pipeline == null || pipeline.Commands.Count == 0)
             {
+                if (Current.Type != TokenType.EOF && !stopWords.Contains(Current.Value))
+                {
+                    Console.Error.WriteLine($"aursh: syntax error near unexpected token `{Current.Value}`");
+                    break;
+                }
                 SkipNewlines();
                 continue;
             }
@@ -429,6 +434,11 @@ public class Parser
                 Advance(); // consume 'function'
                 node.Name = Current.Value;
                 Advance(); // consume name
+                if (Current.Type == TokenType.LeftParen)
+                {
+                    Advance();
+                    if (Current.Type == TokenType.RightParen) Advance();
+                }
             }
             else
             {
@@ -447,7 +457,7 @@ public class Parser
         
         if (Current.Type == TokenType.Word && Current.Value == "{" && !Current.WasQuoted)
         {
-            node.Body = ParseBlock();
+            node.Body = ParseBlock() ?? new BlockNode();
         }
 
         while (IsRedirect(Current.Type)) ParseRedirection(node);

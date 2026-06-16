@@ -707,7 +707,7 @@ aursh.print(""[plugin] {name} loaded"")
     private void RegisterRequire(LoadedPlugin plugin)
     {
         var loaded = new Dictionary<string, LuaValue>(StringComparer.Ordinal);
-        plugin.Interpreter.SetGlobalFunc("require", args =>
+        plugin.Interpreter!.SetGlobalFunc("require", args =>
         {
             if (args.Length == 0) throw new LuaError("require expects a module name");
             string modName = args[0].AsString();
@@ -715,7 +715,7 @@ aursh.print(""[plugin] {name} loaded"")
             if (loaded.TryGetValue(modName, out var cached))
                 return new[] { cached };
 
-            string filePath = Path.Combine(plugin.Manifest.PluginDir, modName.Replace('.', Path.DirectorySeparatorChar) + ".lua");
+            string filePath = Path.Combine(plugin.Manifest.PluginDir ?? "", modName.Replace('.', Path.DirectorySeparatorChar) + ".lua");
             if (!File.Exists(filePath))
                 throw new LuaError($"module '{modName}' not found at {filePath}");
 

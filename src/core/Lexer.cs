@@ -567,8 +567,16 @@ public class Lexer
             if (depth > 0) _pos++;
         }
 
-        string mathExpr = _input.Substring(start, _pos - start);
-        if (_pos < _input.Length) _pos++; // skip last )
+        string mathExpr = "";
+        if (depth == 0)
+        {
+            mathExpr = _input.Substring(start, _pos - start - 1);
+            _pos++; // skip last )
+        }
+        else
+        {
+            mathExpr = _input.Substring(start);
+        }
 
         return "$((" + mathExpr + "))";
     }

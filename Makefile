@@ -275,6 +275,12 @@ install: publish
 ifeq ($(WIN_ENV),native)
 	@echo [install] Installing to $(INSTALL_DIR)...
 	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE).old') { Remove-Item '$(INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE).old') { Remove-Item '$(INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE).old') { Remove-Item '$(INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(EXE)' -NewName '$(EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(UPDATE_EXE)' -NewName '$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(CONTEXT_EXE)' -NewName '$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
@@ -322,6 +328,12 @@ install-user: publish
 ifeq ($(WIN_ENV),native)
 	@echo [install] Installing to $(USER_INSTALL_DIR)/$(EXE)...
 	@$(PS) "New-Item -Path '$(USER_INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(EXE)' -NewName '$(EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -NewName '$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -NewName '$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Force"

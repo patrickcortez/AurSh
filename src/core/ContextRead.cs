@@ -24,6 +24,7 @@ internal class ContextReader
 
     public string GetAttributeValue(string ContextName, string AttributeName)
     {
+        if (cons == null) return "";
         foreach (Context con in cons)
         {
             if (con.ContextName == ContextName)

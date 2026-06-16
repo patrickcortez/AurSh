@@ -79,10 +79,10 @@ sealed class Utility
 
 internal class Builtins
 {
-    Reader read;
+    Reader read = new();
 
-    string Command;
-    List<Parser.Context>? cons;
+    string Command = "";
+    List<Parser.Context> cons = new();
     List<string> cmds = new()
     {
         "new","del","list","update", "insert","remove" // new, del and list: Done!
@@ -228,7 +228,7 @@ internal class Builtins
 
         Command = cmd;
         read = new();
-        cons = read.GetContexts().ToList();
+        cons = read.GetContexts()?.ToList() ?? new();
         List<string> newargs = new(args.Skip(1));
 
         exitcode = ExecuteCommand(cmd, newargs.ToArray());

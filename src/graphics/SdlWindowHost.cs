@@ -28,7 +28,7 @@ public unsafe class SdlWindowHost : IDisposable
 
         int numDrivers = _sdl.GetNumRenderDrivers();
         bool debugRenderer = Environment.GetEnvironmentVariable("AURSH_DEBUG_RENDERER") == "1";
-        string logPath = null;
+        string? logPath = null;
 
         if (debugRenderer)
         {
@@ -36,8 +36,8 @@ public unsafe class SdlWindowHost : IDisposable
             string logDir = System.IO.Path.Combine(homeDir, ".aursh", "logs");
             System.IO.Directory.CreateDirectory(logDir);
             logPath = System.IO.Path.Combine(logDir, "aursh-view.log");
-            System.IO.File.AppendAllText(logPath, $"\n--- {DateTime.Now} ---\n");
-            System.IO.File.AppendAllText(logPath, $"Found {numDrivers} SDL Render Drivers.\n");
+            System.IO.File.AppendAllText(logPath!, $"\n--- {DateTime.Now} ---\n");
+            System.IO.File.AppendAllText(logPath!, $"Found {numDrivers} SDL Render Drivers.\n");
         }
 
         int bestIndex = -1;
@@ -52,7 +52,7 @@ public unsafe class SdlWindowHost : IDisposable
 
             if (debugRenderer)
             {
-                System.IO.File.AppendAllText(logPath, $"Driver {i}: '{driverName}', Flags: {info.Flags}\n");
+                System.IO.File.AppendAllText(logPath!, $"Driver {i}: '{driverName}', Flags: {info.Flags}\n");
             }
 
             bool isAccel = (info.Flags & (uint)RendererFlags.Accelerated) != 0;
@@ -80,7 +80,7 @@ public unsafe class SdlWindowHost : IDisposable
         {
             if (debugRenderer)
             {
-                System.IO.File.AppendAllText(logPath, $"Selecting Driver Index: {bestIndex}, Requested Flags: {bestFlags}\n");
+                System.IO.File.AppendAllText(logPath!, $"Selecting Driver Index: {bestIndex}, Requested Flags: {bestFlags}\n");
             }
             _renderer = _sdl.CreateRenderer(_window, bestIndex, bestFlags);
         }
@@ -89,7 +89,7 @@ public unsafe class SdlWindowHost : IDisposable
         {
             if (debugRenderer)
             {
-                System.IO.File.AppendAllText(logPath, $"Smart selection failed or no drivers found. Falling back to default index -1.\n");
+                System.IO.File.AppendAllText(logPath!, $"Smart selection failed or no drivers found. Falling back to default index -1.\n");
             }
 
             _renderer = _sdl.CreateRenderer(_window, -1, (uint)RendererFlags.Accelerated | (uint)RendererFlags.Presentvsync);

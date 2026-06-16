@@ -111,6 +111,25 @@ public static class Pipeline
                 BlackBoxWriter? boxErr = null;
                 TextWriter? boxOutOrigOut = null;
                 TextWriter? boxOutOrigErr = null;
+
+                if (originalOut == null && outStream != null)
+                {
+                    originalOut = Console.Out;
+                    Console.SetOut(new StreamWriter(outStream) { AutoFlush = true });
+                }
+
+                if (originalErr == null && errStream != null)
+                {
+                    originalErr = Console.Error;
+                    Console.SetError(new StreamWriter(errStream) { AutoFlush = true });
+                }
+
+                if (originalIn == null && inStream != null)
+                {
+                    originalIn = Console.In;
+                    Console.SetIn(new StreamReader(inStream));
+                }
+
                 if (ShouldRouteToBlackBox(cmd, out var box, out var sess))
                 {
                     if (originalOut == null)
@@ -200,11 +219,19 @@ public static class Pipeline
                 foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
 
                 var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
-                var process = Process.Start(assocPsi);
-                if (process != null)
+                try
                 {
-                    if (!background) process.WaitForExit();
-                    return background ? 0 : process.ExitCode;
+                    var process = Process.Start(assocPsi);
+                    if (process != null)
+                    {
+                        if (!background) process.WaitForExit();
+                        return background ? 0 : process.ExitCode;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: failed to execute associated program: {ex.Message}");
+                    return 126;
                 }
             }
             return 126;
@@ -316,10 +343,15 @@ public static class Pipeline
         bool routeToBox = ShouldRouteToBlackBox(cmd, out var boxOwner, out var boxSession);
         var boxFlags = new BoxRedirectFlags
         {
-            StdoutRedirected = redirectStdout,
-            StderrRedirected = redirectStderr || errToOut,
-            StdinRedirected = redirectStdin
+            StdoutRedirected = redirectStdout || outStream != null,
+            StderrRedirected = redirectStderr || errToOut || errStream != null,
+            StdinRedirected = redirectStdin || inStream != null
         };
+
+        if (inStream != null && !redirectStdin) psi.RedirectStandardInput = true;
+        if (outStream != null && !redirectStdout) psi.RedirectStandardOutput = true;
+        if (errStream != null && !redirectStderr && !errToOut) psi.RedirectStandardError = true;
+
         if (routeToBox)
         {
             BlackBoxIo.PrepareForBox(psi, boxFlags);
@@ -334,12 +366,6 @@ public static class Pipeline
                 return 126;
             }
 
-            if (redirectStdin && stdinFile != null)
-            {
-                stdinFile.CopyTo(process.StandardInput.BaseStream);
-                process.StandardInput.Close();
-            }
-
             if (background)
             {
                 int jobId = env.Jobs.Add(process, cmd.Name + (cmd.Args.Count > 0 ? " " + string.Join(" ", cmd.Args) : ""));
@@ -350,11 +376,27 @@ public static class Pipeline
 
             var tasks = new List<System.Threading.Tasks.Task>();
 
+            if (redirectStdin && stdinFile != null)
+            {
+                stdinFile.CopyTo(process.StandardInput.BaseStream);
+                process.StandardInput.Close();
+            }
+            else if (inStream != null)
+            {
+                tasks.Add(PumpStreamAsync(inStream, process.StandardInput.BaseStream).ContinueWith(_ => { try { process.StandardInput.Close(); } catch { } }));
+            }
+
             if (errToOut && stdoutFile != null)
             {
                 var fileLock = new object();
                 tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile, fileLock));
                 tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stdoutFile, fileLock));
+            }
+            else if (errToOut && outStream != null)
+            {
+                var fileLock = new object();
+                tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, outStream, fileLock));
+                tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, outStream, fileLock));
             }
             else
             {
@@ -362,14 +404,22 @@ public static class Pipeline
                 {
                     tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, stdoutFile));
                 }
+                else if (outStream != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardOutput.BaseStream, outStream));
+                }
 
-                if (errToOut && stdoutFile == null)
+                if (errToOut && stdoutFile == null && outStream == null)
                 {
                     tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, Console.OpenStandardOutput()));
                 }
                 else if (redirectStderr && stderrFile != null)
                 {
                     tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, stderrFile));
+                }
+                else if (errStream != null)
+                {
+                    tasks.Add(PumpStreamAsync(process.StandardError.BaseStream, errStream));
                 }
             }
 

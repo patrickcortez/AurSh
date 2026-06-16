@@ -21,7 +21,7 @@ public static class BuiltinCommands
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
 
-    public static int Execute(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    public static int Execute(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         return cmd.Name.ToLowerInvariant() switch
         {
@@ -95,7 +95,7 @@ public static class BuiltinCommands
         return null;
     }
 
-    private static int ExecuteAurshMusic(CommandNode cmd)
+    private static int ExecuteAurshMusic(SimpleCommandNode cmd)
     {
         if (cmd.Args.Count == 0 || cmd.Args[0] != "start")
         {
@@ -146,7 +146,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteAurshView(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    private static int ExecuteAurshView(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -253,7 +253,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteContext(CommandNode cmd)
+    private static int ExecuteContext(SimpleCommandNode cmd)
     {
         string? contextPath = FindAurshContextExecutable();
         if (string.IsNullOrEmpty(contextPath))
@@ -302,7 +302,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteCat(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int ExecuteCat(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         bool isEditorMode = false;
         string targetFile = "";
@@ -788,7 +788,7 @@ public static class BuiltinCommands
         return RuntimeInformation.OSArchitecture;
     }
 
-    private static int ExecuteAbout(CommandNode cmd)
+    private static int ExecuteAbout(SimpleCommandNode cmd)
     {
 
         string about = $@"
@@ -826,7 +826,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteCd(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int ExecuteCd(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         string target;
 
@@ -871,7 +871,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteLs(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int ExecuteLs(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         string targetPath = workingDirectory;
 
@@ -1002,7 +1002,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteExport(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteExport(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1065,7 +1065,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteUnset(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteUnset(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1082,7 +1082,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteExit(CommandNode cmd)
+    private static int ExecuteExit(SimpleCommandNode cmd)
     {
         int code = 0;
         if (cmd.Args.Count > 0)
@@ -1092,7 +1092,7 @@ public static class BuiltinCommands
         return code;
     }
 
-    private static int ExecuteHistory(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    private static int ExecuteHistory(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         string historyFile = Utils.Platform.HistoryFilePath;
         var history = new History(historyFile);
@@ -1428,7 +1428,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteEcho(CommandNode cmd)
+    private static int ExecuteEcho(SimpleCommandNode cmd)
     {
         bool noNewline = false;
         bool interpretEscapes = false;
@@ -1477,7 +1477,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteType(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    private static int ExecuteType(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1515,7 +1515,7 @@ public static class BuiltinCommands
         return result;
     }
 
-    private static int ExecuteAlias(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteAlias(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1554,7 +1554,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteUnalias(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteUnalias(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1581,7 +1581,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteSource(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int ExecuteSource(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1597,24 +1597,33 @@ public static class BuiltinCommands
             return 1;
         }
 
-        string extension = Path.GetExtension(filePath).ToLowerInvariant();
+        var oldPositional = new List<string>(env.PositionalArguments);
         string[] scriptArgs = cmd.Args.Count > 1 ? cmd.Args.Skip(1).ToArray() : Array.Empty<string>();
-
-        if (extension == ".aur")
+        try
         {
-            var runner = new ScriptRunner(env, workingDirectory);
-            int result = runner.RunFile(filePath, scriptArgs);
+            if (scriptArgs.Length > 0)
+            {
+                env.PositionalArguments.Clear();
+                env.PositionalArguments.AddRange(scriptArgs);
+            }
+
+            string content = File.ReadAllText(filePath);
+            var executor = new Executor(env, workingDirectory);
+            int result = executor.ExecuteScript(content);
+            workingDirectory = executor.WorkingDirectory;
             return result;
         }
-
-        var executor = new Executor(env, workingDirectory);
-        var rcLoader = new RcLoader(env, executor);
-        int rcResult = rcLoader.LoadFrom(filePath);
-        workingDirectory = executor.WorkingDirectory;
-        return rcResult;
+        finally
+        {
+            if (scriptArgs.Length > 0)
+            {
+                env.PositionalArguments.Clear();
+                env.PositionalArguments.AddRange(oldPositional);
+            }
+        }
     }
 
-    private static int ExecuteSet(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteSet(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1645,7 +1654,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteRead(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteRead(SimpleCommandNode cmd, ShellEnvironment env)
     {
         string varName = cmd.Args.Count > 0 ? cmd.Args[0] : "REPLY";
         string prompt = "";
@@ -1669,7 +1678,7 @@ public static class BuiltinCommands
         return line == null ? 1 : 0;
     }
 
-    private static int ExecuteTest(CommandNode cmd)
+    private static int ExecuteTest(SimpleCommandNode cmd)
     {
         if (cmd.Args.Count == 0)
             return 1;
@@ -1721,7 +1730,7 @@ public static class BuiltinCommands
         return 1;
     }
 
-    private static int ExecuteReturn(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteReturn(SimpleCommandNode cmd, ShellEnvironment env)
     {
         int code = 0;
         if (cmd.Args.Count > 0)
@@ -1730,7 +1739,7 @@ public static class BuiltinCommands
         return code;
     }
 
-    private static int ExecuteFallback(CommandNode cmd)
+    private static int ExecuteFallback(SimpleCommandNode cmd)
     {
         Console.Error.WriteLine($"aursh: {cmd.Name}: builtin not implemented");
         return 1;
@@ -1772,7 +1781,7 @@ public static class BuiltinCommands
         return sb.ToString();
     }
 
-    private static int ExecuteJobs(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteJobs(SimpleCommandNode cmd, ShellEnvironment env)
     {
         var allJobs = env.Jobs.GetAll();
 
@@ -1802,7 +1811,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteFg(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteFg(SimpleCommandNode cmd, ShellEnvironment env)
     {
         int jobId;
 
@@ -1848,7 +1857,7 @@ public static class BuiltinCommands
         return exitCode;
     }
 
-    private static int ExecuteKill(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteKill(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -1919,7 +1928,7 @@ public static class BuiltinCommands
         return result;
     }
 
-    private static int ExecuteAurshPlugin(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    private static int ExecuteAurshPlugin(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -2044,7 +2053,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteAssoc(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteAssoc(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count == 0)
         {
@@ -2383,7 +2392,7 @@ public static class BuiltinCommands
         }
     }
 
-    private static int ExecuteUpdate(CommandNode cmd)
+    private static int ExecuteUpdate(SimpleCommandNode cmd)
     {
         string? updaterPath = FindAurshUpdateExecutable();
         if (!string.IsNullOrEmpty(updaterPath))
@@ -2644,13 +2653,13 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteBlackBoxDemo(CommandNode cmd)
+    private static int ExecuteBlackBoxDemo(SimpleCommandNode cmd)
     {
         string[] args = cmd.Args.ToArray();
         return AurShell.BlackBoxView.BlackBoxDemo.Run(args);
     }
 
-    private static int ExecuteSsh(CommandNode cmd, ShellEnvironment env, string workingDirectory)
+    private static int ExecuteSsh(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         if (!env.SshAvailable)
         {
@@ -2660,7 +2669,7 @@ public static class BuiltinCommands
 
         return SshTui.Run(workingDirectory);
     }
-    private static int ExecuteLocal(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteLocal(SimpleCommandNode cmd, ShellEnvironment env)
     {
         foreach (string arg in cmd.Args)
         {
@@ -2682,7 +2691,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteDeclare(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteDeclare(SimpleCommandNode cmd, ShellEnvironment env)
     {
         bool isIndexed = false;
         bool isAssoc = false;
@@ -2731,7 +2740,7 @@ public static class BuiltinCommands
         return 0;
     }
 
-    private static int ExecuteReadonly(CommandNode cmd, ShellEnvironment env)
+    private static int ExecuteReadonly(SimpleCommandNode cmd, ShellEnvironment env)
     {
         foreach (string arg in cmd.Args)
         {
@@ -2754,3 +2763,4 @@ public static class BuiltinCommands
         return 0;
     }
 }
+

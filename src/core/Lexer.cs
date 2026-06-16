@@ -10,6 +10,7 @@ public enum TokenType
     And,
     Or,
     Semicolon,
+    DoubleSemicolon,
     Background,
     RedirectOut,
     RedirectAppend,
@@ -20,6 +21,8 @@ public enum TokenType
     HereDoc,
     HereString,
     Newline,
+    LeftParen,
+    RightParen,
     EOF
 }
 
@@ -59,6 +62,8 @@ public class Lexer
     public List<Token> Tokenize()
     {
         var tokens = new List<Token>();
+        bool isFirstWord = true;
+        HashSet<string> expandedAliases = new HashSet<string>();
 
         while (_pos < _input.Length)
         {
@@ -80,13 +85,25 @@ public class Lexer
             {
                 tokens.Add(new Token(TokenType.Newline, "\n"));
                 _pos++;
+                isFirstWord = true;
+                expandedAliases.Clear();
                 continue;
             }
 
             if (c == ';')
             {
-                tokens.Add(new Token(TokenType.Semicolon, ";"));
                 _pos++;
+                if (_pos < _input.Length && _input[_pos] == ';')
+                {
+                    tokens.Add(new Token(TokenType.DoubleSemicolon, ";;"));
+                    _pos++;
+                }
+                else
+                {
+                    tokens.Add(new Token(TokenType.Semicolon, ";"));
+                }
+                isFirstWord = true;
+                expandedAliases.Clear();
                 continue;
             }
 
@@ -102,6 +119,8 @@ public class Lexer
                 {
                     tokens.Add(new Token(TokenType.Pipe, "|"));
                 }
+                isFirstWord = true;
+                expandedAliases.Clear();
                 continue;
             }
 
@@ -117,6 +136,8 @@ public class Lexer
                 {
                     tokens.Add(new Token(TokenType.Background, "&"));
                 }
+                isFirstWord = true;
+                expandedAliases.Clear();
                 continue;
             }
 
@@ -183,7 +204,41 @@ public class Lexer
                 continue;
             }
 
-            tokens.Add(ReadWord());
+            if (c == '(')
+            {
+                tokens.Add(new Token(TokenType.LeftParen, "("));
+                _pos++;
+                isFirstWord = true;
+                expandedAliases.Clear();
+                continue;
+            }
+
+            if (c == ')')
+            {
+                tokens.Add(new Token(TokenType.RightParen, ")"));
+                _pos++;
+                continue;
+            }
+
+            Token wordToken = ReadWord();
+            if (isFirstWord && !wordToken.WasQuoted)
+            {
+                string? alias = _env.GetAlias(wordToken.Value);
+                if (alias != null && !expandedAliases.Contains(wordToken.Value))
+                {
+                    expandedAliases.Add(wordToken.Value);
+                    var subLexer = new Lexer(alias, _env);
+                    var subTokens = subLexer.Tokenize();
+                    if (subTokens.Count > 0 && subTokens.Last().Type == TokenType.EOF)
+                        subTokens.RemoveAt(subTokens.Count - 1);
+                    tokens.AddRange(subTokens);
+                    isFirstWord = false;
+                    continue;
+                }
+            }
+
+            tokens.Add(wordToken);
+            isFirstWord = false;
         }
 
         tokens.Add(new Token(TokenType.EOF, ""));
@@ -210,7 +265,7 @@ public class Lexer
             if (char.IsWhiteSpace(c) && c != '\n')
                 break;
 
-            if (c == '\n' || c == ';' || c == '|' || c == '<')
+            if (c == '\n' || c == ';' || c == '|' || c == '<' || c == '(' || c == ')')
                 break;
 
             if (c == '>')
@@ -466,7 +521,7 @@ public class Lexer
         string mathExpr = _input.Substring(start, _pos - start);
         if (_pos < _input.Length) _pos++; // skip last )
 
-        return MathEvaluator.Evaluate(mathExpr, _env).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return "$((" + mathExpr + "))";
     }
 
     private string ExpandInline()

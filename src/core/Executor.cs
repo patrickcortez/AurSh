@@ -45,17 +45,6 @@ public class Executor
             return 1;
         }
 
-        if (input.Contains('\n') ||
-            input.TrimStart().StartsWith("if ") ||
-            input.TrimStart().StartsWith("for ") ||
-            input.TrimStart().StartsWith("while ") ||
-            input.TrimStart().StartsWith("until ") ||
-            input.TrimStart().StartsWith("case "))
-        {
-            var runner = new ScriptRunner(_env, this);
-            return runner.RunString(input);
-        }
-
         string trimmedInput = input.Trim();
         if (TryParseArithmeticOrAssignment(trimmedInput))
         {
@@ -158,53 +147,54 @@ public class Executor
             return 1;
         }
 
-        return ExecuteList(ast);
-    }
-
-    public int ExecuteList(ListNode list)
-    {
-        int lastExit = 0;
-
-        for (int i = 0; i < list.Entries.Count; i++)
+        var linter = new AstLinter();
+        var warnings = linter.Analyze(ast);
+        foreach (var warning in warnings)
         {
-            var entry = list.Entries[i];
-
-            if (i > 0)
-            {
-                var prevOp = list.Entries[i - 1].Operator;
-
-                if (prevOp == ListOperator.And && lastExit != 0)
-                    continue;
-
-                if (prevOp == ListOperator.Or && lastExit == 0)
-                    continue;
-            }
-
-            lastExit = ExecutePipeline(entry.Pipeline);
-            _env.LastExitCode = lastExit;
+            Console.Error.WriteLine($"aursh: warning: {warning.Message}");
         }
 
-        return lastExit;
+        var evaluator = new AstEvaluator(_env, this, _workingDirectory);
+        return evaluator.Visit(ast);
+    }
+
+    public int ExecuteScript(string scriptContent)
+    {
+        if (string.IsNullOrWhiteSpace(scriptContent))
+            return 0;
+
+        Lexer lexer = new Lexer(scriptContent, _env);
+        var tokens = lexer.Tokenize();
+        Parser parser = new Parser(tokens);
+
+        ListNode ast;
+        try
+        {
+            ast = parser.Parse();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: parse error: {ex.Message}");
+            return 1;
+        }
+
+        var linter = new AstLinter();
+        var warnings = linter.Analyze(ast);
+        foreach (var warning in warnings)
+        {
+            Console.Error.WriteLine($"aursh: warning: {warning.Message}");
+        }
+
+        var evaluator = new AstEvaluator(_env, this, _workingDirectory);
+        return evaluator.Visit(ast);
     }
 
     public int ExecutePipeline(PipelineNode pipeline)
     {
-        if (pipeline.Commands.Count == 0)
-            return 0;
-
-        try
-        {
-            return Pipeline.Execute(pipeline, _env, _workingDirectory);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"aursh: execution error: {ex.Message}");
-            return 1;
-        }
-        finally
-        {
-            SyncWorkingDirectory();
-        }
+        // PipelineNode execution should now go through AstEvaluator,
+        // but Executor might still call this directly in older flows.
+        var evaluator = new AstEvaluator(_env, this, _workingDirectory);
+        return evaluator.Visit(pipeline);
     }
 
     private string ResolveAliases(string input)

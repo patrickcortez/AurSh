@@ -11,6 +11,12 @@ public class TrackInfo
     public string Title { get; set; } = "";
     public string Artist { get; set; } = "";
     public string Album { get; set; } = "";
+    public uint Year { get; set; }
+    public string Genre { get; set; } = "";
+    public uint TrackNumber { get; set; }
+    public int Bitrate { get; set; }
+    public int SampleRate { get; set; }
+    public int Channels { get; set; }
     public double Duration { get; set; }
     public string Path { get; set; } = "";
     public bool HasCover { get; set; }
@@ -131,6 +137,12 @@ public class MusicScanner
                     Title = string.IsNullOrEmpty(tag.Title) ? Path.GetFileNameWithoutExtension(file) : tag.Title,
                     Artist = tag.FirstPerformer ?? tag.FirstAlbumArtist ?? "Unknown Artist",
                     Album = tag.Album ?? "Unknown Album",
+                    Year = tag.Year,
+                    Genre = tag.FirstGenre ?? "Unknown Genre",
+                    TrackNumber = tag.Track,
+                    Bitrate = tagFile.Properties.AudioBitrate,
+                    SampleRate = tagFile.Properties.AudioSampleRate,
+                    Channels = tagFile.Properties.AudioChannels,
                     Duration = tagFile.Properties.Duration.TotalSeconds,
                     Path = file,
                     HasCover = tag.Pictures.Length > 0

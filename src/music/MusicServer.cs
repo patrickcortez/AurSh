@@ -134,6 +134,23 @@ public static class MusicServer
             return Results.NotFound();
         });
 
+        app.MapPost("/api/upload", async (HttpRequest request) =>
+        {
+            if (!request.HasFormContentType) return Results.BadRequest();
+            var form = await request.ReadFormAsync();
+            foreach (var file in form.Files)
+            {
+                if (file.Length > 0 && !string.IsNullOrEmpty(scanner.MusicDirectory))
+                {
+                    var filePath = Path.Combine(scanner.MusicDirectory, file.FileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await file.CopyToAsync(stream);
+                }
+            }
+            scanner.Scan();
+            return Results.Json(scanner.Tracks, MusicJsonContext.Default.ListTrackInfo);
+        });
+
         string uiPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aursh", "music-ui");
         
         if (Directory.Exists(uiPath))

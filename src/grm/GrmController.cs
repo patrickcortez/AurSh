@@ -11,7 +11,7 @@ public static class GrmController
     private static readonly GrmConfigManager Config = new GrmConfigManager();
     private static readonly GrmNetworkService Network = new GrmNetworkService();
 
-    public static int Execute(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    public static int Execute(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -65,7 +65,7 @@ public static class GrmController
         return token;
     }
 
-    private static async Task<int> SearchAsync(CommandNode cmd, ShellEnvironment env)
+    private static async Task<int> SearchAsync(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -91,7 +91,7 @@ public static class GrmController
         return 0;
     }
 
-    private static int Install(CommandNode cmd, ShellEnvironment env)
+    private static int Install(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -261,13 +261,16 @@ public static class GrmController
             return 1;
         }
 
-        var runner = new AurShell.Core.ScriptRunner(env, targetPath);
+        var executor = new AurShell.Core.Executor(env, targetPath);
         
-        runner.StopOnError = false;
-        runner.RunScript(string.Join(Environment.NewLine, declarationBlock));
+        bool oldStopOnError = env.StopOnError;
+        
+        env.StopOnError = false;
+        executor.ExecuteScript(string.Join(Environment.NewLine, declarationBlock));
 
-        runner.StopOnError = true;
-        int rc = runner.RunScript(string.Join(Environment.NewLine, executionBlock));
+        env.StopOnError = true;
+        int rc = executor.ExecuteScript(string.Join(Environment.NewLine, executionBlock));
+        env.StopOnError = oldStopOnError;
         
         if (rc != 0)
         {
@@ -280,7 +283,7 @@ public static class GrmController
         return rc;
     }
 
-    private static int RunCommand(CommandNode cmd, ShellEnvironment env)
+    private static int RunCommand(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -326,7 +329,7 @@ public static class GrmController
         return ExecuteGrmSection(targetPath, repoIdentifier, "RUN", env);
     }
 
-    private static int Uninstall(CommandNode cmd)
+    private static int Uninstall(SimpleCommandNode cmd)
     {
         if (cmd.Args.Count < 2)
         {
@@ -368,7 +371,7 @@ public static class GrmController
         }
     }
 
-    private static int Upgrade(CommandNode cmd)
+    private static int Upgrade(SimpleCommandNode cmd)
     {
         if (cmd.Args.Count < 2)
         {
@@ -501,7 +504,7 @@ public static class GrmController
         return 0;
     }
 
-    private static int Goto(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    private static int Goto(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         if (cmd.Args.Count < 2)
         {
@@ -547,7 +550,7 @@ public static class GrmController
         return 0;
     }
 
-    private static async Task<int> InfoAsync(CommandNode cmd, ShellEnvironment env)
+    private static async Task<int> InfoAsync(SimpleCommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -645,3 +648,4 @@ public static class GrmController
         Directory.Delete(target_dir, false);
     }
 }
+

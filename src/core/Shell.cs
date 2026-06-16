@@ -43,6 +43,21 @@ public class Shell
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
 
+        _env.SubshellEvaluator = (cmd) =>
+        {
+            var lexer = new Lexer(cmd, _env);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+            
+            var clonedEnv = _env.Clone();
+            var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+            
+            // TODO: Capture stdout via MemoryStream and redirect
+            // evaluator.Visit(ast);
+            return "";
+        };
+
         var suggestions = new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
         suggestions.GenerateDefaults();
         suggestions.Load();
@@ -72,6 +87,21 @@ public class Shell
         _executor = new Executor(_env, workingDirectory);
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
+
+        _env.SubshellEvaluator = (cmd) =>
+        {
+            var lexer = new Lexer(cmd, _env);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+            
+            var clonedEnv = _env.Clone();
+            var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+            
+            // TODO: Capture stdout via MemoryStream and redirect
+            // evaluator.Visit(ast);
+            return "";
+        };
 
         var suggestions = _env.Suggestions ?? new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
         if (_env.Suggestions == null)
@@ -353,10 +383,14 @@ public class Shell
         _running = false;
     }
 
-    public int RunScript(string filePath, string[] args)
+    public int RunScript(string path, string[] args)
     {
-        var runner = new ScriptRunner(_env, _executor);
-        return runner.RunFile(filePath, args);
+        if (System.IO.File.Exists(path))
+        {
+            string content = System.IO.File.ReadAllText(path);
+            return _executor.ExecuteScript(content);
+        }
+        return 1;
     }
 
     private void LoadRc()

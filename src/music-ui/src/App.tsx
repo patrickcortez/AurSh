@@ -18,6 +18,7 @@ function App() {
   const [volume, setVolume] = useState(1);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -38,6 +39,26 @@ function App() {
       setUserData(userObj);
     } catch (err) {
       console.error('Failed to fetch data:', err);
+    }
+  };
+
+  const refreshUserData = async () => {
+    try {
+      const userRes = await fetch('/api/userdata');
+      const userObj = await userRes.json();
+      setUserData(userObj);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const refreshTracks = async () => {
+    try {
+      const tracksRes = await fetch('/api/tracks');
+      const tracksData = await tracksRes.json();
+      setTracks(tracksData);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -146,24 +167,34 @@ function App() {
 
   const isLiked = currentTrack ? (userData?.likedTracks.includes(currentTrack.id) || false) : false;
 
+  const filteredTracks = tracks.filter(t => 
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    t.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="app-container">
-      <TopBar />
+      <TopBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       <div className="middle-row">
         <Sidebar 
-          tracks={tracks}
+          tracks={filteredTracks}
           playTrack={playTrack}
+          userData={userData}
+          refreshUserData={refreshUserData}
+          refreshTracks={refreshTracks}
         />
         
         <MainView 
           status={status}
-          tracks={tracks}
+          tracks={filteredTracks}
           playTrack={playTrack}
         />
 
         <RightSidebar 
           currentTrack={currentTrack}
+          userData={userData}
+          refreshUserData={refreshUserData}
         />
       </div>
 

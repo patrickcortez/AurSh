@@ -67,4 +67,9 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <TrimmerRootAssembly Include="TagLibSharp" />
+    <RdXmlFile Include="rd.xml" />
+  </ItemGroup>
+
 </Project>

@@ -3,6 +3,12 @@ export interface Track {
   title: string;
   artist: string;
   album: string;
+  year: number;
+  genre: string;
+  trackNumber: number;
+  bitrate: number;
+  sampleRate: number;
+  channels: number;
   duration: number;
   path: string;
   hasCover: boolean;

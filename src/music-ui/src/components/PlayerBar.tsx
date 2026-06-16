@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Track } from '../types';
+import { FALLBACK_COVER } from '../constants';
 
 interface PlayerBarProps {
   currentTrack: Track | null;
@@ -32,7 +33,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             <img 
               src={`/api/cover/${currentTrack.id}`} 
               alt="cover" 
-              onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/56?text=Cover' }}
+              onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
             />
             <div className="player-info">
               <span className="title">{currentTrack.title}</span>
@@ -77,6 +78,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             max={currentTrack?.duration || 100} 
             value={progress} 
             onChange={handleSeek} 
+            style={{ '--value': `${currentTrack?.duration ? (progress / currentTrack.duration) * 100 : 0}%` } as React.CSSProperties}
           />
           <span className="progress-time">{formatTime(currentTrack?.duration || 0)}</span>
         </div>
@@ -100,6 +102,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
             step="0.01" 
             value={volume} 
             onChange={handleVolume} 
+            style={{ '--value': `${volume * 100}%` } as React.CSSProperties}
           />
         </div>
       </div>

@@ -9,6 +9,7 @@ public class ShellEnvironment
     private readonly Stack<Dictionary<string, string>> _localScopes = new();
     private readonly Dictionary<string, Dictionary<string, string>> _objects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _aliases = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ICommandNode> _functions = new(StringComparer.Ordinal);
 
     private readonly Dictionary<string, List<string>> _arrays = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _assocArrays = new(StringComparer.Ordinal);
@@ -26,6 +27,10 @@ public class ShellEnvironment
 
     public int BackgroundPid { get; set; } = 0;
 
+    public List<string> PositionalArguments { get; } = new();
+
+    public bool StopOnError { get; set; } = false;
+
     public JobTable Jobs { get; } = new();
 
     public Plugins.PluginManager? PluginManager { get; set; }
@@ -35,6 +40,8 @@ public class ShellEnvironment
     public FileAssociator Associator { get; } = new();
 
     public bool SshAvailable { get; set; }
+
+    public Func<string, string>? SubshellEvaluator { get; set; }
 
     public IReadOnlyDictionary<string, string> Variables => _variables;
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
@@ -279,6 +286,16 @@ public class ShellEnvironment
         return _aliases.Remove(name);
     }
 
+    public void SetFunction(string name, ICommandNode body)
+    {
+        _functions[name] = body;
+    }
+
+    public ICommandNode? GetFunction(string name)
+    {
+        return _functions.TryGetValue(name, out var body) ? body : null;
+    }
+
     public string Expand(string input)
     {
         if (string.IsNullOrEmpty(input))
@@ -299,6 +316,17 @@ public class ShellEnvironment
             {
                 sb.Append('$');
                 i += 2;
+                continue;
+            }
+
+            if (input[i] == '`')
+            {
+                i++;
+                int start = i;
+                while (i < input.Length && input[i] != '`') i++;
+                string cmd = input.Substring(start, i - start);
+                if (i < input.Length) i++;
+                sb.Append(SubshellEvaluator?.Invoke(cmd) ?? "");
                 continue;
             }
 
@@ -338,6 +366,17 @@ public class ShellEnvironment
                     i += 2;
                     continue;
                 }
+            }
+
+            if (input[i] == '`')
+            {
+                i++;
+                int start = i;
+                while (i < input.Length && input[i] != '`') i++;
+                string cmd = input.Substring(start, i - start);
+                if (i < input.Length) i++;
+                sb.Append(SubshellEvaluator?.Invoke(cmd) ?? "");
+                continue;
             }
 
             if (input[i] == '$')
@@ -406,6 +445,8 @@ public class ShellEnvironment
             clone._assocArrays[kv.Key] = new Dictionary<string, string>(kv.Value, StringComparer.Ordinal);
         foreach (var kv in _aliases)
             clone._aliases[kv.Key] = kv.Value;
+        foreach (var kv in _functions)
+            clone._functions[kv.Key] = kv.Value;
         clone._lastExitCode = _lastExitCode;
         return clone;
     }
@@ -457,6 +498,26 @@ public class ShellEnvironment
             }
             // If unbalanced, fallback
             i = start - 2;
+        }
+
+        if (input[i] == '(')
+        {
+            i++;
+            int start = i;
+            int depth = 1;
+            while (i < input.Length && depth > 0)
+            {
+                if (input[i] == '(') depth++;
+                else if (input[i] == ')') depth--;
+                if (depth > 0) i++;
+            }
+            if (depth == 0)
+            {
+                string cmd = input.Substring(start, i - start - 1);
+                i++; // skip last )
+                return SubshellEvaluator?.Invoke(cmd) ?? "";
+            }
+            i = start - 1;
         }
 
         var nameBuf = new StringBuilder();

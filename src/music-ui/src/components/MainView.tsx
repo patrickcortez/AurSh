@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Track, Status } from '../types';
+import { FALLBACK_COVER } from '../constants';
 
 interface MainViewProps {
   status: Status | null;
@@ -53,7 +54,7 @@ export const MainView: React.FC<MainViewProps> = ({ status, tracks, playTrack })
               <img 
                 src={`/api/cover/${track.id}`} 
                 alt="cover" 
-                onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/64?text=Cover' }}
+                onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
               />
               <span className="recent-item-title">{track.title}</span>
             </div>
@@ -72,7 +73,7 @@ export const MainView: React.FC<MainViewProps> = ({ status, tracks, playTrack })
                 <img 
                   src={`/api/cover/${track.id}`} 
                   alt="cover"
-                  onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/200?text=Cover' }}
+                  onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
                 />
                 <button className="card-play-btn">
                   <svg viewBox="0 0 24 24" fill="currentColor" height="24" width="24"><path d="M8 5.14v14l11-7-11-7z"/></svg>
@@ -96,7 +97,7 @@ export const MainView: React.FC<MainViewProps> = ({ status, tracks, playTrack })
                 <img 
                   src={`/api/cover/${track.id}`} 
                   alt="cover"
-                  onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/200?text=Cover' }}
+                  onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
                 />
                 <button className="card-play-btn">
                   <svg viewBox="0 0 24 24" fill="currentColor" height="24" width="24"><path d="M8 5.14v14l11-7-11-7z"/></svg>

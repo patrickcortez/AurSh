@@ -1,12 +1,42 @@
-import React from 'react';
-import type { Track } from '../types';
+import React, { useRef, useState } from 'react';
+import type { Track, UserData } from '../types';
+import { FALLBACK_COVER } from '../constants';
 
 interface SidebarProps {
   tracks: Track[];
   playTrack: (track: Track) => void;
+  userData: UserData | null;
+  refreshUserData: () => void;
+  refreshTracks: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, refreshUserData, refreshTracks }) => {
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCreatePlaylist = async () => {
+    setShowAddMenu(false);
+    const name = prompt("Enter playlist name:");
+    if (!name) return;
+    try {
+      await fetch('/api/playlist', { method: 'POST', body: name });
+      refreshUserData();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setShowAddMenu(false);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+    try {
+      await fetch('/api/upload', { method: 'POST', body: formData });
+      refreshTracks();
+    } catch (e) { console.error(e); }
+  };
   return (
     <div className="panel left-sidebar">
       <div className="sidebar-header">
@@ -16,23 +46,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack }) => {
           </svg>
           Your Library
         </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M15.25 8a.75.75 0 01-.75.75H8.75v5.75a.75.75 0 01-1.5 0V8.75H1.5a.75.75 0 010-1.5h5.75V1.5a.75.75 0 011.5 0v5.75h5.75a.75.75 0 01.75.75z"/></svg>
-          <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M7.19 1A1.449 1.449 0 018.479.217l1.011 1.752a1.449 1.449 0 001.282.72h2.025a1.45 1.45 0 011.45 1.45v2.025a1.45 1.45 0 00.72 1.282l1.752 1.011a1.45 1.45 0 010 2.518l-1.752 1.011a1.45 1.45 0 00-.72 1.282v2.025a1.45 1.45 0 01-1.45 1.45h-2.025a1.45 1.45 0 00-1.282.72l-1.011 1.752a1.45 1.45 0 01-2.518 0l-1.011-1.752a1.45 1.45 0 00-1.282-.72H3.227a1.45 1.45 0 01-1.45-1.45v-2.025a1.45 1.45 0 00-.72-1.282L-.25 8.479a1.45 1.45 0 010-2.518l1.752-1.011a1.45 1.45 0 00.72-1.282V1.667A1.45 1.45 0 013.673.217h2.025a1.45 1.45 0 001.282-.72L8 .25l-.81.75zM11.5 8a3.5 3.5 0 10-7 0 3.5 3.5 0 007 0zm-1.5 0a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        <div style={{ display: 'flex', gap: '16px', position: 'relative' }}>
+          <button className="circle-btn" style={{ background: 'transparent' }} onClick={() => setShowAddMenu(!showAddMenu)}>
+            <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M15.25 8a.75.75 0 01-.75.75H8.75v5.75a.75.75 0 01-1.5 0V8.75H1.5a.75.75 0 010-1.5h5.75V1.5a.75.75 0 011.5 0v5.75h5.75a.75.75 0 01.75.75z"/></svg>
+          </button>
+          
+          {showAddMenu && (
+            <div style={{ position: 'absolute', top: '30px', right: '0', background: '#282828', padding: '4px', borderRadius: '4px', zIndex: 100, display: 'flex', flexDirection: 'column', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              <button onClick={handleCreatePlaylist} style={{ background: 'transparent', color: '#fff', border: 'none', padding: '12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px' }}>Create a new playlist</button>
+              <button onClick={() => fileInputRef.current?.click()} style={{ background: 'transparent', color: '#fff', border: 'none', padding: '12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px' }}>Upload local audio files</button>
+            </div>
+          )}
+          <input type="file" multiple accept="audio/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleUpload} />
+          
+          <button className="circle-btn" style={{ background: 'transparent' }}>
+            <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M7.19 1A1.449 1.449 0 018.479.217l1.011 1.752a1.449 1.449 0 001.282.72h2.025a1.45 1.45 0 011.45 1.45v2.025a1.45 1.45 0 00.72 1.282l1.752 1.011a1.45 1.45 0 010 2.518l-1.752 1.011a1.45 1.45 0 00-.72 1.282v2.025a1.45 1.45 0 01-1.45 1.45h-2.025a1.45 1.45 0 00-1.282.72l-1.011 1.752a1.45 1.45 0 01-2.518 0l-1.011-1.752a1.45 1.45 0 00-1.282-.72H3.227a1.45 1.45 0 01-1.45-1.45v-2.025a1.45 1.45 0 00-.72-1.282L-.25 8.479a1.45 1.45 0 010-2.518l1.752-1.011a1.45 1.45 0 00.72-1.282V1.667A1.45 1.45 0 013.673.217h2.025a1.45 1.45 0 001.282-.72L8 .25l-.81.75zM11.5 8a3.5 3.5 0 10-7 0 3.5 3.5 0 007 0zm-1.5 0a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          </button>
         </div>
-      </div>
-
-      <div className="chips-row">
-        <button className="chip">Playlists</button>
-        <button className="chip">Albums</button>
-        <button className="chip">Artists</button>
-      </div>
-
-      <div style={{ padding: '8px 16px', display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-        <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M7 1.75a5.25 5.25 0 100 10.5 5.25 5.25 0 000-10.5zM.25 7a6.75 6.75 0 1112.096 4.12l3.184 3.185a.75.75 0 11-1.06 1.06L11.304 12.2A6.75 6.75 0 01.25 7z"/></svg>
-        <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          Recents <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M14 6L8 12 2 6h12z"/></svg>
-        </span>
       </div>
 
       <div className="library-list">
@@ -42,9 +72,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack }) => {
           </div>
           <div className="library-info">
             <span className="library-title">Liked Songs</span>
-            <span className="library-subtext" style={{ color: 'var(--accent)' }}>📌 Playlist • User</span>
+            <span className="library-subtext" style={{ color: 'var(--accent)' }}>📌 Playlist • {userData?.likedTracks.length || 0} songs</span>
           </div>
         </div>
+
+        {userData?.playlists.map(pl => (
+          <div key={pl.id} className="library-item" style={{ background: 'var(--bg-elevated)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 4, background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" fill="#b3b3b3" height="20" width="20"><path d="M15 3h6v2h-6V3zM9 3H3v2h6V3zm6 4h6v2h-6V7zM9 7H3v2h6V7zm6 4h6v2h-6v-2zM9 11H3v2h6v-2zm12 4h-6v2h6v-2zm-8 0H3v2h10v-2z"/></svg>
+            </div>
+            <div className="library-info">
+              <span className="library-title">{pl.name}</span>
+              <span className="library-subtext">Playlist • {pl.trackIds.length} tracks</span>
+            </div>
+          </div>
+        ))}
 
         {tracks.map(track => (
           <div key={track.id} className="library-item" onClick={() => playTrack(track)}>
@@ -52,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack }) => {
               src={`/api/cover/${track.id}`} 
               alt={track.title} 
               className="library-cover"
-              onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/48?text=No+Cover' }}
+              onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
             />
             <div className="library-info">
               <span className="library-title">{track.title}</span>

@@ -128,10 +128,14 @@ public class RcLoader
         return lastResult;
     }
 
-    private int ExecuteAurScript(string filePath)
+    private int ExecuteAurScript(string path)
     {
-        var runner = new ScriptRunner(_env, _executor);
-        return runner.RunFile(filePath, Array.Empty<string>());
+        if (System.IO.File.Exists(path))
+        {
+            string content = System.IO.File.ReadAllText(path);
+            _executor.ExecuteScript(content);
+        }
+        return 0;
     }
 
     public static void CreateDefaultRc(string rcPath)

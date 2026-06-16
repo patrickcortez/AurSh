@@ -10,7 +10,7 @@ namespace AurShell.Core;
 
 public static class AurshNetCommand
 {
-    public static int Execute(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
+    public static int Execute(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         if (cmd.Args.Count == 0)
         {
@@ -905,3 +905,4 @@ public static class AurshNetCommand
         }
     }
 }
+

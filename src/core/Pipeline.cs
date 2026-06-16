@@ -11,12 +11,17 @@ public static class Pipeline
             return 0;
 
         if (pipeline.Commands.Count == 1)
-            return ExecuteSingle(pipeline.Commands[0], env, workingDirectory, pipeline.Background);
+        {
+            if (pipeline.Commands[0] is SimpleCommandNode scn)
+                return ExecuteSingle(scn, env, workingDirectory, pipeline.Background);
+            // Non-simple nodes don't normally arrive here, but just in case:
+            return 0;
+        }
 
-        return ExecutePiped(pipeline, env, workingDirectory);
+        return 0;
     }
 
-    private static bool ShouldRouteToBlackBox(CommandNode cmd, out BlackBox box, out BlackBoxSession session)
+    private static bool ShouldRouteToBlackBox(SimpleCommandNode cmd, out BlackBox box, out BlackBoxSession session)
     {
         var current = BlackBox.Current;
         if (current == null || current.ActiveSession == null || !current.Config.Enabled)
@@ -41,7 +46,7 @@ public static class Pipeline
         return true;
     }
 
-    private static int ExecuteSingle(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
+    public static int ExecuteSingle(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, bool background, AstEvaluator evaluator = null, Stream? inStream = null, Stream? outStream = null, Stream? errStream = null)
     {
         if (BuiltinCommands.IsBuiltin(cmd.Name))
         {
@@ -152,32 +157,32 @@ public static class Pipeline
             string? binPath = env.PluginManager.GetPluginBinaryPath(cmd.Name);
             if (binPath != null)
             {
-                var tempCmd = new CommandNode { Name = binPath };
+                var tempCmd = new SimpleCommandNode { Name = binPath };
                 foreach (var arg in cmd.Args) tempCmd.Args.Add(arg);
                 foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-                return ExecuteExternal(tempCmd, env, workingDirectory, background);
+                return ExecuteExternal(tempCmd, env, workingDirectory, background, inStream, outStream, errStream);
             }
 
-            // F# plugins: build a CommandNode so the process goes through
+            // F# plugins: build a SimpleCommandNode so the process goes through
             // ExecuteExternal with full BlackBox pipe capture, instead of
             // the plugin manager's unmanaged child process path.
             var fsharpArgs = env.PluginManager.BuildFSharpArgs(cmd.Name, cmd.Args.ToList());
             if (fsharpArgs != null)
             {
-                var fsharpNode = new CommandNode { Name = "dotnet" };
+                var fsharpNode = new SimpleCommandNode { Name = "dotnet" };
                 foreach (string arg in fsharpArgs)
                     fsharpNode.Args.Add(arg);
                 foreach (var r in cmd.Redirections) fsharpNode.Redirections.Add(r);
-                return ExecuteExternal(fsharpNode, env, workingDirectory, background);
+                return ExecuteExternal(fsharpNode, env, workingDirectory, background, inStream, outStream, errStream);
             }
 
             return env.PluginManager.ExecutePluginCommand(cmd.Name, cmd.Args.ToList());
         }
 
-        return ExecuteExternal(cmd, env, workingDirectory, background);
+        return ExecuteExternal(cmd, env, workingDirectory, background, inStream, outStream, errStream);
     }
 
-    private static int ExecuteExternal(CommandNode cmd, ShellEnvironment env, string workingDirectory, bool background)
+    private static int ExecuteExternal(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, bool background, Stream? inStream = null, Stream? outStream = null, Stream? errStream = null)
     {
         if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
         {
@@ -190,7 +195,7 @@ public static class Pipeline
                     Console.Error.WriteLine($"aursh: {parts[0]}: command not found");
                     return 127;
                 }
-                var tempCmd = new CommandNode { Name = resolvedAssocExe };
+                var tempCmd = new SimpleCommandNode { Name = resolvedAssocExe };
                 for (int i = 1; i < parts.Length; i++) tempCmd.Args.Add(parts[i]);
                 foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
 
@@ -419,480 +424,9 @@ public static class Pipeline
         }
     }
 
-    private static int ExecutePiped(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
-    {
-        var commands = pipeline.Commands;
-        int count = commands.Count;
-
-        BlackBox? pipelineBox = null;
-        BlackBoxSession? pipelineSession = null;
-        if (BlackBox.Current?.ActiveSession is BlackBoxSession activePipeSession && !pipeline.Background)
-        {
-            pipelineBox = BlackBox.Current;
-            pipelineSession = activePipeSession;
-            bool anyBypassed = false;
-            for (int idx = 0; idx < count; idx++)
-            {
-                if (BypassList.IsBypassed(commands[idx].Name, pipelineBox.Config))
-                {
-                    anyBypassed = true;
-                    break;
-                }
-            }
-            if (anyBypassed)
-            {
-                pipelineSession.MarkTtyBypassed();
-                pipelineBox = null;
-                pipelineSession = null;
-            }
-        }
-        bool routePipelineToBox = pipelineBox != null && pipelineSession != null;
-
-        // Coalesced pipeline delegation to OS shell removed to enforce independent system shell behavior
-
-        var processes = new Process?[count];
-        var fileStreams = new List<Stream>();
-        var redirInfos = new (FileStream? stdout, FileStream? stderr, Stream? stdin, bool errToOut)[count];
-
-        async System.Threading.Tasks.Task PumpStreamResilientAsync(Stream source, Stream? destination, object? writeLock = null)
-        {
-            byte[] buffer = new byte[81920];
-            int read;
-            bool destAlive = destination != null;
-
-            try
-            {
-                while ((read = await source.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                {
-                    if (destAlive)
-                    {
-                        try
-                        {
-                            if (writeLock != null)
-                            {
-                                lock (writeLock)
-                                {
-                                    destination!.Write(buffer, 0, read);
-                                }
-                                await destination!.FlushAsync();
-                            }
-                            else
-                            {
-                                await destination!.WriteAsync(buffer, 0, read);
-                                await destination!.FlushAsync();
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            destAlive = false;
-                        }
-                    }
-                }
-            }
-            catch (Exception) { }
-        }
-
-        try
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var cmd = commands[i];
-                bool isFirst = i == 0;
-                bool isLast = i == count - 1;
-
-                if (isFirst && BuiltinCommands.IsBuiltin(cmd.Name))
-                {
-                    var tempPipe = new System.IO.Pipes.AnonymousPipeServerStream(
-                        System.IO.Pipes.PipeDirection.Out);
-
-                    System.IO.Pipes.AnonymousPipeClientStream? clientStream = null;
-                    if (i + 1 < count)
-                    {
-                        clientStream = new System.IO.Pipes.AnonymousPipeClientStream(
-                            System.IO.Pipes.PipeDirection.In,
-                            tempPipe.GetClientHandleAsString());
-                    }
-
-                    var builtinTask = System.Threading.Tasks.Task.Run(() =>
-                    {
-                        StreamWriter? writer = null;
-                        TextWriter? origOut = null;
-                        TextWriter? origErr = null;
-                        Stream? stdoutFileStream = null;
-                        Stream? stderrFileStream = null;
-
-                        try
-                        {
-                            foreach (var r in cmd.Redirections)
-                            {
-                                if (r.Type == RedirectType.Out || r.Type == RedirectType.Append)
-                                {
-                                    string target = ResolveRedirectionTarget(r.Target, workingDirectory);
-                                    stdoutFileStream = SafeOpenFileStream(target,
-                                        r.Type == RedirectType.Out ? FileMode.Create : FileMode.Append,
-                                        FileAccess.Write);
-                                    if (stdoutFileStream != null)
-                                    {
-                                        origOut = Console.Out;
-                                        writer = new StreamWriter(stdoutFileStream) { AutoFlush = true };
-                                        Console.SetOut(writer);
-                                    }
-                                    break;
-                                }
-                            }
-
-                            foreach (var r in cmd.Redirections)
-                            {
-                                if (r.Type == RedirectType.Err || r.Type == RedirectType.ErrAppend || r.Type == RedirectType.ErrToOut)
-                                {
-                                    if (r.Type == RedirectType.ErrToOut)
-                                    {
-                                        origErr = Console.Error;
-                                        Console.SetError(Console.Out);
-                                    }
-                                    else
-                                    {
-                                        string target = ResolveRedirectionTarget(r.Target, workingDirectory);
-                                        stderrFileStream = SafeOpenFileStream(target,
-                                            r.Type == RedirectType.Err ? FileMode.Create : FileMode.Append,
-                                            FileAccess.Write);
-                                        if (stderrFileStream != null)
-                                        {
-                                            origErr = Console.Error;
-                                            Console.SetError(new StreamWriter(stderrFileStream) { AutoFlush = true });
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-
-                            if (origOut == null)
-                            {
-                                writer = new StreamWriter(tempPipe) { AutoFlush = true };
-                                origOut = Console.Out;
-                                Console.SetOut(writer);
-                            }
-
-                            BuiltinCommands.Execute(cmd, env, ref workingDirectory);
-                        }
-                        finally
-                        {
-                            if (origOut != null) Console.SetOut(origOut);
-                            if (origErr != null) Console.SetError(origErr);
-                            writer?.Flush();
-                            stdoutFileStream?.Dispose();
-                            stderrFileStream?.Dispose();
-                            tempPipe.Close();
-                        }
-                    });
-
-                    if (i + 1 < count)
-                    {
-                        var nextCmd = commands[i + 1];
-                        ResolveAlias(nextCmd, env);
-                        bool isNextBuiltin = BuiltinCommands.IsBuiltin(nextCmd.Name);
-                        string? nextExe = ResolveCommand(nextCmd.Name, workingDirectory);
-
-                        if (nextExe == null && env.PluginManager != null && env.PluginManager.IsPluginCommand(nextCmd.Name))
-                        {
-                            nextExe = env.PluginManager.GetPluginBinaryPath(nextCmd.Name);
-                        }
-
-                        if (!isNextBuiltin && nextExe == null && !TryGetAssociationShellCommand(nextCmd, env, workingDirectory, out _))
-                        {
-                            // Let the next iteration handle the shell command parsing, we don't abort.
-                        }
-                        else if (nextExe == null && !isNextBuiltin)
-                        {
-                            Console.Error.WriteLine($"aursh: {nextCmd.Name}: command not found");
-                            clientStream?.Dispose();
-                            builtinTask.Wait();
-                            return 127;
-                        }
-
-                        var nextPsi = CreateProcessStartInfo(nextExe!, nextCmd, env, workingDirectory);
-                        nextPsi.RedirectStandardInput = true;
-
-                        if (i + 1 != count - 1)
-                            nextPsi.RedirectStandardOutput = true;
-
-                        redirInfos[i + 1] = ApplyRedirections(nextCmd, nextPsi, workingDirectory, fileStreams);
-
-                        var nextProc = Process.Start(nextPsi);
-                        if (nextProc != null)
-                        {
-                            processes[i + 1] = nextProc;
-
-                            System.Threading.Tasks.Task.Run(async () =>
-                            {
-                                await PumpStreamResilientAsync(clientStream!, nextProc.StandardInput.BaseStream);
-                                try { nextProc.StandardInput.Close(); } catch { }
-                                clientStream!.Dispose();
-                            });
-                        }
-                        else
-                        {
-                            clientStream?.Dispose();
-                        }
-
-                        builtinTask.Wait();
-                        i++;
-                    }
-                    else
-                    {
-                        builtinTask.Wait();
-                    }
-
-                    continue;
-                }
-
-                if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
-                {
-                    var parts = assocCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
-                    {
-                        string? resolvedAssocExe = ResolveCommand(parts[0], workingDirectory);
-                        if (resolvedAssocExe == null)
-                        {
-                            Console.Error.WriteLine($"aursh: {parts[0]}: command not found");
-                            return 127;
-                        }
-                        var tempCmd = new CommandNode { Name = resolvedAssocExe };
-                        for (int argIdx = 1; argIdx < parts.Length; argIdx++) tempCmd.Args.Add(parts[argIdx]);
-                        foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-
-                        var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
-
-                        if (!isFirst) assocPsi.RedirectStandardInput = true;
-                        if (!isLast || routePipelineToBox) assocPsi.RedirectStandardOutput = true;
-                        if (routePipelineToBox) assocPsi.RedirectStandardError = true;
-
-                        redirInfos[i] = ApplyRedirections(cmd, assocPsi, workingDirectory, fileStreams);
-
-                        processes[i] = Process.Start(assocPsi);
-                        if (processes[i] == null)
-                        {
-                            Console.Error.WriteLine($"aursh: {parts[0]}: failed to start associated process");
-                            return 126;
-                        }
-                        continue;
-                    }
-                }
-
-                // Resolve alias (e.g. BusyBox) before PATH lookup
-                ResolveAlias(cmd, env);
-
-                string? executable = ResolveCommand(cmd.Name, workingDirectory);
-                if (executable == null && env.PluginManager != null && env.PluginManager.IsPluginCommand(cmd.Name))
-                {
-                    executable = env.PluginManager.GetPluginBinaryPath(cmd.Name);
-                }
-
-                if (executable == null)
-                {
-                    Console.Error.WriteLine($"aursh: {cmd.Name}: command not found");
-                    return 127;
-                }
-
-                var psi = CreateProcessStartInfo(executable, cmd, env, workingDirectory);
-
-                if (!isFirst) psi.RedirectStandardInput = true;
-                if (!isLast || routePipelineToBox) psi.RedirectStandardOutput = true;
-                if (routePipelineToBox) psi.RedirectStandardError = true;
-
-                redirInfos[i] = ApplyRedirections(cmd, psi, workingDirectory, fileStreams);
-
-                processes[i] = Process.Start(psi);
-                if (processes[i] == null)
-                {
-                    Console.Error.WriteLine($"aursh: {cmd.Name}: failed to start process");
-                    return 126;
-                }
-            }
-
-            var drainTasks = new List<System.Threading.Tasks.Task>();
-
-            for (int i = 0; i < count; i++)
-            {
-                if (processes[i] == null) continue;
-                var (stdoutFile, stderrFile, stdinFile, errToOut) = redirInfos[i];
-
-                if (stdinFile != null)
-                {
-                    var proc = processes[i]!;
-                    drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                    {
-                        await PumpStreamResilientAsync(stdinFile, proc.StandardInput.BaseStream);
-                        try { proc.StandardInput.Close(); } catch { }
-                    }));
-                }
-
-                if (i < count - 1 && processes[i + 1] != null)
-                {
-                    var proc = processes[i]!;
-                    var nextProc = processes[i + 1]!;
-
-                    if (stdoutFile != null)
-                    {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile);
-                            try { nextProc.StandardInput.Close(); } catch { }
-                        }));
-                    }
-                    else
-                    {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, nextProc.StandardInput.BaseStream);
-                            try { nextProc.StandardInput.Close(); } catch { }
-                        }));
-                    }
-
-                    if (errToOut && stdoutFile == null)
-                    {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, nextProc.StandardInput.BaseStream);
-                        }));
-                    }
-                    else if (stderrFile != null)
-                    {
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, stderrFile);
-                        }));
-                    }
-                }
-                else
-                {
-                    if (errToOut && stdoutFile != null)
-                    {
-                        var proc = processes[i]!;
-                        var fileLock = new object();
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile, fileLock);
-                        }));
-                        drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            await PumpStreamResilientAsync(proc.StandardError.BaseStream, stdoutFile, fileLock);
-                        }));
-                    }
-                    else
-                    {
-                        if (stdoutFile != null)
-                        {
-                            var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                            {
-                                await PumpStreamResilientAsync(proc.StandardOutput.BaseStream, stdoutFile);
-                            }));
-                        }
-
-                        if (errToOut && stdoutFile == null)
-                        {
-                            var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                            {
-                                await PumpStreamResilientAsync(proc.StandardError.BaseStream, Console.OpenStandardOutput());
-                            }));
-                        }
-                        else if (stderrFile != null)
-                        {
-                            var proc = processes[i]!;
-                            drainTasks.Add(System.Threading.Tasks.Task.Run(async () =>
-                            {
-                                await PumpStreamResilientAsync(proc.StandardError.BaseStream, stderrFile);
-                            }));
-                        }
-                    }
-                }
-            }
-
-            System.Threading.CancellationTokenSource? boxCancel = null;
-            if (routePipelineToBox && pipelineBox != null && pipelineSession != null)
-            {
-                boxCancel = new System.Threading.CancellationTokenSource();
-                for (int i = 0; i < count; i++)
-                {
-                    if (processes[i] == null) continue;
-                    var (stdoutFile, stderrFile, _, errToOut) = redirInfos[i];
-                    bool isLast = i == count - 1;
-                    var proc = processes[i]!;
-                    int stageIndex = i;
-
-                    if (isLast && stdoutFile == null && proc.StartInfo.RedirectStandardOutput)
-                    {
-                        drainTasks.Add(BlackBoxIo.PumpToBufferAsync(
-                            proc.StandardOutput.BaseStream,
-                            pipelineSession,
-                            LineKind.Stdout,
-                            count > 1 ? (int?)stageIndex : null,
-                            null,
-                            pipelineBox,
-                            boxCancel.Token));
-                    }
-
-                    if (stderrFile == null && !errToOut && proc.StartInfo.RedirectStandardError)
-                    {
-                        drainTasks.Add(BlackBoxIo.PumpToBufferAsync(
-                            proc.StandardError.BaseStream,
-                            pipelineSession,
-                            LineKind.Stderr,
-                            count > 1 ? (int?)stageIndex : null,
-                            null,
-                            pipelineBox,
-                            boxCancel.Token));
-                    }
-                }
-            }
-
-            try
-            {
-                System.Threading.Tasks.Task.WaitAll(drainTasks.ToArray());
-            }
-            catch (AggregateException) { }
-            finally
-            {
-                boxCancel?.Dispose();
-            }
-
-            int lastExit = 0;
-            for (int i = 0; i < count; i++)
-            {
-                if (processes[i] != null)
-                {
-                    processes[i]!.WaitForExit();
-                    lastExit = processes[i]!.ExitCode;
-                }
-            }
-
-            if (pipeline.Background)
-            {
-                var lastProc = processes[count - 1];
-                if (lastProc != null)
-                {
-                    string fullCmd = string.Join(" | ", commands.Select(c => c.Name));
-                    int jobId = env.Jobs.Add(lastProc, fullCmd);
-                    Console.WriteLine($"[{jobId}] {lastProc.Id}");
-                }
-            }
-
-            return lastExit;
-        }
-        finally
-        {
-            foreach (var p in processes)
-                p?.Dispose();
-            foreach (var fs in fileStreams)
-                fs.Dispose();
-        }
-    }
-
-
+    
     private static ProcessStartInfo CreateProcessStartInfo(
-        string executable, CommandNode cmd, ShellEnvironment env, string workingDirectory)
+        string executable, SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {
         var psi = new ProcessStartInfo
         {
@@ -912,7 +446,7 @@ public static class Pipeline
     }
 
     private static (FileStream? stdout, FileStream? stderr, Stream? stdin, bool errToOut) ApplyRedirections(
-        CommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<Stream> streams)
+        SimpleCommandNode cmd, ProcessStartInfo psi, string workingDirectory, List<Stream> streams)
     {
         FileStream? stdoutFile = null;
         FileStream? stderrFile = null;
@@ -1017,11 +551,11 @@ public static class Pipeline
     }
 
     /// <summary>
-    /// Resolves alias for a CommandNode before external execution.
+    /// Resolves alias for a SimpleCommandNode before external execution.
     /// If the command name has an alias, the alias is expanded into
     /// the command name and any alias args are prepended to the command args.
     /// </summary>
-    private static void ResolveAlias(CommandNode cmd, ShellEnvironment env)
+    private static void ResolveAlias(SimpleCommandNode cmd, ShellEnvironment env)
     {
         string? alias = env.GetAlias(cmd.Name);
         if (alias == null)
@@ -1055,7 +589,7 @@ public static class Pipeline
         }
     }
 
-    private static bool TryGetAssociationShellCommand(CommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)
+    private static bool TryGetAssociationShellCommand(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)
     {
         shellCommand = "";
 
@@ -1105,3 +639,9 @@ public static class Pipeline
         return Utils.FileSystem.ResolvePath(target, workingDirectory);
     }
 }
+
+
+
+
+
+

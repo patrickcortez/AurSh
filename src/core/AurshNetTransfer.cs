@@ -49,8 +49,10 @@ public static class AurshNetTransfer
             _isRunning = true;
             _cts = new CancellationTokenSource();
 
-            Task.Run(() => AcceptClientsAsync(_cts.Token), _cts.Token);
-            Task.Run(() => ListenForDiscoveryAsync(_cts.Token), _cts.Token);
+            Task.Run(() => AcceptClientsAsync(_cts.Token), _cts.Token)
+                .ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            Task.Run(() => ListenForDiscoveryAsync(_cts.Token), _cts.Token)
+                .ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
         }
         catch (SocketException)
         {
@@ -84,7 +86,8 @@ public static class AurshNetTransfer
             try
             {
                 TcpClient client = await _listener.AcceptTcpClientAsync(token);
-                _ = Task.Run(() => HandleClient(client, token), token);
+                _ = Task.Run(() => HandleClient(client, token), token)
+                        .ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
             }
             catch (OperationCanceledException)
             {

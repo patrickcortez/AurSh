@@ -152,10 +152,15 @@ public static class NetworkInfo
         try
         {
             using var client = new System.Net.Sockets.TcpClient();
-            var result = client.BeginConnect("8.8.8.8", 53, null, null);
-            bool success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(300));
-            if (!success) return false;
-            client.EndConnect(result);
+            var connectTask = client.ConnectAsync("8.8.8.8", 53);
+            bool success = connectTask.Wait(TimeSpan.FromMilliseconds(300));
+            if (!success) 
+            {
+                // Explicitly observe the exception that will happen when we dispose the client
+                // to prevent an UnobservedTaskException from crashing the finalizer thread.
+                connectTask.ContinueWith(t => _ = t.Exception, System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+                return false;
+            }
             return true;
         }
         catch

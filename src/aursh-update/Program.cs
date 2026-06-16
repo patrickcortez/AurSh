@@ -179,11 +179,9 @@ internal static class Program
         Console.WriteLine($"Synchronizing updates from channel '{branch}'...");
 
         // Stash any uncommitted changes to avoid conflicts during update
-        Console.WriteLine("Stashing local changes...");
-        RunForeground(sourceDir, "git", "stash");
+        RunForegroundWithSpinner(sourceDir, "git", "stash", "Stashing local changes...");
 
-        Console.WriteLine("Pulling updates...");
-        int pullCode = RunForeground(sourceDir, "git", $"pull origin {branch} --progress");
+        int pullCode = RunForegroundWithSpinner(sourceDir, "git", $"pull origin {branch} --progress", "Pulling updates...");
         if (pullCode != 0)
             return Fail($"failed to download updates from channel '{branch}'.");
 
@@ -193,8 +191,7 @@ internal static class Program
             ? "install"
             : $"build \"{Path.Combine(sourceDir, "src", "AurShell.csproj")}\" -c Release";
 
-        Console.WriteLine("Installing AurShell...");
-        int installCode = RunForeground(sourceDir, installExe, installArgs);
+        int installCode = RunForegroundWithSpinner(sourceDir, installExe, installArgs, "Installing AurShell...");
         if (installCode != 0)
             return Fail("installation failed.");
 
@@ -279,6 +276,54 @@ internal static class Program
             using var proc = Process.Start(psi);
             if (proc == null) return 127;
             proc.WaitForExit();
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh-update: {exe}: {ex.Message}");
+            return 127;
+        }
+    }
+
+    private static int RunForegroundWithSpinner(string workingDir, string exe, string args, string loadingMessage)
+    {
+        var psi = new ProcessStartInfo(exe, args)
+        {
+            WorkingDirectory = workingDir,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        try
+        {
+            using var proc = new Process();
+            proc.StartInfo = psi;
+
+            var output = new System.Text.StringBuilder();
+            var error = new System.Text.StringBuilder();
+
+            proc.OutputDataReceived += (s, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+            proc.ErrorDataReceived += (s, e) => { if (e.Data != null) error.AppendLine(e.Data); };
+
+            using var spinner = new ConsoleSpinner(loadingMessage);
+
+            proc.Start();
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+
+            spinner.Start();
+            proc.WaitForExit();
+
+            bool success = proc.ExitCode == 0;
+            spinner.Stop(success);
+
+            if (!success)
+            {
+                if (output.Length > 0) Console.WriteLine(output.ToString().TrimEnd());
+                if (error.Length > 0) Console.Error.WriteLine(error.ToString().TrimEnd());
+            }
+
             return proc.ExitCode;
         }
         catch (Exception ex)

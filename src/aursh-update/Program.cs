@@ -179,9 +179,11 @@ internal static class Program
         Console.WriteLine($"Synchronizing updates from channel '{branch}'...");
 
         // Stash any uncommitted changes to avoid conflicts during update
-        RunForegroundWithSpinner(sourceDir, "git", "stash", "Stashing local changes");
+        Console.WriteLine("Stashing local changes...");
+        RunForeground(sourceDir, "git", "stash");
 
-        int pullCode = RunForegroundWithSpinner(sourceDir, "git", $"pull origin {branch} --progress", "Pulling updates");
+        Console.WriteLine("Pulling updates...");
+        int pullCode = RunForeground(sourceDir, "git", $"pull origin {branch} --progress");
         if (pullCode != 0)
             return Fail($"failed to download updates from channel '{branch}'.");
 
@@ -191,7 +193,8 @@ internal static class Program
             ? "install"
             : $"build \"{Path.Combine(sourceDir, "src", "AurShell.csproj")}\" -c Release";
 
-        int installCode = RunForegroundWithSpinner(sourceDir, installExe, installArgs, "Installing AurShell");
+        Console.WriteLine("Installing AurShell...");
+        int installCode = RunForeground(sourceDir, installExe, installArgs);
         if (installCode != 0)
             return Fail("installation failed.");
 
@@ -285,108 +288,7 @@ internal static class Program
         }
     }
 
-    private static int RunForegroundWithSpinner(string workingDir, string exe, string args, string description)
-    {
-        var psi = new ProcessStartInfo(exe, args)
-        {
-            WorkingDirectory = workingDir,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
 
-        var outputLines = new List<string>();
-        object syncLock = new object();
-        string currentStatus = "";
-        string percentage = "";
-
-        using var proc = new Process();
-        proc.StartInfo = psi;
-
-        DataReceivedEventHandler handler = (sender, e) =>
-        {
-            if (e.Data == null) return;
-            string line = e.Data.Trim();
-            if (string.IsNullOrWhiteSpace(line)) return;
-
-            lock (syncLock)
-            {
-                outputLines.Add(line);
-
-                // Try to extract percentage from git --progress
-                var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)%");
-                if (match.Success)
-                {
-                    percentage = match.Groups[1].Value + "%";
-                }
-
-                // Use the latest line as status, truncate if too long
-                if (line.Length > 50)
-                    currentStatus = line.Substring(0, 47) + "...";
-                else
-                    currentStatus = line;
-            }
-        };
-
-        proc.OutputDataReceived += handler;
-        proc.ErrorDataReceived += handler;
-
-        try
-        {
-            proc.Start();
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
-
-            string[] spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
-            int spinIndex = 0;
-
-            try { Console.CursorVisible = false; } catch { }
-
-            while (!proc.WaitForExit(100))
-            {
-                lock (syncLock)
-                {
-                    string pctStr = string.IsNullOrEmpty(percentage) ? "" : $" [{percentage}]";
-                    string statusStr = string.IsNullOrEmpty(currentStatus) ? "" : $" - {currentStatus}";
-
-                    string content = $"{spinner[spinIndex]} {description}{pctStr}{statusStr}";
-                    int maxLen = 80;
-                    try { maxLen = Console.WindowWidth - 1; } catch { }
-                    if (content.Length > maxLen && maxLen > 0)
-                    {
-                        content = content.Substring(0, maxLen);
-                    }
-
-                    // Use ANSI sequence to clear the line before writing
-                    Console.Write($"\x1b[2K\r{content}");
-                }
-                spinIndex = (spinIndex + 1) % spinner.Length;
-            }
-
-            // Clear the spinner line
-            Console.Write("\x1b[2K\r");
-            try { Console.CursorVisible = true; } catch { }
-
-            if (proc.ExitCode != 0)
-            {
-                Console.WriteLine($"\x1b[31m[ERROR]\x1b[0m {description} failed. Output:");
-                foreach (var line in outputLines)
-                {
-                    Console.WriteLine($"  {line}");
-                }
-            }
-
-            return proc.ExitCode;
-        }
-        catch (Exception ex)
-        {
-            try { Console.CursorVisible = true; } catch { }
-            Console.Write($"\r{new string(' ', 80)}\r");
-            Console.WriteLine($"\x1b[31m[ERROR]\x1b[0m {exe}: {ex.Message}");
-            return 127;
-        }
-    }
 
     private static string RunGitOutput(string workingDir, string args)
     {

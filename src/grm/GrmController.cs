@@ -25,7 +25,7 @@ public static class GrmController
             switch (subCommand)
             {
                 case "search": return SearchAsync(cmd, env).GetAwaiter().GetResult();
-                case "install": return Install(cmd);
+                case "install": return Install(cmd, env);
                 case "uninstall": return Uninstall(cmd);
                 case "upgrade": return Upgrade(cmd);
                 case "list": return List();
@@ -90,7 +90,7 @@ public static class GrmController
         return 0;
     }
 
-    private static int Install(CommandNode cmd)
+    private static int Install(CommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -99,6 +99,13 @@ public static class GrmController
         }
 
         string repoIdentifier = cmd.Args[1];
+        string branch = "";
+        
+        if (cmd.Args.Count >= 4 && cmd.Args[2] == "--branch")
+        {
+            branch = cmd.Args[3];
+        }
+
         if (!repoIdentifier.Contains('/'))
         {
             Console.Error.WriteLine("grm install: repository must be in 'owner/repo' format");
@@ -136,17 +143,108 @@ public static class GrmController
         Console.WriteLine($"Installing {repoIdentifier} into {targetPath}...");
 
         string workDir = Path.GetDirectoryName(targetPath)!;
-        int rc = RunGit(workDir, $"clone {remoteUrl} \"{repoName}\"");
+        
+        string gitArgs = $"clone {remoteUrl} \"{repoName}\"";
+        if (!string.IsNullOrWhiteSpace(branch))
+        {
+            gitArgs = $"clone -b {branch} {remoteUrl} \"{repoName}\"";
+        }
+
+        int rc = RunGit(workDir, gitArgs);
         if (rc == 0)
         {
             Config.AddRepo(repoIdentifier, targetPath);
-            Console.WriteLine($"grm: Successfully installed {repoIdentifier}");
-            return 0;
+            Console.WriteLine($"grm: {repoIdentifier} successfully installed.");
+            CheckAndRunGrmFile(targetPath, repoIdentifier, env);
         }
         else
         {
-            Console.Error.WriteLine($"grm: Failed to install {repoIdentifier}");
-            return rc;
+            Console.Error.WriteLine($"grm: Failed to clone {repoIdentifier}");
+        }
+        return rc;
+    }
+
+    private static void CheckAndRunGrmFile(string targetPath, string repoIdentifier, ShellEnvironment env)
+    {
+        string grmFile = Path.Combine(targetPath, ".grm");
+        if (!File.Exists(grmFile)) return;
+
+        bool isTrusted = Config.IsRepoTrusted(repoIdentifier);
+        if (!isTrusted)
+        {
+            Console.WriteLine("\nRepository contains a .grm script.");
+            Console.WriteLine("This script can execute arbitrary shell commands.");
+            Console.WriteLine("Run post-install script?");
+            Console.WriteLine("[y] Yes");
+            Console.WriteLine("[n] No");
+            Console.WriteLine("[a] Always trust this repository.");
+            
+            while (true)
+            {
+                Console.Write("> ");
+                string? input = Console.ReadLine()?.Trim().ToLower();
+                if (input == "n")
+                {
+                    Console.WriteLine("Skipping post-install script.");
+                    return;
+                }
+                else if (input == "a")
+                {
+                    Config.TrustRepo(repoIdentifier);
+                    break;
+                }
+                else if (input == "y")
+                {
+                    break;
+                }
+            }
+        }
+
+        Console.WriteLine($"Running .grm script for {repoIdentifier}...");
+        
+        string[] lines = File.ReadAllLines(grmFile);
+        var declarationBlock = new System.Collections.Generic.List<string>();
+        var executionBlock = new System.Collections.Generic.List<string>();
+        bool inExecutionBlock = false;
+
+        foreach (var line in lines)
+        {
+            string tLine = line.Trim();
+            if (tLine == "@start")
+            {
+                inExecutionBlock = true;
+                continue;
+            }
+            if (tLine == "@end")
+            {
+                break;
+            }
+
+            if (inExecutionBlock)
+            {
+                executionBlock.Add(line);
+            }
+            else
+            {
+                declarationBlock.Add(line);
+            }
+        }
+
+        var runner = new AurShell.Core.ScriptRunner(env, targetPath);
+        
+        runner.StopOnError = false;
+        runner.RunScript(string.Join(Environment.NewLine, declarationBlock));
+
+        runner.StopOnError = true;
+        int rc = runner.RunScript(string.Join(Environment.NewLine, executionBlock));
+        
+        if (rc != 0)
+        {
+            Console.Error.WriteLine($"\ngrm: Post-install script failed with exit code {rc}.");
+        }
+        else
+        {
+            Console.WriteLine($"\ngrm: Post-install script completed successfully.");
         }
     }
 
@@ -196,8 +294,20 @@ public static class GrmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("grm upgrade: missing repository name");
-            return 1;
+            var repos = Config.GetInstalledRepos();
+            if (repos.Count == 0)
+            {
+                Console.WriteLine("grm: No repositories installed to upgrade.");
+                return 0;
+            }
+
+            int finalRc = 0;
+            foreach (var kvp in repos)
+            {
+                int rc = UpgradeRepo(kvp.Key, kvp.Value);
+                if (rc != 0) finalRc = rc;
+            }
+            return finalRc;
         }
 
         string repoIdentifier = cmd.Args[1];
@@ -214,6 +324,11 @@ public static class GrmController
             return 1;
         }
 
+        return UpgradeRepo(repoIdentifier, targetPath);
+    }
+
+    private static int UpgradeRepo(string repoIdentifier, string targetPath)
+    {
         if (!Directory.Exists(targetPath))
         {
             Console.Error.WriteLine($"grm: Repository directory '{targetPath}' is missing. Cannot upgrade.");

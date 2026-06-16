@@ -8,12 +8,14 @@ public class GrmConfigManager
 {
     private readonly string _configDirectory;
     private readonly string _configFile;
+    private readonly string _trustedFile;
 
     public GrmConfigManager()
     {
         string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _configDirectory = Path.Combine(homeDir, ".grm");
         _configFile = Path.Combine(_configDirectory, "remotes.con");
+        _trustedFile = Path.Combine(_configDirectory, "trusted.con");
 
         EnsureConfigExists();
     }
@@ -29,6 +31,10 @@ public class GrmConfigManager
             if (!File.Exists(_configFile))
             {
                 File.WriteAllText(_configFile, "");
+            }
+            if (!File.Exists(_trustedFile))
+            {
+                File.WriteAllText(_trustedFile, "");
             }
         }
         catch (Exception ex)
@@ -106,5 +112,34 @@ public class GrmConfigManager
             lines.Add($"\"{kvp.Key}\"=\"{kvp.Value}\"");
         }
         File.WriteAllLines(_configFile, lines);
+    }
+
+    public bool IsRepoTrusted(string repoIdentifier)
+    {
+        try
+        {
+            if (!File.Exists(_trustedFile)) return false;
+            string[] lines = File.ReadAllLines(_trustedFile);
+            foreach (var line in lines)
+            {
+                if (line.Trim().Equals(repoIdentifier, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public void TrustRepo(string repoIdentifier)
+    {
+        if (IsRepoTrusted(repoIdentifier)) return;
+        try
+        {
+            File.AppendAllLines(_trustedFile, new[] { repoIdentifier });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"grm: Failed to save trusted config: {ex.Message}");
+        }
     }
 }

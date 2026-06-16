@@ -16,6 +16,8 @@ public class ScriptRunner
     private bool _continueRequested;
     private int _continueDepth;
 
+    public bool StopOnError { get; set; } = false;
+
     private class FunctionDef
     {
         public string Name { get; set; } = "";
@@ -74,6 +76,11 @@ public class ScriptRunner
 
             lastResult = ExecuteLine(lines, ref index);
             _env.LastExitCode = lastResult;
+
+            if (StopOnError && lastResult != 0)
+            {
+                break;
+            }
         }
 
         return lastResult;
@@ -695,6 +702,11 @@ public class ScriptRunner
 
             lastResult = ExecuteLine(block, ref blockIndex);
             _env.LastExitCode = lastResult;
+
+            if (StopOnError && lastResult != 0)
+            {
+                break;
+            }
         }
 
         return lastResult;

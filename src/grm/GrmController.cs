@@ -4,12 +4,12 @@ using System.IO;
 using System.Threading.Tasks;
 using AurShell.Core;
 
-namespace AurShell.Gpm;
+namespace AurShell.Grm;
 
-public static class GpmController
+public static class GrmController
 {
-    private static readonly GpmConfigManager Config = new GpmConfigManager();
-    private static readonly GpmNetworkService Network = new GpmNetworkService();
+    private static readonly GrmConfigManager Config = new GrmConfigManager();
+    private static readonly GrmNetworkService Network = new GrmNetworkService();
 
     public static int Execute(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
@@ -38,14 +38,14 @@ public static class GpmController
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Unexpected error: {ex.Message}");
+            Console.Error.WriteLine($"grm: Unexpected error: {ex.Message}");
             return 1;
         }
     }
 
     private static void PrintHelp()
     {
-        Console.WriteLine("GPM - Git Package Manager");
+        Console.WriteLine("GRM - Git Package Manager");
         Console.WriteLine("Commands:");
         Console.WriteLine("  search <query>    Search GitHub for repositories.");
         Console.WriteLine("  install <repo>    Clone a repository (e.g., username/repo or exact name if distinct).");
@@ -68,7 +68,7 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm search: missing query");
+            Console.Error.WriteLine("grm search: missing query");
             return 1;
         }
 
@@ -94,14 +94,14 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm install: missing repository name");
+            Console.Error.WriteLine("grm install: missing repository name");
             return 1;
         }
 
         string repoIdentifier = cmd.Args[1];
         if (!repoIdentifier.Contains('/'))
         {
-            Console.Error.WriteLine("gpm install: repository must be in 'owner/repo' format");
+            Console.Error.WriteLine("grm install: repository must be in 'owner/repo' format");
             return 1;
         }
         
@@ -111,7 +111,7 @@ public static class GpmController
         var installed = Config.GetInstalledRepos();
         if (installed.ContainsKey(repoIdentifier))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is already installed.");
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' is already installed.");
             return 1;
         }
 
@@ -128,7 +128,7 @@ public static class GpmController
 
         if (Directory.Exists(targetPath))
         {
-            Console.Error.WriteLine($"gpm: Target directory '{targetPath}' already exists but is not tracked by GPM.");
+            Console.Error.WriteLine($"grm: Target directory '{targetPath}' already exists but is not tracked by GRM.");
             return 1;
         }
 
@@ -139,12 +139,12 @@ public static class GpmController
         if (rc == 0)
         {
             Config.AddRepo(repoIdentifier, targetPath);
-            Console.WriteLine($"gpm: Successfully installed {repoIdentifier}");
+            Console.WriteLine($"grm: Successfully installed {repoIdentifier}");
             return 0;
         }
         else
         {
-            Console.Error.WriteLine($"gpm: Failed to install {repoIdentifier}");
+            Console.Error.WriteLine($"grm: Failed to install {repoIdentifier}");
             return rc;
         }
     }
@@ -153,21 +153,21 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm uninstall: missing repository name");
+            Console.Error.WriteLine("grm uninstall: missing repository name");
             return 1;
         }
 
         string repoIdentifier = cmd.Args[1];
         if (!repoIdentifier.Contains('/'))
         {
-            Console.Error.WriteLine("gpm uninstall: repository must be in 'owner/repo' format");
+            Console.Error.WriteLine("grm uninstall: repository must be in 'owner/repo' format");
             return 1;
         }
 
         var installed = Config.GetInstalledRepos();
         if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' is not installed.");
             return 1;
         }
 
@@ -181,12 +181,12 @@ public static class GpmController
             }
             
             Config.RemoveRepo(repoIdentifier);
-            Console.WriteLine($"gpm: Successfully uninstalled {repoIdentifier}");
+            Console.WriteLine($"grm: Successfully uninstalled {repoIdentifier}");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to uninstall {repoIdentifier}: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to uninstall {repoIdentifier}: {ex.Message}");
             return 1;
         }
     }
@@ -195,40 +195,40 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm upgrade: missing repository name");
+            Console.Error.WriteLine("grm upgrade: missing repository name");
             return 1;
         }
 
         string repoIdentifier = cmd.Args[1];
         if (!repoIdentifier.Contains('/'))
         {
-            Console.Error.WriteLine("gpm upgrade: repository must be in 'owner/repo' format");
+            Console.Error.WriteLine("grm upgrade: repository must be in 'owner/repo' format");
             return 1;
         }
 
         var installed = Config.GetInstalledRepos();
         if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' is not installed.");
             return 1;
         }
 
         if (!Directory.Exists(targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository directory '{targetPath}' is missing. Cannot upgrade.");
+            Console.Error.WriteLine($"grm: Repository directory '{targetPath}' is missing. Cannot upgrade.");
             return 1;
         }
 
         var (statusExit, statusOutput) = RunGitOutput(targetPath, "status --porcelain");
         if (statusExit != 0)
         {
-            Console.Error.WriteLine($"gpm: Failed to check repository status for {repoIdentifier}");
+            Console.Error.WriteLine($"grm: Failed to check repository status for {repoIdentifier}");
             return 1;
         }
 
         if (!string.IsNullOrWhiteSpace(statusOutput))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' has uncommitted changes. Please commit or stash them before upgrading.");
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' has uncommitted changes. Please commit or stash them before upgrading.");
             return 1;
         }
 
@@ -237,19 +237,19 @@ public static class GpmController
         int fetchCode = RunGit(targetPath, "fetch --dry-run");
         if (fetchCode != 0)
         {
-            Console.Error.WriteLine($"gpm: Remote for {repoIdentifier} seems unreachable or vanished. Aborting upgrade.");
+            Console.Error.WriteLine($"grm: Remote for {repoIdentifier} seems unreachable or vanished. Aborting upgrade.");
             return 1;
         }
 
         int pullCode = RunGit(targetPath, "pull");
         if (pullCode == 0)
         {
-            Console.WriteLine($"gpm: Successfully upgraded {repoIdentifier}");
+            Console.WriteLine($"grm: Successfully upgraded {repoIdentifier}");
             return 0;
         }
         else
         {
-            Console.Error.WriteLine($"gpm: Failed to upgrade {repoIdentifier}");
+            Console.Error.WriteLine($"grm: Failed to upgrade {repoIdentifier}");
             return pullCode;
         }
     }
@@ -259,7 +259,7 @@ public static class GpmController
         var installed = Config.GetInstalledRepos();
         if (installed.Count == 0)
         {
-            Console.WriteLine("No repositories installed via GPM.");
+            Console.WriteLine("No repositories installed via GRM.");
             return 0;
         }
 
@@ -275,27 +275,27 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm goto: missing repository name");
+            Console.Error.WriteLine("grm goto: missing repository name");
             return 1;
         }
 
         string repoIdentifier = cmd.Args[1];
         if (!repoIdentifier.Contains('/'))
         {
-            Console.Error.WriteLine("gpm goto: repository must be in 'owner/repo' format");
+            Console.Error.WriteLine("grm goto: repository must be in 'owner/repo' format");
             return 1;
         }
 
         var installed = Config.GetInstalledRepos();
         if (!installed.TryGetValue(repoIdentifier, out string? targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository '{repoIdentifier}' is not installed.");
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' is not installed.");
             return 1;
         }
 
         if (!Directory.Exists(targetPath))
         {
-            Console.Error.WriteLine($"gpm: Repository directory '{targetPath}' is missing.");
+            Console.Error.WriteLine($"grm: Repository directory '{targetPath}' is missing.");
             return 1;
         }
 
@@ -307,7 +307,7 @@ public static class GpmController
         } 
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to change directory: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to change directory: {ex.Message}");
             return 1;
         }
         
@@ -321,14 +321,14 @@ public static class GpmController
     {
         if (cmd.Args.Count < 2)
         {
-            Console.Error.WriteLine("gpm info: missing repository name");
+            Console.Error.WriteLine("grm info: missing repository name");
             return 1;
         }
 
         string repoIdentifier = cmd.Args[1];
         if (!repoIdentifier.Contains('/'))
         {
-            Console.Error.WriteLine("gpm info: repository must be in 'owner/repo' format");
+            Console.Error.WriteLine("grm info: repository must be in 'owner/repo' format");
             return 1;
         }
 
@@ -339,6 +339,14 @@ public static class GpmController
         }
 
         Console.WriteLine(info);
+        
+        string? readme = await Network.GetRepoReadmeAsync(repoIdentifier, GetToken(env));
+        if (!string.IsNullOrWhiteSpace(readme))
+        {
+            Console.WriteLine("\n--- README ---");
+            Console.WriteLine(readme);
+        }
+
         return 0;
     }
 
@@ -359,7 +367,7 @@ public static class GpmController
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to execute git: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to execute git: {ex.Message}");
             return 127;
         }
     }

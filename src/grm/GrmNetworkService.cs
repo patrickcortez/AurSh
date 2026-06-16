@@ -5,14 +5,14 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace AurShell.Gpm;
+namespace AurShell.Grm;
 
-public class GpmNetworkService
+public class GrmNetworkService
 {
     private HttpClient CreateClient(string? token)
     {
         var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("AurSh-GPM", "1.0"));
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("AurSh-GRM", "1.0"));
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
         
         if (!string.IsNullOrWhiteSpace(token))
@@ -33,7 +33,7 @@ public class GpmNetworkService
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
-                Console.Error.WriteLine($"gpm: GitHub API returned {response.StatusCode}");
+                Console.Error.WriteLine($"grm: GitHub API returned {response.StatusCode}");
                 return results;
             }
 
@@ -53,7 +53,7 @@ public class GpmNetworkService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to search GitHub: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to search GitHub: {ex.Message}");
         }
 
         return results;
@@ -69,7 +69,7 @@ public class GpmNetworkService
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
-                Console.Error.WriteLine($"gpm: GitHub API returned {response.StatusCode} for {repoName}");
+                Console.Error.WriteLine($"grm: GitHub API returned {response.StatusCode} for {repoName}");
                 return null;
             }
 
@@ -99,7 +99,32 @@ License: {license}";
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to get repo info: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to fetch info for {repoName}: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<string?> GetRepoReadmeAsync(string repoName, string? token = null)
+    {
+        try
+        {
+            using var client = CreateClient(token);
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3.raw"));
+            
+            string url = $"https://api.github.com/repos/{repoName}/readme";
+            var response = await client.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                return null; // README might not exist, just return null silently
+            }
+
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"grm: Failed to fetch readme for {repoName}: {ex.Message}");
             return null;
         }
     }

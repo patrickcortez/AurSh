@@ -16,7 +16,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly", "help", "gpm"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-ssh", "local", "declare", "readonly", "help", "grm"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -61,7 +61,7 @@ public static class BuiltinCommands
             "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
             "aursh-ssh" => ExecuteSsh(cmd, env, workingDirectory),
             "help" => ExecuteHelp(),
-            "gpm" => AurShell.Gpm.GpmController.Execute(cmd, env, ref workingDirectory),
+            "grm" => AurShell.Grm.GrmController.Execute(cmd, env, ref workingDirectory),
             _ => ExecuteFallback(cmd)
         };
     }

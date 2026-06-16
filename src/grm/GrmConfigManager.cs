@@ -2,17 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace AurShell.Gpm;
+namespace AurShell.Grm;
 
-public class GpmConfigManager
+public class GrmConfigManager
 {
     private readonly string _configDirectory;
     private readonly string _configFile;
 
-    public GpmConfigManager()
+    public GrmConfigManager()
     {
         string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _configDirectory = Path.Combine(homeDir, ".gpm");
+        _configDirectory = Path.Combine(homeDir, ".grm");
         _configFile = Path.Combine(_configDirectory, "remotes.con");
 
         EnsureConfigExists();
@@ -33,7 +33,7 @@ public class GpmConfigManager
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"gpm: Failed to initialize configuration directory: {ex.Message}");
+            Console.Error.WriteLine($"grm: Failed to initialize configuration directory: {ex.Message}");
         }
     }
 

@@ -45,7 +45,7 @@ public static class GrmController
 
     private static void PrintHelp()
     {
-        Console.WriteLine("GRM - Git Package Manager");
+        Console.WriteLine("GRM - Git Repository Manager");
         Console.WriteLine("Commands:");
         Console.WriteLine("  search <query>    Search GitHub for repositories.");
         Console.WriteLine("  install <repo>    Clone a repository (e.g., username/repo or exact name if distinct).");

@@ -30,24 +30,48 @@ internal static class Utility
 
             if (input[i] == '$' && i + 1 < input.Length && input[i + 1] == '(')
             {
-                int start = i + 2;
-                int depth = 1;
-                int j = start;
-                while (j < input.Length && depth > 0)
+                if (i + 2 < input.Length && input[i + 2] == '(')
                 {
-                    if (input[j] == '(') depth++;
-                    else if (input[j] == ')') depth--;
-                    if (depth > 0) j++;
-                }
+                    int start = i + 3;
+                    int depth = 2;
+                    int j = start;
+                    while (j < input.Length && depth > 0)
+                    {
+                        if (input[j] == '(') depth++;
+                        else if (input[j] == ')') depth--;
+                        if (depth > 0) j++;
+                    }
 
-                if (depth == 0)
+                    if (depth == 0)
+                    {
+                        string mathExpr = input.Substring(start, j - start - 1);
+                        string mathOutput = MathEvaluator.Evaluate(mathExpr, env).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        result.Append(mathOutput);
+                        i = j + 1;
+                        continue;
+                    }
+                }
+                else
                 {
-                    string command = input.Substring(start, j - start);
-                    Executor ex = new Executor(env, workingDirectory);
-                    var (_, output) = ex.ExecuteCapture(command);
-                    result.Append(output);
-                    i = j + 1;
-                    continue;
+                    int start = i + 2;
+                    int depth = 1;
+                    int j = start;
+                    while (j < input.Length && depth > 0)
+                    {
+                        if (input[j] == '(') depth++;
+                        else if (input[j] == ')') depth--;
+                        if (depth > 0) j++;
+                    }
+
+                    if (depth == 0)
+                    {
+                        string command = input.Substring(start, j - start);
+                        Executor ex = new Executor(env, workingDirectory);
+                        var (_, output) = ex.ExecuteCapture(command);
+                        result.Append(output);
+                        i = j + 1;
+                        continue;
+                    }
                 }
             }
 

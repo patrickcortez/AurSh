@@ -165,6 +165,38 @@ public class Executor
 
         Lexer lexer = new Lexer(scriptContent, _env);
         var tokens = lexer.Tokenize();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].Type == TokenType.Word && !tokens[i].WasSingleQuoted)
+            {
+                try
+                {
+                    string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
+                    string resolvedRaw = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].RawExpandedValue);
+
+                    if (ContextReader.isContext(resolved))
+                    {
+                        int colonIdx = resolved.IndexOf(':');
+                        if (colonIdx > 0)
+                        {
+                            string contextName = resolved.Substring(0, colonIdx);
+                            string attributeName = resolved.Substring(colonIdx + 1);
+                            ContextReader contextReader = new ContextReader();
+                            resolved = contextReader.GetAttributeValue(contextName, attributeName);
+                            resolvedRaw = resolved;
+                        }
+                    }
+                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"aursh: subcommand resolution error in script: {ex.Message}");
+                    return 1;
+                }
+            }
+        }
+
         Parser parser = new Parser(tokens);
 
         ListNode ast;

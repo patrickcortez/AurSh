@@ -24,23 +24,34 @@ Clones a GitHub repository locally into your `~/Repos/` directory and registers 
   1. Checks if the repository is already installed.
   2. Runs `git clone` (optionally targeting a specific branch with `-b`).
   3. Saves the mapping `nushell/nushell -> ~/Repos/nushell/nushell` into `~/.grm/remotes.con`.
-  4. If a `.grm` script is found in the repository root, GRM prompts for your consent. If trusted (`[y]` or `[a]`), it securely executes the post-install setup commands line-by-line using AurShell's native scripting engine, supporting piping (`|`), logic operators (`&&`), and control flows (`if`).
+  4. If a `.grm` script is found in the repository root, GRM prompts for your consent. If trusted (`[y]` or `[a]`), it securely executes the `[INSTALL]` section's post-install setup commands line-by-line.
 
-### 3. `grm list`
+### 3. `grm run <owner/repository> [--branch <branch>]`
+
+Executes the `[RUN]` section of a repository's `.grm` script.
+
+- **Example:** `grm run nushell/nushell --branch development`
+- **Behavior:**
+  1. Checks if the repository is already installed.
+  2. Checks out the specified branch (defaults to `master` if not provided).
+  3. Validates the `.grm` file formatting.
+  4. Executes the `@start` to `@end` execution block located under the `[RUN]` section of the `.grm` file.
+
+### 4. `grm list`
 
 Lists all repositories currently installed and tracked by GRM.
 
 - **Example:** `grm list`
 - **Behavior:** Prints the local mapping of installed repositories and their absolute paths in the filesystem.
 
-### 4. `grm goto <owner/repository>`
+### 5. `grm goto <owner/repository>`
 
 Changes your current working directory to the specified installed repository.
 
 - **Example:** `grm goto nushell/nushell`
 - **Behavior:** Searches `~/.grm/remotes.con` for `nushell/nushell`. If found, updates the shell's `PWD` and `OLDPWD`, and executes the underlying directory change.
 
-### 5. `grm upgrade [owner/repository]`
+### 6. `grm upgrade [owner/repository]`
 
 Pulls the latest changes for a specific installed repository, or updates **all** installed repositories if run without arguments.
 
@@ -49,7 +60,7 @@ Pulls the latest changes for a specific installed repository, or updates **all**
   1. For a single repo: Checks if you have uncommitted or stashed changes. If clean, executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
   2. For a global upgrade: Automatically loops through all registered entries in `remotes.con` and sequentially runs the update process for each.
 
-### 6. `grm info <owner/repository>`
+### 7. `grm info <owner/repository>`
 
 Fetches detailed repository metadata and displays the project's README.
 
@@ -59,7 +70,7 @@ Fetches detailed repository metadata and displays the project's README.
   2. Requests the raw README file using the `application/vnd.github.v3.raw` HTTP header (acting similarly to a `curl` request).
   3. Prints both the metadata and the markdown content to your terminal.
 
-### 7. `grm uninstall <owner/repository>`
+### 8. `grm uninstall <owner/repository>`
 
 Uninstalls (deletes) a repository from your local machine.
 
@@ -83,24 +94,26 @@ GRM uses the GitHub REST API, which has a rate limit of 60 requests per hour for
 
 ## The `.grm` Configuration File
 
-Repositories can include a `.grm` file in their root directory to automatically execute post-install steps like compiling, moving files, or installing dependencies.
+Repositories can include a `.grm` file in their root directory to automatically execute post-install steps like compiling, moving files, or installing dependencies, as well as define runnable scripts.
 
 GRM utilizes AurSh's native `ScriptRunner` to execute these files, which provides full support for variables, conditional logic (`if`, `while`, `for`), logical operators (`&&`, `||`), and I/O redirection.
 
 ### Syntax
 
-The file is structured into two main parts:
+The file is structured using sections, specifically `[INSTALL]` and `[RUN]`.
 
-1. **Declaration Block**: Anything before `@start` is executed normally and is designed for setting up variables.
-2. **Execution Block**: Anything between `@start` and `@end` is executed under strict rules. If any command in this block exits with a non-zero code, the execution is immediately halted to prevent unintended side effects.
+1. **Declaration Block**: Anything before the first section header is executed normally and is designed for setting up global variables.
+2. **Sections**: Define distinct execution targets. `grm install` executes the `[INSTALL]` section, while `grm run` executes the `[RUN]` section.
+3. **Execution Block**: Inside a section, anything between `@start` and `@end` is executed under strict rules. If any command in this block exits with a non-zero code, the execution is immediately halted to prevent unintended side effects.
 
 ### Example
 
 ```bash
-# Variables declared here are available in the execution block
+# Global variables declared here are available in all sections
 BuildDir="build"
 Target="release"
 
+[INSTALL]
 @start
 # If the build directory exists, remove it
 if [ -d $BuildDir ]; then
@@ -112,6 +125,12 @@ make $Target
 
 # Install the binary
 sudo make install
+@end
+
+[RUN]
+@start
+echo "Starting application..."
+./bin/app --release
 @end
 ```
 

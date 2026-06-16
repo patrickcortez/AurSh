@@ -26,6 +26,7 @@ public static class GrmController
             {
                 case "search": return SearchAsync(cmd, env).GetAwaiter().GetResult();
                 case "install": return Install(cmd, env);
+                case "run": return RunCommand(cmd, env);
                 case "uninstall": return Uninstall(cmd);
                 case "upgrade": return Upgrade(cmd);
                 case "list": return List();
@@ -155,7 +156,7 @@ public static class GrmController
         {
             Config.AddRepo(repoIdentifier, targetPath);
             Console.WriteLine($"grm: {repoIdentifier} successfully installed.");
-            CheckAndRunGrmFile(targetPath, repoIdentifier, env);
+            ExecuteGrmSection(targetPath, repoIdentifier, "INSTALL", env);
         }
         else
         {
@@ -164,17 +165,17 @@ public static class GrmController
         return rc;
     }
 
-    private static void CheckAndRunGrmFile(string targetPath, string repoIdentifier, ShellEnvironment env)
+    private static int ExecuteGrmSection(string targetPath, string repoIdentifier, string targetSection, ShellEnvironment env)
     {
         string grmFile = Path.Combine(targetPath, ".grm");
-        if (!File.Exists(grmFile)) return;
+        if (!File.Exists(grmFile)) return 0;
 
         bool isTrusted = Config.IsRepoTrusted(repoIdentifier);
         if (!isTrusted)
         {
-            Console.WriteLine("\nRepository contains a .grm script.");
+            Console.WriteLine($"\nRepository contains a .grm script. Section: [{targetSection}]");
             Console.WriteLine("This script can execute arbitrary shell commands.");
-            Console.WriteLine("Run post-install script?");
+            Console.WriteLine($"Run {targetSection} script?");
             Console.WriteLine("[y] Yes");
             Console.WriteLine("[n] No");
             Console.WriteLine("[a] Always trust this repository.");
@@ -185,8 +186,8 @@ public static class GrmController
                 string? input = Console.ReadLine()?.Trim().ToLower();
                 if (input == "n")
                 {
-                    Console.WriteLine("Skipping post-install script.");
-                    return;
+                    Console.WriteLine($"Skipping {targetSection} script.");
+                    return 0;
                 }
                 else if (input == "a")
                 {
@@ -200,34 +201,64 @@ public static class GrmController
             }
         }
 
-        Console.WriteLine($"Running .grm script for {repoIdentifier}...");
+        Console.WriteLine($"Running .grm script for {repoIdentifier} (Section: [{targetSection}])...");
         
         string[] lines = File.ReadAllLines(grmFile);
         var declarationBlock = new System.Collections.Generic.List<string>();
         var executionBlock = new System.Collections.Generic.List<string>();
+        
+        bool foundFirstSection = false;
+        bool inTargetSection = false;
         bool inExecutionBlock = false;
 
         foreach (var line in lines)
         {
             string tLine = line.Trim();
-            if (tLine == "@start")
+            
+            if (tLine.StartsWith("[") && tLine.EndsWith("]"))
             {
-                inExecutionBlock = true;
+                foundFirstSection = true;
+                string sectionName = tLine.Substring(1, tLine.Length - 2).Trim();
+                inTargetSection = string.Equals(sectionName, targetSection, StringComparison.OrdinalIgnoreCase);
+                inExecutionBlock = false;
                 continue;
             }
-            if (tLine == "@end")
-            {
-                break;
-            }
-
-            if (inExecutionBlock)
-            {
-                executionBlock.Add(line);
-            }
-            else
+            
+            if (!foundFirstSection)
             {
                 declarationBlock.Add(line);
+                continue;
             }
+
+            if (inTargetSection)
+            {
+                if (tLine == "@start")
+                {
+                    inExecutionBlock = true;
+                    continue;
+                }
+                if (tLine == "@end")
+                {
+                    break;
+                }
+
+                if (inExecutionBlock)
+                {
+                    executionBlock.Add(line);
+                }
+            }
+        }
+
+        if (!foundFirstSection)
+        {
+            Console.Error.WriteLine($"\ngrm: Invalid .grm format. Expected explicit section headers (e.g. [INSTALL] or [RUN]).");
+            return 1;
+        }
+        
+        if (executionBlock.Count == 0)
+        {
+            Console.Error.WriteLine($"\ngrm: Section [{targetSection}] not found or empty in .grm file.");
+            return 1;
         }
 
         var runner = new AurShell.Core.ScriptRunner(env, targetPath);
@@ -240,12 +271,59 @@ public static class GrmController
         
         if (rc != 0)
         {
-            Console.Error.WriteLine($"\ngrm: Post-install script failed with exit code {rc}.");
+            Console.Error.WriteLine($"\ngrm: {targetSection} script failed with exit code {rc}.");
         }
         else
         {
-            Console.WriteLine($"\ngrm: Post-install script completed successfully.");
+            Console.WriteLine($"\ngrm: {targetSection} script completed successfully.");
         }
+        return rc;
+    }
+
+    private static int RunCommand(CommandNode cmd, ShellEnvironment env)
+    {
+        if (cmd.Args.Count < 2)
+        {
+            Console.Error.WriteLine("grm run: missing repository name");
+            return 1;
+        }
+
+        string repoIdentifier = cmd.Args[1];
+        string branch = "master";
+        
+        if (cmd.Args.Count >= 4 && cmd.Args[2] == "--branch")
+        {
+            branch = cmd.Args[3];
+        }
+
+        var repos = Config.GetInstalledRepos();
+        if (!repos.TryGetValue(repoIdentifier, out string? targetPath))
+        {
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' is not installed.");
+            return 1;
+        }
+
+        if (!Directory.Exists(targetPath))
+        {
+            Console.Error.WriteLine($"grm: Repository directory '{targetPath}' is missing.");
+            return 1;
+        }
+
+        int checkoutCode = RunGit(targetPath, $"checkout {branch}");
+        if (checkoutCode != 0)
+        {
+            Console.Error.WriteLine($"grm: Failed to checkout branch '{branch}' in {repoIdentifier}");
+            return checkoutCode;
+        }
+
+        string grmFile = Path.Combine(targetPath, ".grm");
+        if (!File.Exists(grmFile))
+        {
+            Console.Error.WriteLine($"grm: Repository '{repoIdentifier}' does not contain a .grm file.");
+            return 1;
+        }
+
+        return ExecuteGrmSection(targetPath, repoIdentifier, "RUN", env);
     }
 
     private static int Uninstall(CommandNode cmd)

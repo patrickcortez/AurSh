@@ -6,30 +6,43 @@ GRM utilizes AurSh's native `ScriptRunner` to parse and execute `.grm` files. Be
 
 ## File Structure
 
-A `.grm` file is split into two distinct blocks:
+A `.grm` file is split into a global declaration block followed by distinct execution sections:
 
-### 1. The Declaration Block
-Everything **before** the `@start` token is part of the declaration block. 
-- **Purpose**: Defining variables, environment setup, or utility functions.
+### 1. The Global Declaration Block
+Everything **before** the first `[SECTION]` header is part of the declaration block. 
+- **Purpose**: Defining global variables, environment setup, or utility functions that apply to all sections.
 - **Execution**: Runs in a permissive mode. If a command fails here, the script will **not** halt.
 
-### 2. The Execution Block
-Everything between the `@start` and `@end` tokens is part of the execution block.
-- **Purpose**: The actual build, compilation, or post-install logic.
-- **Execution**: Runs in strict mode (`StopOnError = true`). If **any** command in this block yields a non-zero exit code, execution is immediately halted, preventing half-finished or broken installations.
+### 2. Sections
+A section is denoted by square brackets (e.g., `[INSTALL]`, `[RUN]`). It targets a specific GRM subcommand.
+- `[INSTALL]`: Executed when running `grm install`.
+- `[RUN]`: Executed when running `grm run`.
+
+### 3. The Execution Block
+Inside a section, everything between the `@start` and `@end` tokens is part of the execution block.
+- **Purpose**: The actual build, compilation, run, or post-install logic for that specific section.
+- **Execution**: Runs in strict mode (`StopOnError = true`). If **any** command in this block yields a non-zero exit code, execution is immediately halted.
 
 ### Example Skeleton
 ```bash
-# -- DECLARATION BLOCK --
+# -- GLOBAL DECLARATION BLOCK --
 BuildDir="build"
 Target="release"
 
+[INSTALL]
 @start
-# -- EXECUTION BLOCK --
+# -- INSTALL EXECUTION BLOCK --
 mkdir $BuildDir
 cd $BuildDir
 make $Target
 sudo make install
+@end
+
+[RUN]
+@start
+# -- RUN EXECUTION BLOCK --
+echo "Starting application..."
+./bin/app --release
 @end
 ```
 
@@ -45,6 +58,7 @@ You can define and expand variables using standard shell syntax.
 Directory="/opt/myapp"
 Version="1.0.0"
 
+[INSTALL]
 @start
 echo "Installing version $Version to $Directory"
 @end
@@ -53,6 +67,7 @@ echo "Installing version $Version to $Directory"
 ### Logical Operators
 You can chain commands using `&&` (AND) and `||` (OR).
 ```bash
+[INSTALL]
 @start
 # Only runs make install if make succeeds
 make && sudo make install
@@ -67,6 +82,7 @@ cd my_dir || echo "Failed to change directory!"
 
 #### If / Elif / Else
 ```bash
+[INSTALL]
 @start
 if [ -d "build" ]; then
     echo "Build directory exists!"
@@ -81,6 +97,7 @@ fi
 
 #### For Loops
 ```bash
+[INSTALL]
 @start
 for file in src/*.cs; do
     echo "Compiling $file"
@@ -90,6 +107,7 @@ done
 
 #### While Loops
 ```bash
+[RUN]
 @start
 while [ -f "lock.tmp" ]; do
     echo "Waiting for lock..."
@@ -101,6 +119,7 @@ done
 ### I/O Redirection and Pipes
 Standard Unix-style piping (`|`) and redirection (`>`, `>>`) are natively supported.
 ```bash
+[INSTALL]
 @start
 # Redirect output to a log file
 make > build.log
@@ -117,6 +136,7 @@ function cleanup() {
     rm -rf temp/
 }
 
+[INSTALL]
 @start
 echo "Building..."
 make
@@ -130,6 +150,7 @@ cleanup
 1. **Always use the Declaration Block for setup**: Keep the `@start` / `@end` block focused strictly on commands that *must* succeed.
 2. **Handle errors gracefully**: If a command is expected to fail but shouldn't halt the installation, use `|| true` to force a `0` exit code.
    ```bash
+   [INSTALL]
    @start
    # If rm fails (e.g. file doesn't exist), the script continues
    rm old_config.json || true 

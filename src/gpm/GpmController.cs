@@ -24,12 +24,13 @@ public static class GpmController
         {
             switch (subCommand)
             {
-                case "search": return SearchAsync(cmd).GetAwaiter().GetResult();
+                case "search": return SearchAsync(cmd, env).GetAwaiter().GetResult();
                 case "install": return Install(cmd);
                 case "uninstall": return Uninstall(cmd);
                 case "upgrade": return Upgrade(cmd);
                 case "list": return List();
-                case "goto": return Goto(cmd, ref workingDirectory);
+                case "goto": return Goto(cmd, env, ref workingDirectory);
+                case "info": return InfoAsync(cmd, env).GetAwaiter().GetResult();
                 default:
                     PrintHelp();
                     return 1;
@@ -52,9 +53,18 @@ public static class GpmController
         Console.WriteLine("  upgrade <repo>    Pull the latest changes for an installed repository.");
         Console.WriteLine("  list              List all installed repositories.");
         Console.WriteLine("  goto <repo>       Change the current directory to the repository.");
+        Console.WriteLine("  info <repo>       Get detailed information about a repository from GitHub.");
     }
 
-    private static async Task<int> SearchAsync(CommandNode cmd)
+    private static string? GetToken(ShellEnvironment env)
+    {
+        string? token = env.Get("GITHUB_TOKEN");
+        if (string.IsNullOrWhiteSpace(token))
+            token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        return token;
+    }
+
+    private static async Task<int> SearchAsync(CommandNode cmd, ShellEnvironment env)
     {
         if (cmd.Args.Count < 2)
         {
@@ -65,7 +75,7 @@ public static class GpmController
         string query = cmd.Args[1];
         Console.WriteLine($"Searching GitHub for '{query}'...");
         
-        var results = await Network.SearchRepositoriesAsync(query);
+        var results = await Network.SearchRepositoriesAsync(query, GetToken(env));
         if (results.Count == 0)
         {
             Console.WriteLine("No repositories found.");
@@ -258,7 +268,7 @@ public static class GpmController
         return 0;
     }
 
-    private static int Goto(CommandNode cmd, ref string workingDirectory)
+    private static int Goto(CommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
         if (cmd.Args.Count < 2)
         {
@@ -295,6 +305,7 @@ public static class GpmController
             return 1;
         }
 
+        string oldDir = workingDirectory;
         workingDirectory = targetPath;
         try 
         {
@@ -306,6 +317,28 @@ public static class GpmController
             return 1;
         }
         
+        env.Set("OLDPWD", oldDir);
+        env.Set("PWD", workingDirectory);
+        
+        return 0;
+    }
+
+    private static async Task<int> InfoAsync(CommandNode cmd, ShellEnvironment env)
+    {
+        if (cmd.Args.Count < 2)
+        {
+            Console.Error.WriteLine("gpm info: missing repository name");
+            return 1;
+        }
+
+        string repoName = cmd.Args[1];
+        string? info = await Network.GetRepoInfoAsync(repoName, GetToken(env));
+        if (info == null)
+        {
+            return 1;
+        }
+
+        Console.WriteLine(info);
         return 0;
     }
 

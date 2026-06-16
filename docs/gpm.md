@@ -35,10 +35,27 @@ Upgrades an installed repository by fetching and pulling the latest changes from
 - **Example:** `gpm upgrade nushell`
 - **Behavior:** Navigates to the repository path and executes `git pull`. It will first perform a dry-run fetch to ensure the remote is still accessible.
 
-### 6. `gpm uninstall <repository>`
+### 6. `gpm info <repository>`
+Fetches detailed repository information (description, stars, forks, license) directly from GitHub.
+- **Example:** `gpm info nushell/nushell`
+- **Behavior:** Makes an API request to `https://api.github.com/repos/{owner}/{repo}` to retrieve metadata.
+
+### 7. `gpm uninstall <repository>`
 Uninstalls (deletes) a repository from your local machine.
 - **Example:** `gpm uninstall nushell`
 - **Behavior:** Deletes the repository directory from `~/Repos/` and removes its entry from `~/.gpm/remotes.con`.
+
+---
+
+## Authentication and API Limits
+
+GPM uses the GitHub REST API, which has a rate limit of 60 requests per hour for unauthenticated users. 
+
+**To increase your limit to 5,000 requests per hour:**
+1. Generate a Personal Access Token (PAT) on GitHub.
+2. Set it as an environment variable in your system or profile named `GITHUB_TOKEN`.
+   - E.g., `export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"`
+3. GPM will automatically read this token and attach it to API requests.
 
 ---
 

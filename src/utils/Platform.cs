@@ -348,22 +348,25 @@ public static class Platform
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.Combine(DataDirectory, "sessions"));
-        
-        string binDir = Path.Combine(HomeDirectory, ".aursh", "bin");
-        Directory.CreateDirectory(binDir);
-        ExtractBusyBox(binDir);
 
         string aurshDir = Path.Combine(HomeDirectory, ".aursh");
 
-        // If the directory doesn't exist at all, this is a brand new fresh install.
-        // We will pre-generate everything so it doesn't instantly crash on the first command.
-        if (!Directory.Exists(aurshDir))
+        // Check for a fresh install BEFORE creating subdirectories, since
+        // creating ~/.aursh/bin/ implicitly creates ~/.aursh/ and would
+        // make the old Directory.Exists check always pass.
+        bool isFreshInstall = !File.Exists(Path.Combine(aurshDir, "AurSh.config.con"));
+
+        string binDir = Path.Combine(aurshDir, "bin");
+        Directory.CreateDirectory(binDir);
+        ExtractBusyBox(binDir);
+
+        if (isFreshInstall)
         {
+            // Pre-generate everything so it doesn't crash on the first command.
             Directory.CreateDirectory(aurshDir);
             Directory.CreateDirectory(Path.Combine(aurshDir, "plugins"));
             Directory.CreateDirectory(SuggestionsDirectory);
 
-            // Run the integrity check once to generate all the files silently
             VerifyImportantConfigIntegrity();
         }
     }
@@ -371,7 +374,7 @@ public static class Platform
     private static void ExtractBusyBox(string binDir)
     {
         string busyboxPath = Path.Combine(binDir, CurrentOS == OperatingSystemType.Windows ? "busybox.exe" : "busybox");
-        
+
         if (!File.Exists(busyboxPath))
         {
             string resourceName = CurrentOS == OperatingSystemType.Windows ? "AurShell.Resources.busybox_win.exe" : "AurShell.Resources.busybox_linux_x86_64";
@@ -386,7 +389,7 @@ public static class Platform
                 Console.Error.WriteLine($"aursh: warning: bundled busybox resource '{resourceName}' not found!");
             }
         }
-        
+
         if (CurrentOS != OperatingSystemType.Windows && File.Exists(busyboxPath))
         {
             try

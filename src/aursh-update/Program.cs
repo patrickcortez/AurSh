@@ -313,14 +313,14 @@ internal static class Program
             lock (syncLock)
             {
                 outputLines.Add(line);
-                
+
                 // Try to extract percentage from git --progress
                 var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)%");
                 if (match.Success)
                 {
                     percentage = match.Groups[1].Value + "%";
                 }
-                
+
                 // Use the latest line as status, truncate if too long
                 if (line.Length > 50)
                     currentStatus = line.Substring(0, 47) + "...";

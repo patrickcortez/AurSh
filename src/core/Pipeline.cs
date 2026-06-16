@@ -193,7 +193,7 @@ public static class Pipeline
                 var tempCmd = new CommandNode { Name = resolvedAssocExe };
                 for (int i = 1; i < parts.Length; i++) tempCmd.Args.Add(parts[i]);
                 foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-                
+
                 var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
                 var process = Process.Start(assocPsi);
                 if (process != null)
@@ -660,7 +660,7 @@ public static class Pipeline
                         var tempCmd = new CommandNode { Name = resolvedAssocExe };
                         for (int argIdx = 1; argIdx < parts.Length; argIdx++) tempCmd.Args.Add(parts[argIdx]);
                         foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
-                        
+
                         var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
 
                         if (!isFirst) assocPsi.RedirectStandardInput = true;

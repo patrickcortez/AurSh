@@ -376,15 +376,22 @@ pkg_lld() {
 
 build_install_cmd() {
     _pkgs="$1"
+    _sudo="sudo "
+    
+    # Do not use sudo if already root or if command doesn't exist
+    if [ "$(id -u 2>/dev/null)" = "0" ] || ! command -v sudo >/dev/null 2>&1; then
+        _sudo=""
+    fi
+
     case "$PKG_MANAGER" in
-        apt)    INSTALL_CMD="sudo apt-get install -y $_pkgs" ;;
-        dnf)    INSTALL_CMD="sudo dnf install -y $_pkgs" ;;
-        yum)    INSTALL_CMD="sudo yum install -y $_pkgs" ;;
-        pacman) INSTALL_CMD="sudo pacman -S --noconfirm $_pkgs" ;;
-        apk)    INSTALL_CMD="sudo apk add $_pkgs" ;;
-        zypper) INSTALL_CMD="sudo zypper install -y $_pkgs" ;;
-        xbps)   INSTALL_CMD="sudo xbps-install -Sy $_pkgs" ;;
-        emerge) INSTALL_CMD="sudo emerge $_pkgs" ;;
+        apt)    INSTALL_CMD="${_sudo}apt-get install -y $_pkgs" ;;
+        dnf)    INSTALL_CMD="${_sudo}dnf install -y $_pkgs" ;;
+        yum)    INSTALL_CMD="${_sudo}yum install -y $_pkgs" ;;
+        pacman) INSTALL_CMD="${_sudo}pacman -S --noconfirm $_pkgs" ;;
+        apk)    INSTALL_CMD="${_sudo}apk add $_pkgs" ;;
+        zypper) INSTALL_CMD="${_sudo}zypper install -y $_pkgs" ;;
+        xbps)   INSTALL_CMD="${_sudo}xbps-install -Sy $_pkgs" ;;
+        emerge) INSTALL_CMD="${_sudo}emerge $_pkgs" ;;
         brew)   INSTALL_CMD="brew install $_pkgs" ;;
         pkg)    INSTALL_CMD="pkg install -y $_pkgs" ;;
         *)      INSTALL_CMD="" ;;

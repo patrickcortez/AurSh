@@ -43,19 +43,52 @@ public class Shell
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
 
-        _env.SubshellEvaluator = (cmd) =>
+        _env.SubshellEvaluator = (cmd, currentEnv) =>
         {
-            var lexer = new Lexer(cmd, _env);
+            var lexer = new Lexer(cmd, currentEnv);
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
             
-            var clonedEnv = _env.Clone();
+            var clonedEnv = currentEnv.Clone();
+            using var ms = new System.IO.MemoryStream();
             var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
             
-            // TODO: Capture stdout via MemoryStream and redirect
-            // evaluator.Visit(ast);
-            return "";
+            // Redirect subshell output to our memory stream
+            AstEvaluator.RunWithStreams(null, ms, null, () => evaluator.Visit(ast));
+            
+            return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
+        };
+
+        _env.ProcessSubstitutionEvaluator = (cmd, isInput, currentEnv) =>
+        {
+            var lexer = new Lexer(cmd, currentEnv);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+            
+            var clonedEnv = currentEnv.Clone();
+            string tempFile = System.IO.Path.GetTempFileName();
+            
+            if (isInput)
+            {
+                System.Threading.Tasks.Task.Run(() => {
+                    using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
+                    var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+                    AstEvaluator.RunWithStreams(null, fs, null, () => evaluator.Visit(ast));
+                });
+            }
+            else
+            {
+                System.Threading.Tasks.Task.Run(async () => {
+                    await System.Threading.Tasks.Task.Delay(100); 
+                    using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Write);
+                    var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+                    AstEvaluator.RunWithStreams(fs, null, null, () => evaluator.Visit(ast));
+                });
+            }
+            
+            return tempFile;
         };
 
         var suggestions = new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
@@ -88,19 +121,51 @@ public class Shell
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);
 
-        _env.SubshellEvaluator = (cmd) =>
+        _env.SubshellEvaluator = (cmd, currentEnv) =>
         {
-            var lexer = new Lexer(cmd, _env);
+            var lexer = new Lexer(cmd, currentEnv);
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
             
-            var clonedEnv = _env.Clone();
+            var clonedEnv = currentEnv.Clone();
+            using var ms = new System.IO.MemoryStream();
             var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
             
-            // TODO: Capture stdout via MemoryStream and redirect
-            // evaluator.Visit(ast);
-            return "";
+            AstEvaluator.RunWithStreams(null, ms, null, () => evaluator.Visit(ast));
+            
+            return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
+        };
+
+        _env.ProcessSubstitutionEvaluator = (cmd, isInput, currentEnv) =>
+        {
+            var lexer = new Lexer(cmd, currentEnv);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+            
+            var clonedEnv = currentEnv.Clone();
+            string tempFile = System.IO.Path.GetTempFileName();
+            
+            if (isInput)
+            {
+                System.Threading.Tasks.Task.Run(() => {
+                    using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
+                    var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+                    AstEvaluator.RunWithStreams(null, fs, null, () => evaluator.Visit(ast));
+                });
+            }
+            else
+            {
+                System.Threading.Tasks.Task.Run(async () => {
+                    await System.Threading.Tasks.Task.Delay(100); 
+                    using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Write);
+                    var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+                    AstEvaluator.RunWithStreams(fs, null, null, () => evaluator.Visit(ast));
+                });
+            }
+            
+            return tempFile;
         };
 
         var suggestions = _env.Suggestions ?? new SuggestionProvider(Utils.Platform.SuggestionsDirectory);
@@ -387,8 +452,16 @@ public class Shell
     {
         if (System.IO.File.Exists(path))
         {
-            string content = System.IO.File.ReadAllText(path);
-            return _executor.ExecuteScript(content);
+            _env.PushPositionalArguments(args);
+            try
+            {
+                string content = System.IO.File.ReadAllText(path);
+                return _executor.ExecuteScript(content);
+            }
+            finally
+            {
+                _env.PopPositionalArguments();
+            }
         }
         return 1;
     }

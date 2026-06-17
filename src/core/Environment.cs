@@ -29,7 +29,21 @@ public class ShellEnvironment
 
     public int BackgroundPid { get; set; } = 0;
 
-    public List<string> PositionalArguments { get; } = new();
+    private readonly Stack<List<string>> _positionalArgsStack = new();
+    private readonly List<string> _globalPositionalArgs = new();
+
+    public List<string> PositionalArguments => _positionalArgsStack.Count > 0 ? _positionalArgsStack.Peek() : _globalPositionalArgs;
+
+    public void PushPositionalArguments(IEnumerable<string> args)
+    {
+        _positionalArgsStack.Push(new List<string>(args));
+    }
+
+    public void PopPositionalArguments()
+    {
+        if (_positionalArgsStack.Count > 0)
+            _positionalArgsStack.Pop();
+    }
 
     public bool StopOnError { get; set; } = false;
 
@@ -43,7 +57,8 @@ public class ShellEnvironment
 
     public bool SshAvailable { get; set; }
 
-    public Func<string, string>? SubshellEvaluator { get; set; }
+    public Func<string, ShellEnvironment, string>? SubshellEvaluator { get; set; }
+    public Func<string, bool, ShellEnvironment, string>? ProcessSubstitutionEvaluator { get; set; }
 
     public IReadOnlyDictionary<string, string> Variables => _variables;
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
@@ -365,7 +380,7 @@ public class ShellEnvironment
                 while (i < input.Length && input[i] != '`') i++;
                 string cmd = input.Substring(start, i - start);
                 if (i < input.Length) i++;
-                sb.Append(SubshellEvaluator?.Invoke(cmd) ?? "");
+                sb.Append(SubshellEvaluator?.Invoke(cmd, this) ?? "");
                 continue;
             }
 
@@ -414,7 +429,7 @@ public class ShellEnvironment
                 while (i < input.Length && input[i] != '`') i++;
                 string cmd = input.Substring(start, i - start);
                 if (i < input.Length) i++;
-                sb.Append(SubshellEvaluator?.Invoke(cmd) ?? "");
+                sb.Append(SubshellEvaluator?.Invoke(cmd, this) ?? "");
                 continue;
             }
 
@@ -487,6 +502,9 @@ public class ShellEnvironment
         foreach (var kv in _functions)
             clone._functions[kv.Key] = kv.Value;
         clone._lastExitCode = _lastExitCode;
+        clone.SubshellEvaluator = SubshellEvaluator;
+        clone.ProcessSubstitutionEvaluator = ProcessSubstitutionEvaluator;
+        clone.Suggestions = Suggestions;
         return clone;
     }
 
@@ -554,7 +572,7 @@ public class ShellEnvironment
             {
                 string cmd = input.Substring(start, i - start - 1);
                 i++; // skip last )
-                return SubshellEvaluator?.Invoke(cmd) ?? "";
+                return SubshellEvaluator?.Invoke(cmd, this) ?? "";
             }
             i = start - 1;
         }

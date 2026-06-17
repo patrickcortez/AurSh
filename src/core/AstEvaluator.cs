@@ -14,16 +14,39 @@ public class AstEvaluator
     private bool _returnRequested;
     private int _breakDepth;
     private int _continueDepth;
+    private int _loopDepth;
 
     private static readonly System.Threading.AsyncLocal<Stream?> _asyncOut = new();
     private static readonly System.Threading.AsyncLocal<Stream?> _asyncIn = new();
     private static readonly System.Threading.AsyncLocal<Stream?> _asyncErr = new();
+
+    public static Stream? OutStream => _asyncOut.Value;
+    public static Stream? InStream => _asyncIn.Value;
+    public static Stream? ErrStream => _asyncErr.Value;
 
     public AstEvaluator(ShellEnvironment env, Executor executor, string workingDirectory)
     {
         _env = env;
         _executor = executor;
         _workingDirectory = workingDirectory;
+    }
+
+    public static void RunWithStreams(Stream? inStream, Stream? outStream, Stream? errStream, Action action)
+    {
+        var prevIn = _asyncIn.Value;
+        var prevOut = _asyncOut.Value;
+        var prevErr = _asyncErr.Value;
+        
+        _asyncIn.Value = inStream;
+        _asyncOut.Value = outStream;
+        _asyncErr.Value = errStream;
+        
+        try { action(); }
+        finally {
+            _asyncIn.Value = prevIn;
+            _asyncOut.Value = prevOut;
+            _asyncErr.Value = prevErr;
+        }
     }
 
     public int Visit(ListNode list)
@@ -128,13 +151,13 @@ public class AstEvaluator
         return node switch
         {
             SimpleCommandNode scn => ExecuteSimpleCommand(scn),
-            IfNode inod => Visit(inod),
-            WhileNode wn => Visit(wn),
-            UntilNode un => Visit(un),
-            ForNode fn => Visit(fn),
-            CaseNode cn => Visit(cn),
-            BlockNode bn => Visit(bn),
-            SubshellNode ssn => Visit(ssn),
+            IfNode inod => ExecuteWithRedirections(inod, () => Visit(inod)),
+            WhileNode wn => ExecuteWithRedirections(wn, () => Visit(wn)),
+            UntilNode un => ExecuteWithRedirections(un, () => Visit(un)),
+            ForNode fn => ExecuteWithRedirections(fn, () => Visit(fn)),
+            CaseNode cn => ExecuteWithRedirections(cn, () => Visit(cn)),
+            BlockNode bn => ExecuteWithRedirections(bn, () => Visit(bn)),
+            SubshellNode ssn => ExecuteWithRedirections(ssn, () => Visit(ssn)),
             FunctionNode fnod => Visit(fnod),
             AssignmentNode an => Visit(an),
             ArrayAssignmentNode aan => Visit(aan),
@@ -144,61 +167,230 @@ public class AstEvaluator
 
     private int ExecuteSimpleCommand(SimpleCommandNode cmd)
     {
-        if (cmd.Name == "break")
+        var allRaw = new List<string>();
+        if (!string.IsNullOrEmpty(cmd.RawExpandedName)) allRaw.Add(cmd.RawExpandedName);
+        allRaw.AddRange(cmd.RawExpandedArgs);
+
+        string rawCommandStr = string.Join(" ", allRaw);
+        if (_executor.TryParseArithmeticOrAssignment(rawCommandStr))
         {
-            _breakRequested = true;
-            return 0;
-        }
-        if (cmd.Name == "continue")
-        {
-            _continueRequested = true;
-            return 0;
-        }
-        if (cmd.Name == "return")
-        {
-            _returnRequested = true;
-            if (cmd.Args.Count > 0 && int.TryParse(cmd.Args[0], out int retCode))
-                return retCode;
             return 0;
         }
 
-        // Before executing an external command or builtin, check if it's a user-defined function.
-        if (!string.IsNullOrEmpty(cmd.Name))
+        var expandedArgs = new List<string>();
+        foreach (var arg in allRaw)
         {
-            var funcBody = _env.GetFunction(cmd.Name);
-            if (funcBody != null)
+            expandedArgs.AddRange(WordExpander.ExpandWord(arg, _env));
+        }
+
+        if (expandedArgs.Count == 0) return 0;
+
+        var execCmd = new SimpleCommandNode
+        {
+            Line = cmd.Line,
+            Column = cmd.Column,
+            Name = expandedArgs[0]
+        };
+        execCmd.Args.AddRange(expandedArgs.Skip(1));
+        execCmd.Redirections.AddRange(cmd.Redirections);
+
+        var savedAssignments = ApplyPrefixAssignments(cmd.PrefixAssignments);
+        try
+        {
+            if (execCmd.Name == "break")
             {
-                _env.PushFrame(new StackFrame(cmd.Name, cmd.Line, cmd.Column, FrameType.Function));
-                _env.PushScope();
-                for (int i = 0; i < cmd.Args.Count; i++)
+                if (_loopDepth == 0)
                 {
-                    _env.SetLocal((i + 1).ToString(), cmd.Args[i]);
+                    Console.Error.WriteLine("aursh: break: only meaningful in a loop");
+                    return 1;
                 }
-                _env.SetLocal("#", cmd.Args.Count.ToString());
-                _env.SetLocal("@", string.Join(" ", cmd.Args));
-                _env.SetLocal("*", string.Join(" ", cmd.Args));
-                
-                int exitCode = 1;
-                try
-                {
-                    exitCode = Visit(funcBody);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"aursh: error in function '{cmd.Name}': {ex.Message}");
-                    _env.PrintCallStack();
-                }
-                finally
-                {
-                    _env.PopScope();
-                    _env.PopFrame();
-                    _returnRequested = false; // Reset return flag after function exit
-                }
-                return exitCode;
+
+                if (!TryGetFlowDepth(execCmd, out _breakDepth))
+                    return 1;
+
+                _breakRequested = true;
+                return 0;
             }
+            if (execCmd.Name == "continue")
+            {
+                if (_loopDepth == 0)
+                {
+                    Console.Error.WriteLine("aursh: continue: only meaningful in a loop");
+                    return 1;
+                }
+
+                if (!TryGetFlowDepth(execCmd, out _continueDepth))
+                    return 1;
+
+                _continueRequested = true;
+                return 0;
+            }
+            if (execCmd.Name == "return")
+            {
+                _returnRequested = true;
+                if (execCmd.Args.Count > 0 && int.TryParse(execCmd.Args[0], out int retCode))
+                    return retCode;
+                return 0;
+            }
+
+            // Before executing an external command or builtin, check if it's a user-defined function.
+            if (!string.IsNullOrEmpty(execCmd.Name))
+            {
+                var funcBody = _env.GetFunction(execCmd.Name);
+                if (funcBody != null)
+                {
+                    return ExecuteWithRedirections(execCmd, () => {
+                        _env.PushFrame(new StackFrame(execCmd.Name, execCmd.Line, execCmd.Column, FrameType.Function));
+                        _env.PushScope();
+                        _env.PushPositionalArguments(execCmd.Args);
+                        
+                        int exitCode = 1;
+                        try
+                        {
+                            exitCode = Visit(funcBody);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"aursh: error in function '{execCmd.Name}': {ex.Message}");
+                            _env.PrintCallStack();
+                        }
+                        finally
+                        {
+                            _env.PopPositionalArguments();
+                            _env.PopScope();
+                            _env.PopFrame();
+                            _returnRequested = false; // Reset return flag after function exit
+                        }
+                        return exitCode;
+                    });
+                }
+            }
+
+            return Pipeline.ExecuteSingle(execCmd, _env, _workingDirectory, false, this, _asyncIn.Value, _asyncOut.Value, _asyncErr.Value);
+        }
+        finally
+        {
+            RestorePrefixAssignments(savedAssignments);
+        }
+    }
+
+    private List<(string Name, bool HadValue, string? OldValue)> ApplyPrefixAssignments(List<AssignmentNode> assignments)
+    {
+        var saved = new List<(string Name, bool HadValue, string? OldValue)>();
+
+        foreach (var assignment in assignments)
+        {
+            bool hadValue = _env.Variables.ContainsKey(assignment.VariableName);
+            string? oldValue = hadValue ? _env.Get(assignment.VariableName) : null;
+            saved.Add((assignment.VariableName, hadValue, oldValue));
+
+            string value = string.Join(" ", WordExpander.ExpandWord(assignment.RawExpandedValue, _env));
+            _env.Set(assignment.VariableName, value);
         }
 
-        return Pipeline.ExecuteSingle(cmd, _env, _workingDirectory, false, this, _asyncIn.Value, _asyncOut.Value, _asyncErr.Value);
+        return saved;
+    }
+
+    private void RestorePrefixAssignments(List<(string Name, bool HadValue, string? OldValue)> saved)
+    {
+        for (int i = saved.Count - 1; i >= 0; i--)
+        {
+            var item = saved[i];
+            if (item.HadValue)
+                _env.Set(item.Name, item.OldValue ?? "");
+            else
+                _env.Unset(item.Name);
+        }
+    }
+
+    private int ExecuteWithRedirections(ICommandNode node, Func<int> execute)
+    {
+        if (node.Redirections.Count == 0)
+            return execute();
+
+        Stream? stdinStream = null;
+        Stream? stdoutStream = null;
+        Stream? stderrStream = null;
+        TextReader? originalIn = null;
+        TextWriter? originalOut = null;
+        TextWriter? originalErr = null;
+
+        Stream? nextIn = _asyncIn.Value;
+        Stream? nextOut = _asyncOut.Value;
+        Stream? nextErr = _asyncErr.Value;
+
+        try
+        {
+            foreach (var redir in node.Redirections)
+            {
+                string target = ExpandRedirectionTarget(redir.Target);
+                switch (redir.Type)
+                {
+                    case RedirectType.In:
+                        stdinStream = new FileStream(AurShell.Utils.FileSystem.ResolvePath(target, _workingDirectory), FileMode.Open, FileAccess.Read);
+                        nextIn = stdinStream;
+                        originalIn ??= Console.In;
+                        Console.SetIn(new StreamReader(stdinStream));
+                        break;
+                    case RedirectType.HereString:
+                    case RedirectType.HereDoc:
+                        stdinStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + (redir.Type == RedirectType.HereString ? "\n" : "")));
+                        nextIn = stdinStream;
+                        originalIn ??= Console.In;
+                        Console.SetIn(new StreamReader(stdinStream));
+                        break;
+                    case RedirectType.Out:
+                    case RedirectType.Append:
+                        stdoutStream = new FileStream(
+                            AurShell.Utils.FileSystem.ResolvePath(target, _workingDirectory),
+                            redir.Type == RedirectType.Out ? FileMode.Create : FileMode.Append,
+                            FileAccess.Write);
+                        nextOut = stdoutStream;
+                        originalOut ??= Console.Out;
+                        Console.SetOut(new StreamWriter(stdoutStream) { AutoFlush = true });
+                        break;
+                    case RedirectType.Err:
+                    case RedirectType.ErrAppend:
+                        stderrStream = new FileStream(
+                            AurShell.Utils.FileSystem.ResolvePath(target, _workingDirectory),
+                            redir.Type == RedirectType.Err ? FileMode.Create : FileMode.Append,
+                            FileAccess.Write);
+                        nextErr = stderrStream;
+                        originalErr ??= Console.Error;
+                        Console.SetError(new StreamWriter(stderrStream) { AutoFlush = true });
+                        break;
+                    case RedirectType.ErrToOut:
+                        nextErr = nextOut;
+                        originalErr ??= Console.Error;
+                        Console.SetError(Console.Out);
+                        break;
+                }
+            }
+
+            int exitCode = 0;
+            RunWithStreams(nextIn, nextOut, nextErr, () => exitCode = execute());
+            return exitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: redirection error: {ex.Message}");
+            return 1;
+        }
+        finally
+        {
+            if (originalIn != null) Console.SetIn(originalIn);
+            if (originalOut != null) Console.SetOut(originalOut);
+            if (originalErr != null) Console.SetError(originalErr);
+            stdinStream?.Dispose();
+            stdoutStream?.Dispose();
+            stderrStream?.Dispose();
+        }
+    }
+
+    private string ExpandRedirectionTarget(string target)
+    {
+        var expanded = WordExpander.ExpandWord(target, _env);
+        return expanded.Count > 0 ? expanded[0] : target;
     }
 
     private int Visit(SubshellNode node)
@@ -232,7 +424,7 @@ public class AstEvaluator
 
     private int Visit(AssignmentNode node)
     {
-        string expanded = _env.Expand(node.Value);
+        string expanded = string.Join(" ", WordExpander.ExpandWord(node.RawExpandedValue, _env));
         _env.Set(node.VariableName, expanded);
         return 0;
     }
@@ -242,7 +434,7 @@ public class AstEvaluator
         var expanded = new List<string>();
         foreach (var val in node.Values)
         {
-            expanded.Add(_env.Expand(val));
+            expanded.AddRange(WordExpander.ExpandWord(val, _env));
         }
         _env.SetArray(node.VariableName, expanded);
         return 0;
@@ -275,26 +467,28 @@ public class AstEvaluator
     private int Visit(WhileNode node)
     {
         int lastExit = 0;
-        while (Visit(node.Condition) == 0)
+        _loopDepth++;
+        try
         {
-            if (_returnRequested) break;
-
-            lastExit = Visit(node.Body);
-
-            if (_continueRequested)
+            while (Visit(node.Condition) == 0)
             {
-                _continueDepth--;
-                _continueRequested = _continueDepth > 0;
-                if (_continueRequested) break;
-                continue;
-            }
+                if (_returnRequested) break;
 
-            if (_breakRequested)
-            {
-                _breakDepth--;
-                _breakRequested = _breakDepth > 0;
-                break;
+                lastExit = Visit(node.Body);
+
+                if (HandleContinue())
+                {
+                    if (_continueRequested) break;
+                    continue;
+                }
+
+                if (HandleBreak())
+                    break;
             }
+        }
+        finally
+        {
+            _loopDepth--;
         }
         return lastExit;
     }
@@ -302,26 +496,28 @@ public class AstEvaluator
     private int Visit(UntilNode node)
     {
         int lastExit = 0;
-        while (Visit(node.Condition) != 0)
+        _loopDepth++;
+        try
         {
-            if (_returnRequested) break;
-
-            lastExit = Visit(node.Body);
-
-            if (_continueRequested)
+            while (Visit(node.Condition) != 0)
             {
-                _continueDepth--;
-                _continueRequested = _continueDepth > 0;
-                if (_continueRequested) break;
-                continue;
-            }
+                if (_returnRequested) break;
 
-            if (_breakRequested)
-            {
-                _breakDepth--;
-                _breakRequested = _breakDepth > 0;
-                break;
+                lastExit = Visit(node.Body);
+
+                if (HandleContinue())
+                {
+                    if (_continueRequested) break;
+                    continue;
+                }
+
+                if (HandleBreak())
+                    break;
             }
+        }
+        finally
+        {
+            _loopDepth--;
         }
         return lastExit;
     }
@@ -331,66 +527,96 @@ public class AstEvaluator
         int lastExit = 0;
         
         var expandedValues = new List<string>();
-        string ifs = _env.Variables.ContainsKey("IFS") ? _env.Get("IFS") ?? "" : " \t\n";
-
-        foreach (var val in node.IteratorValues)
+        if (node.IteratorValues.Count == 0)
         {
-            if (val == "$@")
+            expandedValues.AddRange(_env.PositionalArguments);
+        }
+        else
+        {
+            foreach (var val in node.IteratorValues)
             {
-                for (int i = 1; i <= _env.PositionalArguments.Count; i++)
-                {
-                    expandedValues.Add(_env.PositionalArguments[i - 1]);
-                }
-            }
-            else if (val == "$*")
-            {
-                if (_env.PositionalArguments.Count > 0)
-                {
-                    string joined = string.Join(ifs.Length > 0 ? ifs[0].ToString() : " ", _env.PositionalArguments);
-                    expandedValues.AddRange(SplitWordsByIFS(joined, ifs));
-                }
-            }
-            else
-            {
-                var expanded = _env.Expand(val);
-                expandedValues.AddRange(SplitWordsByIFS(expanded, ifs));
+                expandedValues.AddRange(WordExpander.ExpandWord(val, _env));
             }
         }
 
-        foreach (var val in expandedValues)
+        _loopDepth++;
+        try
         {
-            if (_returnRequested) break;
-
-            _env.Set(node.VariableName, val);
-            lastExit = Visit(node.Body);
-
-            if (_continueRequested)
+            foreach (var val in expandedValues)
             {
-                _continueDepth--;
-                _continueRequested = _continueDepth > 0;
-                if (_continueRequested) break;
-                continue;
-            }
+                if (_returnRequested) break;
 
-            if (_breakRequested)
-            {
-                _breakDepth--;
-                _breakRequested = _breakDepth > 0;
-                break;
+                _env.Set(node.VariableName, val);
+                lastExit = Visit(node.Body);
+
+                if (HandleContinue())
+                {
+                    if (_continueRequested) break;
+                    continue;
+                }
+
+                if (HandleBreak())
+                    break;
             }
+        }
+        finally
+        {
+            _loopDepth--;
         }
         return lastExit;
     }
 
+    private bool TryGetFlowDepth(SimpleCommandNode cmd, out int depth)
+    {
+        depth = 1;
+
+        if (cmd.Args.Count == 0)
+            return true;
+
+        if (!int.TryParse(cmd.Args[0], out depth) || depth < 1)
+        {
+            Console.Error.WriteLine($"aursh: {cmd.Name}: {cmd.Args[0]}: numeric argument required");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool HandleBreak()
+    {
+        if (!_breakRequested)
+            return false;
+
+        _breakDepth--;
+        if (_breakDepth <= 0 || _loopDepth <= 1)
+            _breakRequested = false;
+
+        return true;
+    }
+
+    private bool HandleContinue()
+    {
+        if (!_continueRequested)
+            return false;
+
+        _continueDepth--;
+        if (_continueDepth <= 0 || _loopDepth <= 1)
+        {
+            _continueRequested = false;
+        }
+
+        return true;
+    }
+
     private int Visit(CaseNode node)
     {
-        string value = _env.Expand(node.Value);
+        string value = string.Join(" ", WordExpander.ExpandWord(node.Value, _env));
         foreach (var c in node.Cases)
         {
             bool match = false;
             foreach (var pat in c.Patterns)
             {
-                string expandedPat = _env.Expand(pat);
+                string expandedPat = string.Join(" ", WordExpander.ExpandWord(pat, _env, performGlobbing: false));
                 if (IsGlobMatch(value, expandedPat))
                 {
                     match = true;

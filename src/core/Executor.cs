@@ -109,8 +109,8 @@ public class Executor
             {
                 try
                 {
-                    string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
-                    string resolvedRaw = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].RawExpandedValue);
+                    string resolved = tokens[i].Value;
+                    string resolvedRaw = tokens[i].RawExpandedValue;
 
                     if (ContextReader.isContext(resolved))
                     {
@@ -122,9 +122,9 @@ public class Executor
                             ContextReader contextReader = new ContextReader();
                             resolved = contextReader.GetAttributeValue(contextName, attributeName);
                             resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
+                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                         }
                     }
-                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                 }
                 catch (Exception ex)
                 {
@@ -172,8 +172,8 @@ public class Executor
             {
                 try
                 {
-                    string resolved = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].Value);
-                    string resolvedRaw = Utility.ResolveSubCommand(_env, _workingDirectory, tokens[i].RawExpandedValue);
+                    string resolved = tokens[i].Value;
+                    string resolvedRaw = tokens[i].RawExpandedValue;
 
                     if (ContextReader.isContext(resolved))
                     {
@@ -184,10 +184,10 @@ public class Executor
                             string attributeName = resolved.Substring(colonIdx + 1);
                             ContextReader contextReader = new ContextReader();
                             resolved = contextReader.GetAttributeValue(contextName, attributeName);
-                            resolvedRaw = resolved;
+                            resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
+                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                         }
                     }
-                    tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
                 }
                 catch (Exception ex)
                 {
@@ -324,7 +324,7 @@ public class Executor
     }
 
 
-    private bool TryParseArithmeticOrAssignment(string input)
+    internal bool TryParseArithmeticOrAssignment(string input)
     {
         var arrayInitMatch = System.Text.RegularExpressions.Regex.Match(input, @"^([a-zA-Z_][a-zA-Z0-9_]*)=\((.*)\)$");
         if (arrayInitMatch.Success)
@@ -382,14 +382,14 @@ public class Executor
             string rightSide = arithMatch.Groups[3].Value;
 
             string currentValStr = _env.Get(varName) ?? "0";
-            if (!double.TryParse(currentValStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double currentVal)) currentVal = 0;
+            if (!long.TryParse(currentValStr, System.Globalization.NumberStyles.Integer | System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out long currentVal)) currentVal = 0;
 
             var rightLexer = new Lexer(rightSide, _env);
             string rightExpanded = string.Join("", rightLexer.Tokenize().Where(t => t.Type == TokenType.Word).Select(t => t.Value));
 
-            double rightVal = EvaluateMath(rightExpanded);
+            long rightVal = EvaluateMath(rightExpanded);
 
-            double result = currentVal;
+            long result = currentVal;
             switch (op)
             {
                 case "+=": result += rightVal; break;
@@ -413,7 +413,7 @@ public class Executor
 
             if (System.Text.RegularExpressions.Regex.IsMatch(rightExpanded, @"[\+\-\*/]"))
             {
-                double result = EvaluateMath(rightExpanded);
+                long result = EvaluateMath(rightExpanded);
                 _env.Set(varName, result.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
             else
@@ -426,7 +426,7 @@ public class Executor
         return false;
     }
 
-    private double EvaluateMath(string expression)
+    private long EvaluateMath(string expression)
     {
         return MathEvaluator.Evaluate(expression, _env);
     }

@@ -23,6 +23,7 @@ public class PlaylistUpdateRequest
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? CoverArt { get; set; }
+    public string? BannerArt { get; set; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
@@ -151,12 +152,21 @@ public static class MusicServer
             return Results.NotFound();
         });
 
+        app.MapDelete("/api/playlist/{playlistId}", (string playlistId) =>
+        {
+            if (userDataManager.DeletePlaylist(playlistId))
+            {
+                return Results.Json(userDataManager.Data, MusicJsonContext.Default.UserData);
+            }
+            return Results.NotFound();
+        });
+
         app.MapPut("/api/playlist/{playlistId}", async (string playlistId, HttpContext context) =>
         {
             var req = await System.Text.Json.JsonSerializer.DeserializeAsync(context.Request.Body, MusicJsonContext.Default.PlaylistUpdateRequest);
             if (req != null)
             {
-                if (userDataManager.UpdatePlaylist(playlistId, req.Name, req.Description, req.CoverArt))
+                if (userDataManager.UpdatePlaylist(playlistId, req.Name, req.Description, req.CoverArt, req.BannerArt))
                 {
                     return Results.Json(userDataManager.Data, MusicJsonContext.Default.UserData);
                 }

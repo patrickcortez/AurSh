@@ -6,7 +6,7 @@ namespace AurShell.Core;
 
 public static class MathEvaluator
 {
-    public static double Evaluate(string expression, ShellEnvironment env)
+    public static long Evaluate(string expression, ShellEnvironment env)
     {
         if (string.IsNullOrWhiteSpace(expression)) return 0;
 
@@ -72,17 +72,17 @@ public static class MathEvaluator
         return tokens;
     }
 
-    private static double ParseTernary(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParseTernary(List<string> tokens, ref int pos, ShellEnvironment env)
     {
-        double condition = ParseLogical(tokens, ref pos, env);
+        long condition = ParseLogical(tokens, ref pos, env);
         if (pos < tokens.Count && tokens[pos] == "?")
         {
             pos++;
-            double trueBranch = ParseTernary(tokens, ref pos, env);
+            long trueBranch = ParseTernary(tokens, ref pos, env);
             if (pos < tokens.Count && tokens[pos] == ":")
             {
                 pos++;
-                double falseBranch = ParseTernary(tokens, ref pos, env);
+                long falseBranch = ParseTernary(tokens, ref pos, env);
                 return condition != 0 ? trueBranch : falseBranch;
             }
             return condition != 0 ? trueBranch : 0;
@@ -90,21 +90,21 @@ public static class MathEvaluator
         return condition;
     }
 
-    private static double ParseLogical(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParseLogical(List<string> tokens, ref int pos, ShellEnvironment env)
     {
         return ParseComparison(tokens, ref pos, env);
     }
 
-    private static double ParseComparison(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParseComparison(List<string> tokens, ref int pos, ShellEnvironment env)
     {
-        double left = ParseAddSub(tokens, ref pos, env);
+        long left = ParseAddSub(tokens, ref pos, env);
         while (pos < tokens.Count)
         {
             string op = tokens[pos];
             if (op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=")
             {
                 pos++;
-                double right = ParseAddSub(tokens, ref pos, env);
+                long right = ParseAddSub(tokens, ref pos, env);
                 bool res = false;
                 if (op == "==") res = left == right;
                 else if (op == "!=") res = left != right;
@@ -119,16 +119,16 @@ public static class MathEvaluator
         return left;
     }
 
-    private static double ParseAddSub(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParseAddSub(List<string> tokens, ref int pos, ShellEnvironment env)
     {
-        double left = ParseMulDivMod(tokens, ref pos, env);
+        long left = ParseMulDivMod(tokens, ref pos, env);
         while (pos < tokens.Count)
         {
             string op = tokens[pos];
             if (op == "+" || op == "-")
             {
                 pos++;
-                double right = ParseMulDivMod(tokens, ref pos, env);
+                long right = ParseMulDivMod(tokens, ref pos, env);
                 if (op == "+") left += right;
                 else left -= right;
             }
@@ -137,16 +137,16 @@ public static class MathEvaluator
         return left;
     }
 
-    private static double ParseMulDivMod(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParseMulDivMod(List<string> tokens, ref int pos, ShellEnvironment env)
     {
-        double left = ParsePower(tokens, ref pos, env);
+        long left = ParsePower(tokens, ref pos, env);
         while (pos < tokens.Count)
         {
             string op = tokens[pos];
             if (op == "*" || op == "/" || op == "%")
             {
                 pos++;
-                double right = ParsePower(tokens, ref pos, env);
+                long right = ParsePower(tokens, ref pos, env);
                 if (op == "*") left *= right;
                 else if (op == "/") left = right != 0 ? left / right : 0;
                 else if (op == "%") left = right != 0 ? left % right : 0;
@@ -156,23 +156,23 @@ public static class MathEvaluator
         return left;
     }
 
-    private static double ParsePower(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParsePower(List<string> tokens, ref int pos, ShellEnvironment env)
     {
-        double left = ParsePrimary(tokens, ref pos, env);
+        long left = ParsePrimary(tokens, ref pos, env);
         while (pos < tokens.Count)
         {
             if (tokens[pos] == "**")
             {
                 pos++;
-                double right = ParsePrimary(tokens, ref pos, env);
-                left = Math.Pow(left, right);
+                long right = ParsePrimary(tokens, ref pos, env);
+                left = (long)Math.Pow(left, right);
             }
             else break;
         }
         return left;
     }
 
-    private static double ParsePrimary(List<string> tokens, ref int pos, ShellEnvironment env)
+    private static long ParsePrimary(List<string> tokens, ref int pos, ShellEnvironment env)
     {
         if (pos >= tokens.Count) return 0;
         string token = tokens[pos];
@@ -196,20 +196,21 @@ public static class MathEvaluator
         if (token == "(")
         {
             pos++;
-            double val = ParseTernary(tokens, ref pos, env);
+            long val = ParseTernary(tokens, ref pos, env);
             if (pos < tokens.Count && tokens[pos] == ")") pos++;
             return val;
         }
 
         pos++;
-        if (double.TryParse(token, NumberStyles.Any, CultureInfo.InvariantCulture, out double num))
+        if (long.TryParse(token, NumberStyles.Integer | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long num))
             return num;
 
         string varName = token.StartsWith("$") ? token.Substring(1) : token;
         string envVal = env.Get(varName) ?? "";
-        if (double.TryParse(envVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double envNum))
+        if (long.TryParse(envVal, NumberStyles.Integer | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long envNum))
             return envNum;
 
         return 0;
     }
 }
+

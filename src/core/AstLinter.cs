@@ -139,11 +139,15 @@ public class AstLinter
         }
 
         // Warn on unquoted variables that might undergo word splitting
-        foreach (var arg in cmd.Args)
+        for (int i = 0; i < cmd.Args.Count; i++)
         {
-            if (arg.Contains("$") && !arg.StartsWith("\"") && !arg.StartsWith("'"))
+            string arg = cmd.Args[i];
+            string rawArg = i < cmd.RawExpandedArgs.Count ? cmd.RawExpandedArgs[i] : arg;
+            string trimmedRaw = rawArg.TrimStart();
+
+            if (rawArg.Contains("$") && !trimmedRaw.StartsWith("\"") && !trimmedRaw.StartsWith("'"))
             {
-                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"Unquoted variable expansion in argument '{arg}' may be subject to word splitting.", Severity.Warning));
+                _warnings.Add(new LinterWarning(cmd.Line, cmd.Column, $"Unquoted variable expansion in argument '{rawArg}' may be subject to word splitting.", Severity.Warning));
             }
         }
     }

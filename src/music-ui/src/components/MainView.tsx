@@ -88,20 +88,22 @@ export const MainView: React.FC<MainViewProps> = ({
     const likedTracks = tracks.filter(t => userData?.likedTracks.includes(t.id));
     return (
       <div className="panel main-content">
-        <div className="main-header-bg" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,1))' }}></div>
-        <div style={{ position: 'relative', zIndex: 1, padding: '16px 24px' }}>
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-end', marginBottom: '24px' }}>
-            <div style={{ width: '232px', height: '232px', background: 'linear-gradient(135deg, #450af5, #c4efd9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 60px rgba(0,0,0,.5)' }}>
-              <svg viewBox="0 0 24 24" fill="#fff" height="80" width="80"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            </div>
-            <div>
-              <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 8px 0' }}>Playlist</p>
-              <h1 style={{ fontSize: '96px', margin: '0 0 16px 0', lineHeight: '1.1' }}>Liked Songs</h1>
-              <div style={{ fontSize: '14px' }}>
-                <span style={{ fontWeight: 'bold' }}>You</span> • {likedTracks.length} songs
-              </div>
+        <div style={{ 
+          background: 'linear-gradient(to bottom, #450af5, #121212)',
+          display: 'flex', gap: '24px', alignItems: 'flex-end', padding: '24px', height: '30vh', maxHeight: '400px', minHeight: '250px' 
+        }}>
+          <div style={{ width: '192px', height: '192px', background: 'linear-gradient(135deg, #450af5, #c4efd9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 60px rgba(0,0,0,.5)' }}>
+            <svg viewBox="0 0 24 24" fill="#fff" height="80" width="80"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </div>
+          <div>
+            <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 8px 0' }}>Playlist</p>
+            <h1 style={{ fontSize: 'clamp(32px, 5vw, 64px)', margin: '0 0 16px 0', lineHeight: '1.1' }}>Liked Songs</h1>
+            <div style={{ fontSize: '14px' }}>
+              <span style={{ fontWeight: 'bold' }}>You</span> • {likedTracks.length} songs
             </div>
           </div>
+        </div>
+        <div style={{ padding: '0 24px 24px 24px', zIndex: 1, position: 'relative' }}>
           {renderTrackList(likedTracks)}
         </div>
       </div>
@@ -115,9 +117,8 @@ export const MainView: React.FC<MainViewProps> = ({
     
     return (
       <div className="panel main-content">
-        <div className="main-header-bg"></div>
-        <div style={{ position: 'relative', zIndex: 1, padding: '16px 24px' }}>
-          <PlaylistHeader playlist={playlist} refreshUserData={refreshUserData} />
+        <PlaylistHeader playlist={playlist} refreshUserData={refreshUserData} />
+        <div style={{ padding: '0 24px 24px 24px', zIndex: 1, position: 'relative' }}>
           {renderTrackList(playlistTracks)}
         </div>
       </div>
@@ -130,12 +131,6 @@ export const MainView: React.FC<MainViewProps> = ({
       <div className="main-header-bg"></div>
       
       <div style={{ position: 'relative', zIndex: 1, padding: '16px 24px' }}>
-        <div className="chips-row" style={{ padding: '0 0 24px 0' }}>
-          <button className="chip" style={{ background: '#fff', color: '#000' }}>All</button>
-          <button className="chip">Music</button>
-          <button className="chip">Podcasts</button>
-        </div>
-
         <div className="recent-grid">
           {tracks.slice(0, 6).map((track, i) => (
             <div key={track.id} className="recent-item" style={{ position: 'relative', overflow: 'visible', zIndex: 1000 - i }}>

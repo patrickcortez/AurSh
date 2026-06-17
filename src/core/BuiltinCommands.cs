@@ -16,10 +16,26 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-music", "aursh-ssh", "local", "declare", "readonly", "help", "grm"
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-music", "aursh-ssh", "local", "declare", "readonly", "help", "grm", "[", "[["
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
+
+    public static void WriteOut(string text, bool newline = true)
+    {
+        var stream = AstEvaluator.OutStream;
+        if (stream != null)
+        {
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(text + (newline ? "\n" : ""));
+            stream.Write(bytes, 0, bytes.Length);
+            stream.Flush();
+        }
+        else
+        {
+            if (newline) Console.WriteLine(text);
+            else Console.Write(text);
+        }
+    }
 
     public static int Execute(SimpleCommandNode cmd, ShellEnvironment env, ref string workingDirectory)
     {
@@ -44,7 +60,7 @@ public static class BuiltinCommands
             "true" => 0,
             "false" => 1,
             "read" => ExecuteRead(cmd, env),
-            "test" => ExecuteTest(cmd),
+            "test" or "[" or "[[" => ExecuteTest(cmd),
             "return" => ExecuteReturn(cmd, env),
             "jobs" => ExecuteJobs(cmd, env),
             "fg" => ExecuteFg(cmd, env),
@@ -1464,16 +1480,16 @@ public static class BuiltinCommands
             output = InterpretEscapes(output);
 
         if (noNewline)
-            Console.Write(output);
+            WriteOut(output, false);
         else
-            Console.WriteLine(output);
+            WriteOut(output, true);
 
         return 0;
     }
 
     private static int ExecutePwd(string workingDirectory)
     {
-        Console.WriteLine(workingDirectory);
+        WriteOut(workingDirectory);
         return 0;
     }
 
@@ -1491,18 +1507,18 @@ public static class BuiltinCommands
         {
             if (IsBuiltin(name))
             {
-                Console.WriteLine($"{name} is a shell builtin");
+                WriteOut($"{name} is a shell builtin");
             }
             else if (env.GetAlias(name) != null)
             {
-                Console.WriteLine($"{name} is aliased to '{env.GetAlias(name)}'");
+                WriteOut($"{name} is aliased to '{env.GetAlias(name)}'");
             }
             else
             {
                 string? path = Pipeline.ResolveCommand(name, workingDirectory);
                 if (path != null)
                 {
-                    Console.WriteLine($"{name} is {path}");
+                    WriteOut($"{name} is {path}");
                 }
                 else
                 {
@@ -1632,6 +1648,13 @@ public static class BuiltinCommands
             return 0;
         }
 
+        if (cmd.Args[0] == "--")
+        {
+            env.PositionalArguments.Clear();
+            env.PositionalArguments.AddRange(cmd.Args.Skip(1));
+            return 0;
+        }
+
         for (int i = 0; i < cmd.Args.Count; i++)
         {
             string arg = cmd.Args[i];
@@ -1685,6 +1708,10 @@ public static class BuiltinCommands
         {
             args.RemoveAt(args.Count - 1);
         }
+        else if (cmd.Name == "[[" && args.Count > 0 && args.Last() == "]]")
+        {
+            args.RemoveAt(args.Count - 1);
+        }
 
         if (args.Count == 0)
             return 1;
@@ -1721,8 +1748,8 @@ public static class BuiltinCommands
 
             return op switch
             {
-                "=" or "==" => left == right ? 0 : 1,
-                "!=" => left != right ? 0 : 1,
+                "=" or "==" => cmd.Name == "[[" ? (System.Text.RegularExpressions.Regex.IsMatch(left, WordExpander.GlobSegmentToRegex(right)) ? 0 : 1) : (left == right ? 0 : 1),
+                "!=" => cmd.Name == "[[" ? (!System.Text.RegularExpressions.Regex.IsMatch(left, WordExpander.GlobSegmentToRegex(right)) ? 0 : 1) : (left != right ? 0 : 1),
                 "-eq" => ParseIntCompare(left, right, (a, b) => a == b),
                 "-ne" => ParseIntCompare(left, right, (a, b) => a != b),
                 "-lt" => ParseIntCompare(left, right, (a, b) => a < b),

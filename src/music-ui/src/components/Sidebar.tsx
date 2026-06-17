@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import type { Track, UserData, Playlist } from '../types';
 import { FALLBACK_COVER } from '../constants';
 import { EditPlaylistModal } from './EditPlaylistModal';
+import { SettingsModal } from './SettingsModal';
 
 interface SidebarProps {
   tracks: Track[];
@@ -16,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreatePlaylist = async () => {
@@ -25,6 +27,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
     try {
       await fetch('/api/playlist', { method: 'POST', body: name });
       refreshUserData();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeletePlaylist = async (pl: Playlist) => {
+    if (!confirm(`Are you sure you want to delete '${pl.name}'?`)) return;
+    try {
+      await fetch(`/api/playlist/${pl.id}`, { method: 'DELETE' });
+      refreshUserData();
+      // Optionally could setView('Home') if currently on this playlist, but parent can handle if needed.
     } catch (e) { console.error(e); }
   };
 
@@ -63,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
           )}
           <input type="file" multiple accept="audio/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleUpload} />
           
-          <button className="circle-btn" style={{ background: 'transparent' }}>
+          <button className="circle-btn" style={{ background: 'transparent' }} onClick={() => setShowSettings(true)}>
             <svg viewBox="0 0 16 16" fill="currentColor" height="16" width="16"><path d="M7.19 1A1.449 1.449 0 018.479.217l1.011 1.752a1.449 1.449 0 001.282.72h2.025a1.45 1.45 0 011.45 1.45v2.025a1.45 1.45 0 00.72 1.282l1.752 1.011a1.45 1.45 0 010 2.518l-1.752 1.011a1.45 1.45 0 00-.72 1.282v2.025a1.45 1.45 0 01-1.45 1.45h-2.025a1.45 1.45 0 00-1.282.72l-1.011 1.752a1.45 1.45 0 01-2.518 0l-1.011-1.752a1.45 1.45 0 00-1.282-.72H3.227a1.45 1.45 0 01-1.45-1.45v-2.025a1.45 1.45 0 00-.72-1.282L-.25 8.479a1.45 1.45 0 010-2.518l1.752-1.011a1.45 1.45 0 00.72-1.282V1.667A1.45 1.45 0 013.673.217h2.025a1.45 1.45 0 001.282-.72L8 .25l-.81.75zM11.5 8a3.5 3.5 0 10-7 0 3.5 3.5 0 007 0zm-1.5 0a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
           </button>
         </div>
@@ -116,6 +127,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
                   >
                     Edit details
                   </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeletePlaylist(pl); setActiveMenu(null); }} 
+                    style={{ background: 'transparent', color: '#fff', border: 'none', padding: '12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', width: '100%' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#3E3E3E'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Delete playlist
+                  </button>
                 </div>
               )}
             </div>
@@ -146,6 +165,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
           onSave={refreshUserData}
         />
       )}
+
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        refreshTracks={refreshTracks}
+      />
     </div>
   );
 };

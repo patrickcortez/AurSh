@@ -12,6 +12,7 @@ public class Playlist
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public string CoverArt { get; set; } = "";
+    public string BannerArt { get; set; } = "";
     public List<string> TrackIds { get; set; } = new List<string>();
 }
 
@@ -104,7 +105,7 @@ public class UserDataManager
         return false;
     }
 
-    public bool UpdatePlaylist(string playlistId, string name, string description, string coverArt)
+    public bool UpdatePlaylist(string playlistId, string name, string description, string coverArt, string bannerArt)
     {
         var playlist = Data.Playlists.Find(p => p.Id == playlistId);
         if (playlist != null)
@@ -112,6 +113,19 @@ public class UserDataManager
             playlist.Name = name ?? playlist.Name;
             playlist.Description = description ?? playlist.Description;
             playlist.CoverArt = coverArt ?? playlist.CoverArt;
+            playlist.BannerArt = bannerArt ?? playlist.BannerArt;
+            SaveData();
+            return true;
+        }
+        return false;
+    }
+
+    public bool DeletePlaylist(string playlistId)
+    {
+        var playlist = Data.Playlists.Find(p => p.Id == playlistId);
+        if (playlist != null)
+        {
+            Data.Playlists.Remove(playlist);
             SaveData();
             return true;
         }

@@ -1,4 +1,5 @@
 import React from 'react';
+import aurshIcon from '../assets/AurSh-Music-Icon.svg';
 
 interface TopBarProps {
   searchQuery: string;
@@ -9,9 +10,10 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({ searchQuery, setSearchQuery, goHome }) => {
   return (
     <div className="top-bar">
-      <div className="top-bar-left">
+      <div className="top-bar-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <img src={aurshIcon} alt="AurSh-Music" style={{ height: '32px', width: '32px' }} />
+        <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>AurSh-Music</span>
       </div>
-      
       <div className="top-bar-center">
         <button className="circle-btn" style={{ background: '#282828', color: '#fff', cursor: 'pointer' }} onClick={goHome} title="Home">
           <svg viewBox="0 0 24 24" fill="currentColor" height="24" width="24"><path d="M12.5 3.247a1 1 0 00-1 0L4 7.577V20h4.5v-6a1 1 0 011-1h5a1 1 0 011 1v6H20V7.577l-7.5-4.33z"/></svg>

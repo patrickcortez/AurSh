@@ -13,43 +13,78 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({ playlist, 
   const [name, setName] = useState(playlist.name);
   const [desc, setDesc] = useState(playlist.description || "");
   const [coverArt, setCoverArt] = useState(playlist.coverArt || "");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bannerArt, setBannerArt] = useState(playlist.bannerArt || "");
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setName(playlist.name);
       setDesc(playlist.description || "");
       setCoverArt(playlist.coverArt || "");
+      setBannerArt(playlist.bannerArt || "");
     }
   }, [isOpen, playlist]);
 
   if (!isOpen) return null;
 
+  const resizeImage = (file: File, maxWidth: number, maxHeight: number, callback: (base64: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (!ev.target?.result) return;
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          callback(canvas.toDataURL('image/jpeg', 0.85)); // Use jpeg for smaller size
+        } else {
+          callback(ev.target?.result as string); // fallback
+        }
+      };
+      img.src = ev.target.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async () => {
     try {
-      await fetch(`/api/playlist/${playlist.id}`, {
+      const res = await fetch(`/api/playlist/${playlist.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: desc, coverArt })
+        body: JSON.stringify({ name, description: desc, coverArt, bannerArt })
       });
+      if (!res.ok) {
+        alert("Failed to save playlist. The image might be too large.");
+        return;
+      }
       onSave();
       onClose();
     } catch (e) {
       console.error(e);
+      alert("Network error occurred while saving.");
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    resizeImage(file, 512, 512, setCoverArt);
+  };
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (ev.target?.result) {
-        setCoverArt(ev.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resizeImage(file, 1920, 1080, setBannerArt);
   };
 
   return (
@@ -68,10 +103,26 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({ playlist, 
           </button>
         </div>
 
+        <div 
+          style={{ width: '100%', height: '120px', cursor: 'pointer', position: 'relative', background: '#3E3E3E', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}
+          onClick={() => bannerInputRef.current?.click()}
+        >
+          {bannerArt ? (
+            <img src={bannerArt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Playlist Banner" />
+          ) : (
+            <span style={{ color: 'var(--text-secondary)' }}>Add an optional background banner</span>
+          )}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', flexDirection: 'column', opacity: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+            <svg viewBox="0 0 24 24" fill="currentColor" height="32" width="32" style={{ marginBottom: '8px' }}><path d="M17.39 5.86l1.75 1.75L6 20.75H4.25V19l13.14-13.14zm0-2.83a2.5 2.5 0 00-1.77.73L2.5 16.88V23h6.12L21.74 9.88a2.5 2.5 0 000-3.53l-1.77-1.77a2.5 2.5 0 00-2.58-.49z"/></svg>
+            Choose banner
+          </div>
+          <input type="file" accept="image/*" style={{ display: 'none' }} ref={bannerInputRef} onChange={handleBannerUpload} />
+        </div>
+
         <div style={{ display: 'flex', gap: '16px' }}>
           <div 
-            style={{ width: '180px', height: '180px', cursor: 'pointer', position: 'relative', background: '#3E3E3E', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', overflow: 'hidden' }}
-            onClick={() => fileInputRef.current?.click()}
+            style={{ width: '180px', height: '180px', cursor: 'pointer', position: 'relative', background: '#3E3E3E', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}
+            onClick={() => coverInputRef.current?.click()}
           >
             <img 
               src={coverArt || FALLBACK_COVER} 
@@ -80,9 +131,9 @@ export const EditPlaylistModal: React.FC<EditPlaylistModalProps> = ({ playlist, 
             />
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px', flexDirection: 'column', opacity: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
               <svg viewBox="0 0 24 24" fill="currentColor" height="48" width="48" style={{ marginBottom: '8px' }}><path d="M17.39 5.86l1.75 1.75L6 20.75H4.25V19l13.14-13.14zm0-2.83a2.5 2.5 0 00-1.77.73L2.5 16.88V23h6.12L21.74 9.88a2.5 2.5 0 000-3.53l-1.77-1.77a2.5 2.5 0 00-2.58-.49z"/></svg>
-              Choose photo
+              Choose cover
             </div>
-            <input type="file" accept="image/*" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImageUpload} />
+            <input type="file" accept="image/*" style={{ display: 'none' }} ref={coverInputRef} onChange={handleCoverUpload} />
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>

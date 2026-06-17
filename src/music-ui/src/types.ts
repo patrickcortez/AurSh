@@ -25,6 +25,7 @@ export interface Playlist {
   name: string;
   description: string;
   coverArt: string;
+  bannerArt?: string;
   trackIds: string[];
 }
 

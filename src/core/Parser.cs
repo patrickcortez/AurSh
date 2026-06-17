@@ -37,6 +37,7 @@ public class SimpleCommandNode : ICommandNode
     public int Column { get; set; }
     public string Name { get; set; } = "";
     public string RawExpandedName { get; set; } = "";
+    public List<AssignmentNode> PrefixAssignments { get; } = new();
     public List<string> Args { get; } = new();
     public List<string> RawExpandedArgs { get; } = new();
     public List<Redirection> Redirections { get; } = new();
@@ -238,6 +239,7 @@ public class Parser
                 if (Current.Type != TokenType.EOF && !stopWords.Contains(Current.Value))
                 {
                     Console.Error.WriteLine($"aursh: syntax error near unexpected token `{Current.Value}`");
+                    Advance(); // prevent infinite loops
                     break;
                 }
                 SkipNewlines();
@@ -328,16 +330,25 @@ public class Parser
             return ParseFunction();
         }
 
-        if (Current.Type == TokenType.Word && Current.Value.Contains("=") && !Current.WasQuoted)
+        if (Current.Type == TokenType.Word && Current.Value.Contains("="))
         {
-            if (IsValidAssignment(Current.Value))
+            // Only reject if the variable name part was quoted (e.g., "v1"=Hello)
+            string raw = Current.RawExpandedValue ?? Current.Value;
+            int rawEq = raw.IndexOf('=');
+            if (rawEq > 0 && !raw.Substring(0, rawEq).Contains("\"") && !raw.Substring(0, rawEq).Contains("'"))
             {
-                int equalsIdx = Current.Value.IndexOf('=');
-                string name = Current.Value.Substring(0, equalsIdx);
-                if (Current.Value.EndsWith("=") && Next.Type == TokenType.LeftParen)
-                    return ParseArrayAssignment(name);
-                else
-                    return ParseAssignment(name);
+                if (IsValidAssignment(Current.Value))
+                {
+                    if (StartsAssignmentPrefixedCommand())
+                        return ParseSimpleCommand();
+
+                    int equalsIdx = Current.Value.IndexOf('=');
+                    string name = Current.Value.Substring(0, equalsIdx);
+                    if (Current.Value.EndsWith("=") && Next.Type == TokenType.LeftParen)
+                        return ParseArrayAssignment(name);
+                    else
+                        return ParseAssignment(name);
+                }
             }
         }
 
@@ -351,6 +362,13 @@ public class Parser
 
         while (Current.Type == TokenType.Word)
         {
+            if (!hasContent && IsValidAssignment(Current.Value) && StartsAssignmentPrefixedCommand())
+            {
+                cmd.PrefixAssignments.Add(CreateAssignmentFromCurrent());
+                Advance();
+                continue;
+            }
+
             if (!hasContent)
             {
                 cmd.Name = Current.Value;
@@ -379,13 +397,37 @@ public class Parser
         return hasContent ? cmd : null;
     }
 
+    private bool StartsAssignmentPrefixedCommand()
+    {
+        int lookahead = 0;
+        while (LookAhead(lookahead).Type == TokenType.Word && IsValidAssignment(LookAhead(lookahead).Value))
+            lookahead++;
+
+        return LookAhead(lookahead).Type == TokenType.Word;
+    }
+
+    private AssignmentNode CreateAssignmentFromCurrent()
+    {
+        var node = InitNode(new AssignmentNode());
+        int equalsIdx = Current.Value.IndexOf('=');
+        node.VariableName = Current.Value.Substring(0, equalsIdx);
+        node.Value = Current.Value.Substring(equalsIdx + 1);
+
+        int rawEqualsIdx = Current.RawExpandedValue.IndexOf('=');
+        node.RawExpandedValue = rawEqualsIdx >= 0
+            ? Current.RawExpandedValue.Substring(rawEqualsIdx + 1)
+            : node.Value;
+
+        return node;
+    }
+
     private IfNode? ParseIf()
     {
         var node = InitNode(new IfNode());
         Advance(); // consume 'if'
         
         node.Condition = ParseListUntilKeyword("then");
-        if (Current.Type == TokenType.Word && Current.Value == "then" && !Current.WasQuoted) Advance();
+        ExpectKeyword("then", node.Line, node.Column);
         
         node.ThenBlock = ParseListUntilKeyword("elif", "else", "fi");
         
@@ -393,7 +435,7 @@ public class Parser
         {
             Advance();
             var elifCond = ParseListUntilKeyword("then");
-            if (Current.Type == TokenType.Word && Current.Value == "then" && !Current.WasQuoted) Advance();
+            ExpectKeyword("then", node.Line, node.Column);
             var elifBlock = ParseListUntilKeyword("elif", "else", "fi");
             node.ElifBlocks.Add((elifCond, elifBlock));
         }
@@ -404,10 +446,7 @@ public class Parser
             node.ElseBlock = ParseListUntilKeyword("fi");
         }
 
-        if (Current.Type == TokenType.Word && Current.Value == "fi" && !Current.WasQuoted)
-        {
-            Advance();
-        }
+        ExpectKeyword("fi", node.Line, node.Column);
 
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
@@ -418,7 +457,7 @@ public class Parser
         var node = InitNode(new SubshellNode());
         Advance(); // consume '('
         node.Body = ParseListUntilKeyword(")");
-        if (Current.Type == TokenType.RightParen) Advance();
+        ExpectToken(TokenType.RightParen, ")", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -517,9 +556,9 @@ public class Parser
         var node = InitNode(new WhileNode());
         Advance(); // consume 'while'
         node.Condition = ParseListUntilKeyword("do");
-        if (Current.Type == TokenType.Word && Current.Value == "do" && !Current.WasQuoted) Advance();
+        ExpectKeyword("do", node.Line, node.Column);
         node.Body = ParseListUntilKeyword("done");
-        if (Current.Type == TokenType.Word && Current.Value == "done" && !Current.WasQuoted) Advance();
+        ExpectKeyword("done", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -529,9 +568,9 @@ public class Parser
         var node = InitNode(new UntilNode());
         Advance(); // consume 'until'
         node.Condition = ParseListUntilKeyword("do");
-        if (Current.Type == TokenType.Word && Current.Value == "do" && !Current.WasQuoted) Advance();
+        ExpectKeyword("do", node.Line, node.Column);
         node.Body = ParseListUntilKeyword("done");
-        if (Current.Type == TokenType.Word && Current.Value == "done" && !Current.WasQuoted) Advance();
+        ExpectKeyword("done", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -563,9 +602,9 @@ public class Parser
             
         SkipNewlines();
 
-        if (Current.Type == TokenType.Word && Current.Value == "do" && !Current.WasQuoted) Advance();
+        ExpectKeyword("do", node.Line, node.Column);
         node.Body = ParseListUntilKeyword("done");
-        if (Current.Type == TokenType.Word && Current.Value == "done" && !Current.WasQuoted) Advance();
+        ExpectKeyword("done", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -603,7 +642,7 @@ public class Parser
                 string last = patterns.Last();
                 if (last.EndsWith(")"))
                     patterns[patterns.Count - 1] = last.Substring(0, last.Length - 1);
-                else if (Current.Type == TokenType.Word && Current.Value == ")")
+                else if (Current.Type == TokenType.RightParen || (Current.Type == TokenType.Word && Current.Value == ")"))
                     Advance();
             }
 
@@ -618,7 +657,7 @@ public class Parser
             SkipNewlines();
         }
         
-        if (Current.Type == TokenType.Word && Current.Value == "esac" && !Current.WasQuoted) Advance();
+        ExpectKeyword("esac", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -628,7 +667,7 @@ public class Parser
         var node = InitNode(new BlockNode());
         Advance(); // consume '{'
         node.Body = ParseListUntilKeyword("}");
-        if (Current.Type == TokenType.Word && Current.Value == "}" && !Current.WasQuoted) Advance();
+        ExpectKeyword("}", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -651,6 +690,12 @@ public class Parser
 
             target = Current.Value;
             Advance();
+
+            if (redirectType == TokenType.HereDoc && Current.Type == TokenType.HereDocText)
+            {
+                target = Current.Value;
+                Advance();
+            }
         }
 
         RedirectType type = redirectType switch
@@ -683,6 +728,34 @@ public class Parser
     {
         while (_pos < _tokens.Count && _tokens[_pos].Type == TokenType.Newline)
             _pos++;
+    }
+
+    private void ExpectKeyword(string keyword, int ownerLine, int ownerColumn)
+    {
+        if (Current.Type == TokenType.Word && Current.Value == keyword && !Current.WasQuoted)
+        {
+            Advance();
+            return;
+        }
+
+        ThrowMissing(keyword, ownerLine, ownerColumn);
+    }
+
+    private void ExpectToken(TokenType type, string display, int ownerLine, int ownerColumn)
+    {
+        if (Current.Type == type)
+        {
+            Advance();
+            return;
+        }
+
+        ThrowMissing(display, ownerLine, ownerColumn);
+    }
+
+    private void ThrowMissing(string expected, int ownerLine, int ownerColumn)
+    {
+        string found = Current.Type == TokenType.EOF ? "end of input" : $"`{Current.Value}`";
+        throw new InvalidOperationException($"expected `{expected}` before {found} while parsing construct started at line {ownerLine}, column {ownerColumn}");
     }
 
     private Token Current => _pos < _tokens.Count ? _tokens[_pos] : new Token(TokenType.EOF, "", 0, 0);

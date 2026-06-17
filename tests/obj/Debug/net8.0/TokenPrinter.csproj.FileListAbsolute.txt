@@ -1,0 +1,6 @@
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.csproj.AssemblyReference.cache
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.AssemblyInfoInputs.cache
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.AssemblyInfo.cs
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.csproj.CoreCompileInputs.cache
+C:\Users\Cortez\Documents\Projects\AurSh\tests\obj\Debug\net8.0\TokenPrinter.sourcelink.json

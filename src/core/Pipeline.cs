@@ -61,7 +61,9 @@ public static class Pipeline
             {
                 foreach (var redir in cmd.Redirections)
                 {
-                    string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
+                    string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc 
+                        ? redir.Target 
+                        : ResolveRedirectionTarget(redir.Target, workingDirectory);
                     switch (redir.Type)
                     {
                         case RedirectType.Out:
@@ -295,7 +297,9 @@ public static class Pipeline
 
         foreach (var redir in cmd.Redirections)
         {
-            string target = ResolveRedirectionTarget(redir.Target, workingDirectory);
+            string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc 
+                ? redir.Target 
+                : ResolveRedirectionTarget(redir.Target, workingDirectory);
             switch (redir.Type)
             {
                 case RedirectType.Out:
@@ -316,6 +320,7 @@ public static class Pipeline
                     psi.RedirectStandardInput = true;
                     redirectStdin = true;
                     break;
+                case RedirectType.HereDoc:
                 case RedirectType.HereString:
                     stdinFile = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target + "\n"));
                     psi.RedirectStandardInput = true;

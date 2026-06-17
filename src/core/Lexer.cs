@@ -20,6 +20,7 @@ public enum TokenType
     RedirectErrToOut,
     HereDoc,
     HereString,
+    HereDocText,
     Newline,
     LeftParen,
     RightParen,
@@ -88,6 +89,7 @@ public class Lexer
         var tokens = new List<Token>();
         bool isFirstWord = true;
         HashSet<string> expandedAliases = new HashSet<string>();
+        var pendingHereDocs = new Queue<(string delimiter, bool stripTabs, int insertIndex)>();
 
         while (_pos < _input.Length)
         {
@@ -110,6 +112,37 @@ public class Lexer
             {
                 tokens.Add(CreateToken(TokenType.Newline, "\n", startPos));
                 _pos++;
+
+                // Process pending HereDocs before continuing to the next line of commands
+                int insertedTokens = 0;
+                while (pendingHereDocs.Count > 0 && _pos < _input.Length)
+                {
+                    var hereDoc = pendingHereDocs.Dequeue();
+                    var sb = new StringBuilder();
+                    int hereDocStartPos = _pos;
+
+                    while (_pos < _input.Length)
+                    {
+                        int lineStart = _pos;
+                        while (_pos < _input.Length && _input[_pos] != '\n') _pos++;
+                        
+                        string rawLine = _input.Substring(lineStart, _pos - lineStart);
+                        string checkLine = hereDoc.stripTabs ? rawLine.TrimStart('\t') : rawLine;
+                        
+                        if (checkLine == hereDoc.delimiter)
+                        {
+                            if (_pos < _input.Length && _input[_pos] == '\n') _pos++;
+                            break;
+                        }
+                        
+                        sb.AppendLine(rawLine);
+                        if (_pos < _input.Length && _input[_pos] == '\n') _pos++;
+                    }
+
+                    tokens.Insert(hereDoc.insertIndex + insertedTokens, CreateToken(TokenType.HereDocText, sb.ToString(), hereDocStartPos));
+                    insertedTokens++;
+                }
+
                 isFirstWord = true;
                 expandedAliases.Clear();
                 continue;
@@ -188,45 +221,59 @@ public class Lexer
 
             if (c == '>')
             {
-                _pos++;
-                if (_pos < _input.Length && _input[_pos] == '>')
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
-                    tokens.Add(CreateToken(TokenType.RedirectAppend, ">>", startPos));
-                    _pos++;
+                    // Fall through to ReadWord for process substitution >(...)
                 }
                 else
                 {
-                    tokens.Add(CreateToken(TokenType.RedirectOut, ">", startPos));
+                    _pos++;
+                    if (_pos < _input.Length && _input[_pos] == '>')
+                    {
+                        tokens.Add(CreateToken(TokenType.RedirectAppend, ">>", startPos));
+                        _pos++;
+                    }
+                    else
+                    {
+                        tokens.Add(CreateToken(TokenType.RedirectOut, ">", startPos));
+                    }
+                    continue;
                 }
-                continue;
             }
 
             if (c == '<')
             {
-                _pos++;
-                if (_pos < _input.Length && _input[_pos] == '<')
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
+                {
+                    // Fall through to ReadWord for process substitution <(...)
+                }
+                else
                 {
                     _pos++;
                     if (_pos < _input.Length && _input[_pos] == '<')
                     {
                         _pos++;
-                        tokens.Add(CreateToken(TokenType.HereString, "<<<", startPos));
-                    }
-                    else if (_pos < _input.Length && _input[_pos] == '-')
-                    {
-                        _pos++;
-                        tokens.Add(CreateToken(TokenType.HereDoc, "<<-", startPos));
+                        if (_pos < _input.Length && _input[_pos] == '<')
+                        {
+                            _pos++;
+                            tokens.Add(CreateToken(TokenType.HereString, "<<<", startPos));
+                        }
+                        else if (_pos < _input.Length && _input[_pos] == '-')
+                        {
+                            _pos++;
+                            tokens.Add(CreateToken(TokenType.HereDoc, "<<-", startPos));
+                        }
+                        else
+                        {
+                            tokens.Add(CreateToken(TokenType.HereDoc, "<<", startPos));
+                        }
                     }
                     else
                     {
-                        tokens.Add(CreateToken(TokenType.HereDoc, "<<", startPos));
+                        tokens.Add(CreateToken(TokenType.RedirectIn, "<", startPos));
                     }
+                    continue;
                 }
-                else
-                {
-                    tokens.Add(CreateToken(TokenType.RedirectIn, "<", startPos));
-                }
-                continue;
             }
 
             if (c == '(')
@@ -263,6 +310,17 @@ public class Lexer
             }
 
             tokens.Add(wordToken);
+
+            if (tokens.Count >= 2)
+            {
+                var prevToken = tokens[tokens.Count - 2];
+                if (prevToken.Type == TokenType.HereDoc)
+                {
+                    bool stripTabs = prevToken.Value == "<<-";
+                    pendingHereDocs.Enqueue((wordToken.Value, stripTabs, tokens.Count));
+                }
+            }
+
             isFirstWord = false;
         }
 
@@ -290,10 +348,59 @@ public class Lexer
             if (char.IsWhiteSpace(c) && c != '\n')
                 break;
 
-            if (c == '\n' || c == ';' || c == '|' || c == '<' || c == '(' || c == ')')
-                break;
+            if ("?*+@!".Contains(c) && _pos + 1 < _input.Length && _input[_pos + 1] == '(')
+            {
+                sb.Append(c);
+                sb.Append('(');
+                rawSb.Append(c);
+                rawSb.Append('(');
+                _pos += 2;
+                
+                int depth = 1;
+                while (_pos < _input.Length && depth > 0)
+                {
+                    char gc = _input[_pos];
+                    if (gc == '(') depth++;
+                    else if (gc == ')') depth--;
+                    
+                    sb.Append(gc);
+                    rawSb.Append(gc);
+                    _pos++;
+                }
+                wasSingleQuoted = false;
+                continue;
+            }
 
-            if (c == '>')
+            if (c == '<' || c == '>')
+            {
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
+                {
+                    sb.Append(c);
+                    sb.Append('(');
+                    rawSb.Append(c);
+                    rawSb.Append('(');
+                    _pos += 2;
+                    int depth = 1;
+                    while (_pos < _input.Length && depth > 0)
+                    {
+                        char gc = _input[_pos];
+                        if (gc == '(') depth++;
+                        else if (gc == ')') depth--;
+                        
+                        sb.Append(gc);
+                        rawSb.Append(gc);
+                        _pos++;
+                    }
+                    wasSingleQuoted = false;
+                    continue;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (c == '\n' || c == ';' || c == '|' || c == '(' || c == ')')
                 break;
 
             if (c == '&')
@@ -591,28 +698,28 @@ public class Lexer
 
         char c = _input[_pos];
 
-        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && c == '_')
-        {
-            _pos++;
-            return "$_";
-        }
-
         if (c == '?')
         {
             _pos++;
-            return _env.LastExitCode.ToString();
+            return "$?";
         }
 
         if (c == '$')
         {
             _pos++;
-            return _env.ShellPid.ToString();
+            return "$$";
         }
 
         if (c == '!')
         {
             _pos++;
-            return _env.BackgroundPid.ToString();
+            return "$!";
+        }
+
+        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && c == '_')
+        {
+            _pos++;
+            return "$_";
         }
 
         if (c == '{')
@@ -630,7 +737,7 @@ public class Lexer
             string content = _input.Substring(braceStart, _pos - braceStart);
             if (_pos < _input.Length) _pos++;
 
-            return ExpandBracedContent(content);
+            return "${" + content + "}";
         }
 
         var nameBuf = new StringBuilder();
@@ -643,239 +750,21 @@ public class Lexer
         if (_pos < _input.Length && _input[_pos] == '.' && nameBuf.Length > 0)
         {
             string objName = nameBuf.ToString();
-            if (_env.Objects.ContainsKey(objName))
+            _pos++;
+            var fieldBuf = new StringBuilder();
+            while (_pos < _input.Length && (char.IsLetterOrDigit(_input[_pos]) || _input[_pos] == '_'))
             {
+                fieldBuf.Append(_input[_pos]);
                 _pos++;
-                var fieldBuf = new StringBuilder();
-                while (_pos < _input.Length && (char.IsLetterOrDigit(_input[_pos]) || _input[_pos] == '_'))
-                {
-                    fieldBuf.Append(_input[_pos]);
-                    _pos++;
-                }
-                return _env.GetObjectField(objName, fieldBuf.ToString()) ?? "";
             }
-
-            if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
-                return "$" + objName;
+            return "$" + objName + "." + fieldBuf.ToString();
         }
 
         string name = nameBuf.ToString();
         if (string.IsNullOrEmpty(name))
             return "$";
 
-        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
-        {
-            if (_pos < _input.Length && _input[_pos] == ':' && IsPowerShellScopeName(name))
-                return "$" + name;
-
-            if (IsPowerShellAutomaticVariable(name) && _env.Get(name) == null)
-                return "$" + name;
-        }
-
-        return _env.Get(name) ?? "";
-    }
-
-    private string ExpandBracedContent(string content)
-    {
-        if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && IsPowerShellBracedVariable(content))
-            return "${" + content + "}";
-
-        if (content.StartsWith("#"))
-        {
-            string varName = content.Substring(1);
-            if (varName.EndsWith("[@]") || varName.EndsWith("[*]"))
-            {
-                string arrName = varName.Substring(0, varName.Length - 3);
-                int length = _env.GetArrayLength(arrName);
-                if (length == 0 && _env.GetAssocArray(arrName) != null)
-                    length = _env.GetAssocArray(arrName)!.Count;
-                return length.ToString();
-            }
-            string? v = _env.Get(varName);
-            return v != null ? v.Length.ToString() : "0";
-        }
-
-        int colonDash = content.IndexOf(":-", StringComparison.Ordinal);
-        if (colonDash >= 0)
-        {
-            string name = content.Substring(0, colonDash);
-            string def = content.Substring(colonDash + 2);
-            string? val = _env.Get(name);
-            return string.IsNullOrEmpty(val) ? _env.Expand(def) : val;
-        }
-
-        int colonEquals = content.IndexOf(":=", StringComparison.Ordinal);
-        if (colonEquals >= 0)
-        {
-            string name = content.Substring(0, colonEquals);
-            string def = content.Substring(colonEquals + 2);
-            string? val = _env.Get(name);
-            if (string.IsNullOrEmpty(val))
-            {
-                val = _env.Expand(def);
-                _env.Set(name, val);
-            }
-            return val;
-        }
-
-        int colonPlus = content.IndexOf(":+", StringComparison.Ordinal);
-        if (colonPlus >= 0)
-        {
-            string name = content.Substring(0, colonPlus);
-            string alt = content.Substring(colonPlus + 2);
-            string? val = _env.Get(name);
-            return !string.IsNullOrEmpty(val) ? _env.Expand(alt) : "";
-        }
-
-        int colonQ = content.IndexOf(":?", StringComparison.Ordinal);
-        if (colonQ >= 0)
-        {
-            string name = content.Substring(0, colonQ);
-            string err = content.Substring(colonQ + 2);
-            string? val = _env.Get(name);
-            if (string.IsNullOrEmpty(val))
-            {
-                Console.Error.WriteLine($"aursh: {name}: {(string.IsNullOrEmpty(err) ? "parameter not set" : err)}");
-                return "";
-            }
-            return val;
-        }
-
-        int dotIdx = content.IndexOf('.');
-        if (dotIdx > 0)
-        {
-            string objName = content.Substring(0, dotIdx);
-            string field = content.Substring(dotIdx + 1);
-            return _env.GetObjectField(objName, field) ?? "";
-        }
-
-        // String Manipulation Expansions
-        if (content.Contains("//"))
-        {
-            var parts = content.Split(new[] { "//" }, 2, StringSplitOptions.None);
-            string name = parts[0];
-            var subParts = parts[1].Split(new[] { '/' }, 2);
-            string pattern = subParts[0];
-            string replacement = subParts.Length > 1 ? subParts[1] : "";
-            string? val = _env.Get(name) ?? "";
-            return Regex.Replace(val, GlobToRegex(pattern, true), replacement);
-        }
-        else if (content.Contains("/"))
-        {
-            var parts = content.Split(new[] { '/' }, 3);
-            string name = parts[0];
-            string pattern = parts[1];
-            string replacement = parts.Length > 2 ? parts[2] : "";
-            string? val = _env.Get(name) ?? "";
-            return new Regex(GlobToRegex(pattern, true)).Replace(val, replacement, 1);
-        }
-
-        if (content.Contains("##"))
-        {
-            var parts = content.Split(new[] { "##" }, 2, StringSplitOptions.None);
-            string name = parts[0];
-            string pattern = parts[1];
-            string? val = _env.Get(name) ?? "";
-            return Regex.Replace(val, "^" + GlobToRegex(pattern, true), "");
-        }
-        else if (content.Contains("#"))
-        {
-            var parts = content.Split(new[] { '#' }, 2);
-            string name = parts[0];
-            string pattern = parts[1];
-            string? val = _env.Get(name) ?? "";
-            return Regex.Replace(val, "^" + GlobToRegex(pattern, false), "");
-        }
-
-        if (content.Contains("%%"))
-        {
-            var parts = content.Split(new[] { "%%" }, 2, StringSplitOptions.None);
-            string name = parts[0];
-            string pattern = parts[1];
-            string? val = _env.Get(name) ?? "";
-            return Regex.Replace(val, GlobToRegex(pattern, true) + "$", "");
-        }
-        else if (content.Contains("%"))
-        {
-            var parts = content.Split(new[] { '%' }, 2);
-            string name = parts[0];
-            string pattern = parts[1];
-            string? val = _env.Get(name) ?? "";
-            return Regex.Replace(val, GlobToRegex(pattern, false) + "$", "", RegexOptions.RightToLeft);
-        }
-
-        if (content.EndsWith("^^"))
-        {
-            string name = content.Substring(0, content.Length - 2);
-            return (_env.Get(name) ?? "").ToUpperInvariant();
-        }
-        else if (content.EndsWith("^"))
-        {
-            string name = content.Substring(0, content.Length - 1);
-            string? val = _env.Get(name) ?? "";
-            if (val.Length > 0) return char.ToUpperInvariant(val[0]) + val.Substring(1);
-            return val;
-        }
-
-        if (content.EndsWith(",,"))
-        {
-            string name = content.Substring(0, content.Length - 2);
-            return (_env.Get(name) ?? "").ToLowerInvariant();
-        }
-        else if (content.EndsWith(","))
-        {
-            string name = content.Substring(0, content.Length - 1);
-            string? val = _env.Get(name) ?? "";
-            if (val.Length > 0) return char.ToLowerInvariant(val[0]) + val.Substring(1);
-            return val;
-        }
-
-        return _env.Get(content) ?? "";
-    }
-
-    private static string GlobToRegex(string glob, bool greedy)
-    {
-        string escaped = Regex.Escape(glob).Replace("\\?", ".");
-        return greedy ? escaped.Replace("\\*", ".*") : escaped.Replace("\\*", ".*?");
-    }
-
-    private static bool IsPowerShellBracedVariable(string content)
-    {
-        if (content == "_")
-            return true;
-
-        int colonIdx = content.IndexOf(':');
-        if (colonIdx > 0)
-        {
-            string scopeName = content.Substring(0, colonIdx);
-            return IsPowerShellScopeName(scopeName);
-        }
-
-        return IsPowerShellAutomaticVariable(content);
-    }
-
-    private static bool IsPowerShellScopeName(string name)
-    {
-        return name.Equals("env", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("global", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("local", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("private", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("script", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("using", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("variable", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsPowerShellAutomaticVariable(string name)
-    {
-        return name.Equals("PSItem", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("this", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("input", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("args", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("foreach", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("switch", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("false", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("null", StringComparison.OrdinalIgnoreCase);
+        return "$" + name;
     }
 
     private static char MapEscapeChar(char c) => c switch

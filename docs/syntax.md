@@ -1,11 +1,13 @@
 # AurShell Syntax Guide
 
 **What it does**
-AurShell is a cross-platform shell with a syntax designed to feel instantly familiar to users of `bash` or `zsh`. It provides built-in support for pipelines, I/O redirection, variable expansions, loops, conditional statements, and custom `.aur` shell scripts.
+AurShell is a fast, cross-platform shell. Its syntax is designed to feel instantly familiar to users of `bash` or `zsh`. 
 
-**Example Usage**
+It supports pipelines, variables, loops, conditional statements, and custom `.aur` shell scripts natively.
+
+### Example
 ```bash
-# Variables and logic
+# Basic Variables and logic
 if [ "$USER" == "admin" ]; then
     echo "Welcome back, Admin!"
 else
@@ -16,11 +18,11 @@ fi
 cat output.log | grep "Error" > errors.txt
 ```
 
-**How it works internally**
-1. When you enter a command, AurSh's internal `Lexer` reads the raw string and breaks it down into individual tokens (words, pipes, strings).
-2. The `Parser` builds a hierarchical Abstract Syntax Tree (AST), identifying pipelines, loops, and conditional blocks.
-3. The `AstLinter` scans the AST for syntax errors (like missing spaces or unquoted variables) and warns you before execution.
-4. Finally, the `AstEvaluator` securely executes the AST, managing function scoping, variables, and Native OS processes.
+### How it works internally
+1. **Lexer**: Reads your command and breaks it into tokens (words, pipes, strings).
+2. **Parser**: Builds a hierarchical tree (AST) identifying pipelines, loops, and conditional blocks.
+3. **Linter**: Scans for common syntax errors (missing spaces, unclosed quotes) to warn you early.
+4. **Evaluator**: Securely executes the tree, managing variables and native OS processes.
 
 ---
 
@@ -181,9 +183,9 @@ The shell intercepts `$(( ))` syntax during parsing and forwards the raw express
 ## Command Substitution
 
 **What it does**
-AurSh supports native command substitution using both `$()` and classic backticks ``` `cmd` ```. This allows you to execute a command and capture its output, substituting it directly into another command.
+Execute a command in the background and capture its text output directly into another command.
 
-**Example Usage**
+### Example
 ```bash
 # Using $()
 current_dir=$(pwd)
@@ -194,8 +196,53 @@ files=`ls -l`
 echo "Directory contents: $files"
 ```
 
-**How it works internally**
-When the `Lexer` processes your commands, `ReadSubCommand` isolates the block. The `AstEvaluator` intercepts it, creates an isolated sub-environment, executes the sub-command silently, strips the trailing newlines, and injects the output string directly back into your command's tokens natively without launching an external shell!
+### How it works internally
+AurSh isolates the command, runs it silently in a subshell, strips any trailing newlines, and injects the output string seamlessly back into your command.
+
+---
+
+## Process Substitution
+
+**What it does**
+Process substitution allows you to treat the output of a command like a temporary file. This is incredibly useful for commands that only accept files as arguments (like `diff` or `cat`).
+
+### Example
+```bash
+# Compare the output of two different commands directly!
+diff <(ls folderA) <(ls folderB)
+
+# Feed output directly into a while loop
+while read line; do
+    echo "Log: $line"
+done < <(cat server.log | grep "ERROR")
+```
+
+### How it works internally
+AurSh executes the inner command asynchronously, connects its output to an anonymous Named Pipe (or temporary file descriptors), and passes the path to that pipe (e.g., `/dev/fd/63` or `\\.\pipe\...`) to the outer command.
+
+---
+
+## Here Strings and Here Docs
+
+**What it does**
+Easily pass multi-line strings or blocks of text directly into the standard input of a command without creating temporary files.
+
+### Example
+```bash
+# Here String (<<<): Pass a single string directly to a command
+grep "admin" <<< "user1 admin user2"
+
+# Here Doc (<<): Pass a multi-line block of text
+cat <<EOF > config.txt
+Server=127.0.0.1
+Port=8080
+EOF
+```
+
+### How it works internally
+AurSh captures the text on the right-hand side, writes it directly to the process's standard input stream, and handles the `EOF` delimiter parsing natively in the Lexer.
+
+---
 
 ## Functions and Scoping
 

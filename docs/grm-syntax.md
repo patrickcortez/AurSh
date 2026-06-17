@@ -1,6 +1,9 @@
 # The `.grm` Script Syntax Guide
 
-GRM utilizes AurSh's native `ScriptRunner` to parse and execute `.grm` files. Because of this, `.grm` scripts behave similarly to standard shell scripts (like Bash) but with a few GRM-specific block rules to ensure secure and predictable execution.
+**What it does**
+`.grm` files allow developers to script automatic installation steps (like running `make` or moving files) when someone downloads their project through GRM.
+
+Because GRM uses AurSh's internal engine, you can use standard bash syntax (like variables and if-statements) inside your `.grm` files!
 
 ---
 
@@ -8,20 +11,19 @@ GRM utilizes AurSh's native `ScriptRunner` to parse and execute `.grm` files. Be
 
 A `.grm` file is split into a global declaration block followed by distinct execution sections:
 
-### 1. The Global Declaration Block
-Everything **before** the first `[SECTION]` header is part of the declaration block. 
-- **Purpose**: Defining global variables, environment setup, or utility functions that apply to all sections.
-- **Execution**: Runs in a permissive mode. If a command fails here, the script will **not** halt.
+### 1. The Global Setup Block
+Anything **before** the first `[SECTION]` header is global setup.
+- Use it to define variables like `$Target` or `$Version`.
+- If a command fails here, the script will *keep going*.
 
-### 2. Sections
-A section is denoted by square brackets (e.g., `[INSTALL]`, `[RUN]`). It targets a specific GRM subcommand.
-- `[INSTALL]`: Executed when running `grm install`.
-- `[RUN]`: Executed when running `grm run`.
+### 2. The Sections
+Sections target specific GRM commands:
+- `[INSTALL]`: Runs when a user types `grm install`
+- `[RUN]`: Runs when a user types `grm run`
 
-### 3. The Execution Block
-Inside a section, everything between the `@start` and `@end` tokens is part of the execution block.
-- **Purpose**: The actual build, compilation, run, or post-install logic for that specific section.
-- **Execution**: Runs in strict mode (`StopOnError = true`). If **any** command in this block yields a non-zero exit code, execution is immediately halted.
+### 3. The Strict Execution Block (`@start` to `@end`)
+Inside a section, the actual commands go between `@start` and `@end`.
+- If **any** command inside this block fails (exits with a non-zero code), the entire installation is instantly canceled to prevent damage.
 
 ### Example Skeleton
 ```bash

@@ -65,6 +65,7 @@ the command-line.
 - `aursh-net` : A network tool for connecting,disconnecting and recieving/sending data through the command-line.
 - `aursh-ssh` : A TUI interface for managing SSH keys and remote hosts.
 - `grm` : A Git Repository Manager that queries Github for remote repositories.
+- `aursh-music` : Launches a music player, accessible at `http://127.0.0.1:7007`
 
 ---
 

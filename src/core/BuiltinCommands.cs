@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using AurShell.Utils;
 
@@ -833,6 +834,7 @@ public static class BuiltinCommands
                                 - {Ansi.FgBrightCyan}aursh-net : {Ansi.FgBrightBlue}A network tool for connecting,disconnecting and recieving/sending data through the command-line.
                                 - {Ansi.FgBrightCyan}aursh-ssh : {Ansi.FgBrightBlue}TUI interface for managing SSH keys and remote hosts.
                                 - {Ansi.FgBrightCyan}grm : {Ansi.FgBrightBlue}Git Repo Manager for installing repositories from GitHub.
+                                - {Ansi.FgBrightCyan}aursh-music : {Ansi.FgBrightBlue}A websever music player, available at http://127.0.0.1:7007.
 
        {Ansi.FgBrightCyan} -------------------------------------------------------------------------------------------------------
         ";

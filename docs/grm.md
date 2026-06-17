@@ -1,8 +1,10 @@
 # GRM (Git Repo Manager)
 
-**GRM** is a built-in repository manager for AurShell that leverages the GitHub API and Git version control to search, install, upgrade, and manage repositories directly from the shell.
+**What it does**
+GRM is a built-in package manager for AurShell. Instead of downloading software from a centralized package repository, GRM searches and installs code directly from GitHub repositories.
 
-Unlike traditional package managers that maintain large offline indexes, GRM uses the GitHub REST API to perform live repository searches, ensuring you always get accurate and up-to-date results with zero local storage overhead.
+**Why it's cool**
+Because it uses GitHub directly, you get live, up-to-date results instantly with absolutely no local storage overhead.
 
 ---
 
@@ -79,16 +81,14 @@ Uninstalls (deletes) a repository from your local machine.
 
 ---
 
-## Authentication and API Limits
+## API Limits
 
-GRM uses the GitHub REST API, which has a rate limit of 60 requests per hour for unauthenticated users.
+GRM uses the public GitHub API, which has a limit of 60 requests per hour for anonymous users.
 
-**To increase your limit to 5,000 requests per hour:**
-
+**How to unlock 5,000 requests per hour:**
 1. Generate a Personal Access Token (PAT) on GitHub.
-2. Set it as an environment variable in your system or profile named `GITHUB_TOKEN`.
-   - E.g., `export GITHUB_TOKEN="ghp_xxxxxxxxxxxx"`
-3. GRM will automatically read this token and attach it to API requests.
+2. Set it as an environment variable in your profile: `export GITHUB_TOKEN="ghp_xxxxxx"`
+3. GRM will automatically find it and use it.
 
 ---
 

@@ -23,6 +23,8 @@ export interface Status {
 export interface Playlist {
   id: string;
   name: string;
+  description: string;
+  coverArt: string;
   trackIds: string[];
 }
 
@@ -31,4 +33,4 @@ export interface UserData {
   playlists: Playlist[];
 }
 
-export type ViewState = 'Home' | 'Search' | 'Library' | 'Liked';
+export type ViewState = 'Home' | 'Search' | 'Library' | 'Liked' | 'Playlist';

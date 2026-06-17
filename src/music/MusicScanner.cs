@@ -176,4 +176,26 @@ public class MusicScanner
         catch { }
         return null;
     }
+
+    public bool DeleteTrack(string id)
+    {
+        var track = Tracks.FirstOrDefault(t => t.Id == id);
+        if (track != null)
+        {
+            try
+            {
+                if (File.Exists(track.Path))
+                {
+                    File.Delete(track.Path);
+                }
+                Tracks.Remove(track);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Music] Error deleting file {track.Path}: {ex.Message}");
+            }
+        }
+        return false;
+    }
 }

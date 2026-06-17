@@ -18,11 +18,19 @@ public class StatusResponse
     public int TrackCount { get; set; }
 }
 
+public class PlaylistUpdateRequest
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public string? CoverArt { get; set; }
+}
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(System.Collections.Generic.List<TrackInfo>))]
 [JsonSerializable(typeof(StatusResponse))]
 [JsonSerializable(typeof(UserData))]
 [JsonSerializable(typeof(Playlist))]
+[JsonSerializable(typeof(PlaylistUpdateRequest))]
 internal partial class MusicJsonContext : JsonSerializerContext { }
 
 public static class MusicServer
@@ -134,6 +142,38 @@ public static class MusicServer
             return Results.NotFound();
         });
 
+        app.MapDelete("/api/playlist/{playlistId}/remove/{trackId}", (string playlistId, string trackId) =>
+        {
+            if (userDataManager.RemoveFromPlaylist(playlistId, trackId))
+            {
+                return Results.Json(userDataManager.Data, MusicJsonContext.Default.UserData);
+            }
+            return Results.NotFound();
+        });
+
+        app.MapPut("/api/playlist/{playlistId}", async (string playlistId, HttpContext context) =>
+        {
+            var req = await System.Text.Json.JsonSerializer.DeserializeAsync(context.Request.Body, MusicJsonContext.Default.PlaylistUpdateRequest);
+            if (req != null)
+            {
+                if (userDataManager.UpdatePlaylist(playlistId, req.Name, req.Description, req.CoverArt))
+                {
+                    return Results.Json(userDataManager.Data, MusicJsonContext.Default.UserData);
+                }
+            }
+            return Results.BadRequest();
+        });
+
+        app.MapDelete("/api/tracks/{id}", (string id) =>
+        {
+            if (scanner.DeleteTrack(id))
+            {
+                userDataManager.PurgeTrack(id);
+                return Results.Ok();
+            }
+            return Results.NotFound();
+        });
+
         app.MapPost("/api/upload", async (HttpRequest request) =>
         {
             if (!request.HasFormContentType) return Results.BadRequest();
@@ -161,7 +201,12 @@ public static class MusicServer
             });
             app.UseStaticFiles(new StaticFileOptions
             {
-                FileProvider = new PhysicalFileProvider(uiPath)
+                FileProvider = new PhysicalFileProvider(uiPath),
+                OnPrepareResponse = ctx =>
+                {
+                    ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+                    ctx.Context.Response.Headers.Append("Expires", "-1");
+                }
             });
         }
 
@@ -174,8 +219,11 @@ public static class MusicServer
     private static void ExtractFrontendResources()
     {
         string uiPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aursh", "music-ui");
-        if (!Directory.Exists(uiPath))
-            Directory.CreateDirectory(uiPath);
+        if (Directory.Exists(uiPath))
+        {
+            try { Directory.Delete(uiPath, true); } catch { }
+        }
+        Directory.CreateDirectory(uiPath);
 
         var assembly = Assembly.GetExecutingAssembly();
         using var stream = assembly.GetManifestResourceStream("AurShell.Resources.music_ui.zip");

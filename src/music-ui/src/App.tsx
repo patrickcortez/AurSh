@@ -11,6 +11,15 @@ function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+
+  const [currentView, setCurrentView] = useState<import('./types').ViewState>('Home');
+  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
+
+  const setView = (view: import('./types').ViewState, playlistId: string | null = null) => {
+    setCurrentView(view);
+    setCurrentPlaylistId(playlistId);
+  };
+
   
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -174,7 +183,11 @@ function App() {
 
   return (
     <div className="app-container">
-      <TopBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <TopBar 
+        searchQuery={searchQuery} 
+        setSearchQuery={setSearchQuery} 
+        goHome={() => setView('Home')} 
+      />
 
       <div className="middle-row">
         <Sidebar 
@@ -183,12 +196,18 @@ function App() {
           userData={userData}
           refreshUserData={refreshUserData}
           refreshTracks={refreshTracks}
+          setView={setView}
         />
         
         <MainView 
           status={status}
           tracks={filteredTracks}
           playTrack={playTrack}
+          userData={userData}
+          refreshUserData={refreshUserData}
+          refreshTracks={refreshTracks}
+          currentView={currentView}
+          currentPlaylistId={currentPlaylistId}
         />
 
         <RightSidebar 
@@ -215,6 +234,9 @@ function App() {
         handleSeek={handleSeek}
         handleVolume={handleVolume}
         formatTime={formatTime}
+        userData={userData}
+        refreshUserData={refreshUserData}
+        refreshTracks={refreshTracks}
       />
 
       <audio 

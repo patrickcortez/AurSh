@@ -10,6 +10,8 @@ public class Playlist
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string CoverArt { get; set; } = "";
     public List<string> TrackIds { get; set; } = new List<string>();
 }
 
@@ -100,5 +102,46 @@ public class UserDataManager
             return true;
         }
         return false;
+    }
+
+    public bool UpdatePlaylist(string playlistId, string name, string description, string coverArt)
+    {
+        var playlist = Data.Playlists.Find(p => p.Id == playlistId);
+        if (playlist != null)
+        {
+            playlist.Name = name ?? playlist.Name;
+            playlist.Description = description ?? playlist.Description;
+            playlist.CoverArt = coverArt ?? playlist.CoverArt;
+            SaveData();
+            return true;
+        }
+        return false;
+    }
+
+    public bool RemoveFromPlaylist(string playlistId, string trackId)
+    {
+        var playlist = Data.Playlists.Find(p => p.Id == playlistId);
+        if (playlist != null)
+        {
+            if (playlist.TrackIds.Remove(trackId))
+            {
+                SaveData();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public void PurgeTrack(string trackId)
+    {
+        bool changed = false;
+        if (Data.LikedTracks.Remove(trackId)) changed = true;
+        
+        foreach (var playlist in Data.Playlists)
+        {
+            if (playlist.TrackIds.Remove(trackId)) changed = true;
+        }
+
+        if (changed) SaveData();
     }
 }

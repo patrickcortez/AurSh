@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import type { Track, UserData } from '../types';
+import type { Track, UserData, Playlist } from '../types';
 import { FALLBACK_COVER } from '../constants';
+import { EditPlaylistModal } from './EditPlaylistModal';
 
 interface SidebarProps {
   tracks: Track[];
@@ -8,10 +9,13 @@ interface SidebarProps {
   userData: UserData | null;
   refreshUserData: () => void;
   refreshTracks: () => void;
+  setView: (view: import('../types').ViewState, playlistId?: string | null) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, refreshUserData, refreshTracks }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, refreshUserData, refreshTracks, setView }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreatePlaylist = async () => {
@@ -66,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
       </div>
 
       <div className="library-list">
-        <div className="library-item" style={{ background: 'var(--bg-elevated)' }}>
+        <div className="library-item" style={{ background: 'var(--bg-elevated)', cursor: 'pointer' }} onClick={() => setView('Liked')}>
           <div style={{ width: 48, height: 48, borderRadius: 4, background: 'linear-gradient(135deg, #450af5, #c4efd9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" fill="#fff" height="20" width="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </div>
@@ -76,14 +80,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
           </div>
         </div>
 
-        {userData?.playlists.map(pl => (
-          <div key={pl.id} className="library-item" style={{ background: 'var(--bg-elevated)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 4, background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg viewBox="0 0 24 24" fill="#b3b3b3" height="20" width="20"><path d="M15 3h6v2h-6V3zM9 3H3v2h6V3zm6 4h6v2h-6V7zM9 7H3v2h6V7zm6 4h6v2h-6v-2zM9 11H3v2h6v-2zm12 4h-6v2h6v-2zm-8 0H3v2h10v-2z"/></svg>
+        {userData?.playlists.map((pl, idx) => (
+          <div 
+            key={pl.id} 
+            className="library-item" 
+            style={{ background: 'var(--bg-elevated)', cursor: 'pointer', position: 'relative', zIndex: 100 - idx }} 
+            onClick={() => setView('Playlist', pl.id)}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: 4, background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <img src={pl.coverArt || FALLBACK_COVER} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="cover" />
             </div>
-            <div className="library-info">
-              <span className="library-title">{pl.name}</span>
+            <div className="library-info" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              <span className="library-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{pl.name}</span>
               <span className="library-subtext">Playlist • {pl.trackIds.length} tracks</span>
+            </div>
+            <div style={{ position: 'relative' }} className="playlist-menu-container">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenu(activeMenu === pl.id ? null : pl.id);
+                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" height="20" width="20">
+                  <path d="M12 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 6a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 6a1.5 1.5 0 110 3 1.5 1.5 0 010-3z"/>
+                </svg>
+              </button>
+              {activeMenu === pl.id && (
+                <div style={{ position: 'absolute', right: 0, top: '100%', background: '#282828', padding: '4px', borderRadius: '4px', zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', minWidth: '150px' }}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setEditingPlaylist(pl); setActiveMenu(null); }} 
+                    style={{ background: 'transparent', color: '#fff', border: 'none', padding: '12px', textAlign: 'left', cursor: 'pointer', borderRadius: '2px', width: '100%' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#3E3E3E'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Edit details
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -103,6 +137,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ tracks, playTrack, userData, r
           </div>
         ))}
       </div>
+
+      {editingPlaylist && (
+        <EditPlaylistModal
+          playlist={editingPlaylist}
+          isOpen={true}
+          onClose={() => setEditingPlaylist(null)}
+          onSave={refreshUserData}
+        />
+      )}
     </div>
   );
 };

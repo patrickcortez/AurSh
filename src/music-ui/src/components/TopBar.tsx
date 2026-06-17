@@ -3,16 +3,17 @@ import React from 'react';
 interface TopBarProps {
   searchQuery: string;
   setSearchQuery: (val: string) => void;
+  goHome: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ searchQuery, setSearchQuery }) => {
+export const TopBar: React.FC<TopBarProps> = ({ searchQuery, setSearchQuery, goHome }) => {
   return (
     <div className="top-bar">
       <div className="top-bar-left">
       </div>
       
       <div className="top-bar-center">
-        <button className="circle-btn" style={{ background: '#282828', color: '#fff' }}>
+        <button className="circle-btn" style={{ background: '#282828', color: '#fff', cursor: 'pointer' }} onClick={goHome} title="Home">
           <svg viewBox="0 0 24 24" fill="currentColor" height="24" width="24"><path d="M12.5 3.247a1 1 0 00-1 0L4 7.577V20h4.5v-6a1 1 0 011-1h5a1 1 0 011 1v6H20V7.577l-7.5-4.33z"/></svg>
         </button>
         <div className="search-container">

@@ -61,6 +61,27 @@ else
     ARCH := x64
 endif
 
+# Memory Detection for AOT fallback (Disable AOT if < 4GB RAM to prevent ilc OOM crashes)
+AOT_DEFAULT := 1
+ifneq ($(WIN_ENV),native)
+    TOTAL_MEM_KB := $(shell grep MemTotal /proc/meminfo 2>/dev/null | grep -o '[0-9]*' || echo 8000000)
+    IS_LOW_MEM := $(shell if [ "$$(($(TOTAL_MEM_KB)))" -lt 4000000 ] 2>/dev/null; then echo 1; else echo 0; fi)
+    ifeq ($(IS_LOW_MEM),1)
+        AOT_DEFAULT := 0
+    endif
+    ifeq ($(DETECTED_OS),Termux)
+        AOT_DEFAULT := 0
+    endif
+endif
+
+AOT ?= $(AOT_DEFAULT)
+
+ifeq ($(AOT),1)
+    PUBLISH_FLAGS := -p:PublishAot=true -p:PublishTrimmed=true
+else
+    PUBLISH_FLAGS := -p:PublishSingleFile=true -p:PublishTrimmed=true
+endif
+
 # Shell Selection
 
 ifneq ($(WIN_ENV),native)
@@ -139,7 +160,7 @@ ifeq ($(WIN_ENV),native)
 	@echo   make info           Show detected platform info
 	@echo   make help           Show this help
 	@cmd /c "echo."
-	@echo   Detected: $(DETECTED_OS) $(ARCH) [$(RID)]
+	@echo   Detected: $(DETECTED_OS) $(ARCH) [$(RID)] (AOT=$(AOT))
 	@echo   Install:  $(INSTALL_DIR)
 	@cmd /c "echo."
 else
@@ -160,7 +181,7 @@ else
 	@echo "  make info           Show detected platform info"
 	@echo "  make help           Show this help"
 	@echo ""
-	@echo "  Detected: $(DETECTED_OS) $(ARCH) [$(RID)]"
+	@echo "  Detected: $(DETECTED_OS) $(ARCH) [$(RID)] (AOT=$(AOT))"
 	@echo "  Install:  $(INSTALL_DIR)"
 	@echo ""
 endif
@@ -170,6 +191,7 @@ ifeq ($(WIN_ENV),native)
 	@echo OS:          $(DETECTED_OS)
 	@echo Arch:        $(ARCH)
 	@echo RID:         $(RID)
+	@echo AOT:         $(AOT)
 	@echo Executable:  $(EXE)
 	@echo Install Dir: $(INSTALL_DIR)
 	@echo User Dir:    $(USER_INSTALL_DIR)
@@ -178,6 +200,7 @@ else
 	@echo "OS:          $(DETECTED_OS)"
 	@echo "Arch:        $(ARCH)"
 	@echo "RID:         $(RID)"
+	@echo "AOT:         $(AOT)"
 	@echo "Executable:  $(EXE)"
 	@echo "Install Dir: $(INSTALL_DIR)"
 	@echo "User Dir:    $(USER_INSTALL_DIR)"
@@ -224,14 +247,14 @@ endif
 publish:
 ifeq ($(WIN_ENV),native)
 	@echo [publish] Publishing self-contained $(RID) binary...
-	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishAot=true -p:PublishTrimmed=true -o $(PUBLISH_DIR)
-	dotnet publish $(UPDATE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-update/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishAot=true -p:PublishTrimmed=true -o $(PUBLISH_DIR)
-	dotnet publish $(CONTEXT_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-contexts/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true -p:PublishAot=true -p:PublishTrimmed=true -o $(PUBLISH_DIR)
+	dotnet publish $(PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true $(PUBLISH_FLAGS) -o $(PUBLISH_DIR)
+	dotnet publish $(UPDATE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-update/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true $(PUBLISH_FLAGS) -o $(PUBLISH_DIR)
+	dotnet publish $(CONTEXT_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-contexts/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true $(PUBLISH_FLAGS) -o $(PUBLISH_DIR)
 	@echo [publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)
 else
 	@echo "[publish] Checking NativeAOT build dependencies..."
 	@sh $(ENSURE_DEPS) --auto-install
-	@echo "[publish] Publishing self-contained $(RID) binaries..."
+	@echo "[publish] Publishing self-contained $(RID) binaries... (AOT=$(AOT))"
 	dotnet publish $(PROJECT) \
 		-c Release \
 		-r $(RID) \
@@ -239,8 +262,7 @@ else
 		-p:OutputPath=obj/publish-build/ \
 		-p:AppendTargetFrameworkToOutputPath=true \
 		-p:AppendRuntimeIdentifierToOutputPath=true \
-		-p:PublishAot=true \
-		-p:PublishTrimmed=true \
+		$(PUBLISH_FLAGS) \
 		-o $(PUBLISH_DIR)
 	dotnet publish $(UPDATE_PROJECT) \
 		-c Release \
@@ -249,8 +271,7 @@ else
 		-p:OutputPath=obj/publish-build-update/ \
 		-p:AppendTargetFrameworkToOutputPath=true \
 		-p:AppendRuntimeIdentifierToOutputPath=true \
-		-p:PublishAot=true \
-		-p:PublishTrimmed=true \
+		$(PUBLISH_FLAGS) \
 		-o $(PUBLISH_DIR)
 	dotnet publish $(CONTEXT_PROJECT) \
 		-c Release \
@@ -259,8 +280,7 @@ else
 		-p:OutputPath=obj/publish-build-contexts/ \
 		-p:AppendTargetFrameworkToOutputPath=true \
 		-p:AppendRuntimeIdentifierToOutputPath=true \
-		-p:PublishAot=true \
-		-p:PublishTrimmed=true \
+		$(PUBLISH_FLAGS) \
 		-o $(PUBLISH_DIR)
 	@echo "[publish] Output: $(PUBLISH_DIR)/$(EXE) + $(PUBLISH_DIR)/$(UPDATE_EXE) + $(PUBLISH_DIR)/$(CONTEXT_EXE)"
 ifeq ($(DETECTED_OS),Termux)

@@ -56,7 +56,7 @@ export const MainView: React.FC<MainViewProps> = ({
         <span></span>
       </div>
       {trackList.map((track, i) => (
-        <div key={track.id} className="track-list-row" style={{ display: 'grid', gridTemplateColumns: '16px 2fr 1fr 1fr 40px', gap: '16px', alignItems: 'center', padding: '8px 0', borderRadius: '4px', cursor: 'pointer', position: 'relative', zIndex: 1000 - i }}>
+        <div key={track.id} className="track-list-row" style={{ display: 'grid', gridTemplateColumns: '16px 2fr 1fr 1fr 40px', gap: '16px', alignItems: 'center', padding: '8px 0', borderRadius: '4px', cursor: 'pointer', position: 'relative' }}>
           <span style={{ color: 'var(--text-secondary)' }}>{i + 1}</span>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }} onClick={() => playTrack(track)}>
             <img src={`/api/cover/${track.id}`} onError={(e) => { e.currentTarget.src = FALLBACK_COVER }} style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }} alt="cover" />
@@ -132,8 +132,8 @@ export const MainView: React.FC<MainViewProps> = ({
       
       <div style={{ position: 'relative', zIndex: 1, padding: '16px 24px' }}>
         <div className="recent-grid">
-          {tracks.slice(0, 6).map((track, i) => (
-            <div key={track.id} className="recent-item" style={{ position: 'relative', overflow: 'visible', zIndex: 1000 - i }}>
+          {tracks.slice(0, 6).map((track) => (
+            <div key={track.id} className="recent-item" style={{ position: 'relative', overflow: 'visible' }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%' }} onClick={() => playTrack(track)}>
                 <img 
                   src={`/api/cover/${track.id}`} 
@@ -150,44 +150,13 @@ export const MainView: React.FC<MainViewProps> = ({
         </div>
 
         <div className="section-title-row">
-          <h2 className="section-title">Pre-save upcoming releases</h2>
+          <h2 className="section-title">Your songs</h2>
           <span className="show-all">Show all</span>
         </div>
         
         <div className="card-grid">
-          {tracks.slice(0, 4).map((track, i) => (
-            <div key={track.id} className="card" style={{ position: 'relative', zIndex: 1000 - i }}>
-              <div className="card-img-wrapper" onClick={() => playTrack(track)}>
-                <img 
-                  src={`/api/cover/${track.id}`} 
-                  alt="cover"
-                  onError={(e) => { e.currentTarget.src = FALLBACK_COVER }}
-                />
-                <button className="card-play-btn">
-                  <svg viewBox="0 0 24 24" fill="currentColor" height="24" width="24"><path d="M8 5.14v14l11-7-11-7z"/></svg>
-                </button>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '12px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="card-title" onClick={() => playTrack(track)}>{track.title}</div>
-                  <div className="card-subtitle" onClick={() => playTrack(track)}>{track.artist}</div>
-                </div>
-                <div style={{ marginTop: '-4px' }}>
-                  <TrackOptionsMenu track={track} userData={userData} refreshUserData={refreshUserData} refreshTracks={refreshTracks} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="section-title-row">
-          <h2 className="section-title">Albums featuring songs you like</h2>
-          <span className="show-all">Show all</span>
-        </div>
-        
-        <div className="card-grid">
-          {tracks.slice().reverse().slice(0, 4).map((track, i) => (
-            <div key={track.id} className="card" style={{ position: 'relative', zIndex: 1000 - i }}>
+          {tracks.map((track) => (
+            <div key={track.id} className="card" style={{ position: 'relative' }}>
               <div className="card-img-wrapper" onClick={() => playTrack(track)}>
                 <img 
                   src={`/api/cover/${track.id}`} 

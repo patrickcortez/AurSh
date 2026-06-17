@@ -108,33 +108,60 @@ function App() {
     }
   };
 
+  const getCurrentQueue = () => {
+    if (currentView === 'Liked') {
+      return tracks.filter(t => userData?.likedTracks.includes(t.id));
+    }
+    if (currentView === 'Playlist' && currentPlaylistId) {
+      const pl = userData?.playlists.find(p => p.id === currentPlaylistId);
+      if (pl) return pl.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean) as Track[];
+    }
+    // In Home view or if searching, use the filteredTracks
+    const filtered = tracks.filter(t => 
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      t.artist.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    return filtered.length > 0 ? filtered : tracks;
+  };
+
   const playNext = () => {
-    if (tracks.length === 0) return;
+    const queue = getCurrentQueue();
+    if (queue.length === 0) return;
     if (isShuffle) {
-      const randomIdx = Math.floor(Math.random() * tracks.length);
-      playTrack(tracks[randomIdx]);
+      const randomIdx = Math.floor(Math.random() * queue.length);
+      playTrack(queue[randomIdx]);
       return;
     }
     
     if (!currentTrack) {
-      playTrack(tracks[0]);
+      playTrack(queue[0]);
       return;
     }
     
-    const idx = tracks.findIndex(t => t.id === currentTrack.id);
-    const nextIdx = (idx + 1) % tracks.length;
-    playTrack(tracks[nextIdx]);
+    const idx = queue.findIndex(t => t.id === currentTrack.id);
+    // If not found in current queue, play the first song in queue
+    if (idx === -1) {
+      playTrack(queue[0]);
+      return;
+    }
+    const nextIdx = (idx + 1) % queue.length;
+    playTrack(queue[nextIdx]);
   };
 
   const playPrev = () => {
-    if (tracks.length === 0) return;
+    const queue = getCurrentQueue();
+    if (queue.length === 0) return;
     if (!currentTrack) {
-      playTrack(tracks[0]);
+      playTrack(queue[0]);
       return;
     }
-    const idx = tracks.findIndex(t => t.id === currentTrack.id);
-    const prevIdx = idx <= 0 ? tracks.length - 1 : idx - 1;
-    playTrack(tracks[prevIdx]);
+    const idx = queue.findIndex(t => t.id === currentTrack.id);
+    if (idx === -1) {
+      playTrack(queue[0]);
+      return;
+    }
+    const prevIdx = idx <= 0 ? queue.length - 1 : idx - 1;
+    playTrack(queue[prevIdx]);
   };
 
   const onAudioEnded = () => {

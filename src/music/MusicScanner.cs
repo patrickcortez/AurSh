@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using AurShell.Utils;
 
 namespace AurShell.Music;
 
@@ -31,7 +32,7 @@ public class MusicScanner
 
     public void LoadConfig()
     {
-        string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string homeDir = Platform.HomeDirectory;
         string configPath = Path.Combine(homeDir, ".aursh", "music.con");
 
         if (!File.Exists(configPath))
@@ -55,7 +56,7 @@ public class MusicScanner
 
     public void SetConfig(string dir)
     {
-        string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string homeDir = Platform.HomeDirectory;
         string configPath = Path.Combine(homeDir, ".aursh", "music.con");
         Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
         File.WriteAllText(configPath, $"dir=\"{dir}\"");

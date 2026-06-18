@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AurShell.Utils;
 
 namespace AurShell.Music;
 
@@ -29,7 +30,7 @@ public class UserDataManager
 
     public UserDataManager()
     {
-        string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string homeDir = Platform.HomeDirectory;
         DataPath = Path.Combine(homeDir, ".aursh", "music_data.json");
         Data = new UserData();
         LoadData();

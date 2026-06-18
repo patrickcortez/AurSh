@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
+using AurShell.Utils;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -201,7 +202,7 @@ public static class MusicServer
             return Results.Json(scanner.Tracks, MusicJsonContext.Default.ListTrackInfo);
         });
 
-        string uiPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aursh", "music-ui");
+        string uiPath = Path.Combine(Platform.HomeDirectory, ".aursh", "music-ui");
         
         if (Directory.Exists(uiPath))
         {
@@ -228,7 +229,7 @@ public static class MusicServer
 
     private static void ExtractFrontendResources()
     {
-        string uiPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aursh", "music-ui");
+        string uiPath = Path.Combine(Platform.HomeDirectory, ".aursh", "music-ui");
         if (Directory.Exists(uiPath))
         {
             try { Directory.Delete(uiPath, true); } catch { }

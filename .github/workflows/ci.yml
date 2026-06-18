@@ -33,6 +33,10 @@ jobs:
       if: matrix.name == 'Windows'
       run: choco install make -y
 
+    - name: Install NativeAOT dependencies (macOS)
+      if: matrix.name == 'macOS'
+      run: sh scripts/linux-termux-macos/ensure-deps.sh --auto-install
+
     - name: Build
       run: make build
 

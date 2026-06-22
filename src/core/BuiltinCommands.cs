@@ -808,7 +808,8 @@ public static class BuiltinCommands
 
     private static int ExecuteClear()
     {
-        Console.Clear();
+        Console.Write(Utils.Ansi.CursorHome + Utils.Ansi.ClearScreen + Utils.Ansi.ClearScrollback);
+        Console.Out.Flush();
         return 0;
     }
 

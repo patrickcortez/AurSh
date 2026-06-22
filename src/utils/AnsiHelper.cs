@@ -31,9 +31,11 @@ public static class Ansi
     public const string CursorRestore = "\x1b[u";
     public const string CursorHide = "\x1b[?25l";
     public const string CursorShow = "\x1b[?25h";
+    public const string CursorHome = "\x1b[H";
 
     public const string ClearScreen = "\x1b[2J";
     public const string ClearScreenFromCursor = "\x1b[0J";
+    public const string ClearScrollback = "\x1b[3J";
     public const string ClearLine = "\x1b[2K";
     public const string ClearLineFromCursor = "\x1b[0K";
     public const string ClearLineToStart = "\x1b[1K";

@@ -157,7 +157,9 @@ public class Executor
         }
 
         var evaluator = new AstEvaluator(_env, this, _workingDirectory);
-        return evaluator.Visit(ast);
+        int exitCode = evaluator.Visit(ast);
+        _workingDirectory = evaluator.WorkingDirectory;
+        return exitCode;
     }
 
     public int ExecuteScript(string scriptContent)

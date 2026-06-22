@@ -420,8 +420,7 @@ public class Shell
         string head = ExtractFirstWord(commandLine);
         if (string.IsNullOrEmpty(head)) return true;
 
-        // if (head.StartsWith("aursh-blackbox-demo", StringComparison.OrdinalIgnoreCase))
-        //   return true;
+        if (BuiltinCommands.IsBuiltin(head)) return true;
 
         return BypassList.IsBypassed(head, _blackBox.Config);
     }

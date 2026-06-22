@@ -152,7 +152,12 @@ public static class Pipeline
 
                 try
                 {
-                    return BuiltinCommands.Execute(cmd, env, ref workingDirectory);
+                    int ret = BuiltinCommands.Execute(cmd, env, ref workingDirectory);
+                    if (evaluator != null)
+                    {
+                        evaluator.UpdateWorkingDirectory(workingDirectory);
+                    }
+                    return ret;
                 }
                 finally
                 {

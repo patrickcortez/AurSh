@@ -31,6 +31,13 @@ public class AstEvaluator
         _workingDirectory = workingDirectory;
     }
 
+    public string WorkingDirectory => _workingDirectory;
+
+    public void UpdateWorkingDirectory(string newDir)
+    {
+        _workingDirectory = newDir;
+    }
+
     public static void RunWithStreams(Stream? inStream, Stream? outStream, Stream? errStream, Action action)
     {
         var prevIn = _asyncIn.Value;

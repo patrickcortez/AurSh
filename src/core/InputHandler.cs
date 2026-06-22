@@ -729,13 +729,19 @@ public class InputHandler
                     string cwd = _env.Get("PWD") ?? Directory.GetCurrentDirectory();
                     string resolved = Utils.FileSystem.ResolvePath(cleanWord, cwd);
 
-                    // Leading / or \ is auto-cd trigger: try relative if absolute fails
-                    if (!Directory.Exists(resolved) && cleanWord.Length > 1 &&
+                    // Leading / or \ is auto-cd trigger: prioritize relative path first
+                    bool isPrefix = cleanWord.Length > 1 &&
                         (cleanWord[0] == '/' || cleanWord[0] == '\\') &&
-                        !cleanWord.StartsWith("~/") && !cleanWord.StartsWith("~\\"))
+                        !cleanWord.StartsWith("~/") && !cleanWord.StartsWith("~\\");
+
+                    if (isPrefix)
                     {
                         string relative = cleanWord.Substring(1);
-                        resolved = Utils.FileSystem.ResolvePath(relative, cwd);
+                        string relResolved = Utils.FileSystem.ResolvePath(relative, cwd);
+                        if (Directory.Exists(relResolved))
+                        {
+                            resolved = relResolved;
+                        }
                     }
 
                     if (Directory.Exists(resolved))

@@ -17,7 +17,7 @@ public static class BuiltinCommands
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
         "true", "false", "shift", "read", "test", "return", "aursh-context",
-        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-music", "aursh-ssh", "local", "declare", "readonly", "help", "grm", "[", "[["
+        "jobs", "fg", "kill", "aursh-plugin", "aursh-assoc", "aursh-reload", "aursh-history","aursh-about","aursh-ls","aursh-cat", "aursh-update", "aursh-net", "aursh-view", "aursh-music", "aursh-ssh", "local", "declare", "readonly", "help", "grm", "[", "[[", "clear"
     };
 
     public static bool IsBuiltin(string name) => Builtins.Contains(name);
@@ -42,6 +42,7 @@ public static class BuiltinCommands
     {
         return cmd.Name.ToLowerInvariant() switch
         {
+            "clear" => ExecuteClear(),
             "cd" => ExecuteCd(cmd, env, ref workingDirectory),
             "export" => ExecuteExport(cmd, env),
             "local" => ExecuteLocal(cmd, env),
@@ -803,6 +804,12 @@ public static class BuiltinCommands
     private static Architecture GetArch()
     {
         return RuntimeInformation.OSArchitecture;
+    }
+
+    private static int ExecuteClear()
+    {
+        Console.Clear();
+        return 0;
     }
 
     private static int ExecuteAbout(SimpleCommandNode cmd)

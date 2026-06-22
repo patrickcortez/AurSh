@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TokenPrinter")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a31e9810fd9200842028634194c499a99751e8eb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+43dcb70576479181f4c5a4a5281b272b95d8db9f")]
 [assembly: System.Reflection.AssemblyProductAttribute("TokenPrinter")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TokenPrinter")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

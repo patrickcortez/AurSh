@@ -56,10 +56,12 @@ public class Executor
             string resolved = Utils.FileSystem.ResolvePath(trimmedInput, _workingDirectory);
 
             // Leading / or \ is an auto-cd trigger prefix (replaces ./)
-            // If absolute resolution fails, strip the prefix and try relative to cwd
-            if (!Directory.Exists(resolved) && trimmedInput.Length > 1 &&
+            // Prioritize relative path resolution first to avoid Windows case-insensitivity matching root folders
+            bool isPrefix = trimmedInput.Length > 1 &&
                 (trimmedInput[0] == '/' || trimmedInput[0] == '\\') &&
-                !trimmedInput.StartsWith("~/") && !trimmedInput.StartsWith("~\\"))
+                !trimmedInput.StartsWith("~/") && !trimmedInput.StartsWith("~\\");
+
+            if (isPrefix)
             {
                 string relative = trimmedInput.Substring(1);
                 string relResolved = Utils.FileSystem.ResolvePath(relative, _workingDirectory);

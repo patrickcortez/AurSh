@@ -35,6 +35,12 @@ public static class WordExpander
 
             if (c == '\\' && !inSingleQuote)
             {
+                if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows && !inDoubleQuote)
+                {
+                    sb.Append(c);
+                    continue;
+                }
+
                 if (i + 1 < input.Length)
                 {
                     char next = input[i + 1];

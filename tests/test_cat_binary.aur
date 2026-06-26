@@ -1,0 +1,13 @@
+# Test that aursh-cat preserves binary data (including newlines and null bytes)
+echo -ne "test\n\0binary\r\ndata" > temp_binary.dat
+aursh-cat temp_binary.dat > temp_binary_out.dat
+
+# Check if files are identical
+if cmp -s temp_binary.dat temp_binary_out.dat; then
+    echo "aursh-cat binary streaming test passed"
+    rm temp_binary.dat temp_binary_out.dat
+    exit 0
+else
+    echo "aursh-cat binary streaming test failed"
+    exit 1
+fi

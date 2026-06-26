@@ -72,7 +72,7 @@ public static class BuiltinCommands
             "aursh-reload" => ExecuteReload(env),
             "aursh-about" => ExecuteAbout(cmd),
             "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
-            "aursh-cat" => ExecuteCat(cmd, env, ref workingDirectory),
+            "aursh-cat" => AurShell.Commands.AurshCatCommand.Execute(cmd, env, ref workingDirectory),
             "aursh-update" => ExecuteUpdate(cmd),
             "aursh-context" => ExecuteContext(cmd),
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),

@@ -42,17 +42,17 @@ public static class BuiltinCommands
     {
         return cmd.Name.ToLowerInvariant() switch
         {
-            "clear" => ExecuteClear(),
+            "clear" => AurShell.Commands.AurshClearCommand.Execute(),
             "cd" => AurShell.Commands.AurshCdCommand.Execute(cmd, env, ref workingDirectory),
             "export" => AurShell.Commands.AurshExportCommand.Execute(cmd, env),
-            "local" => ExecuteLocal(cmd, env),
-            "declare" => ExecuteDeclare(cmd, env),
-            "readonly" => ExecuteReadonly(cmd, env),
+            "local" => AurShell.Commands.AurshLocalCommand.Execute(cmd, env),
+            "declare" => AurShell.Commands.AurshDeclareCommand.Execute(cmd, env),
+            "readonly" => AurShell.Commands.AurshReadonlyCommand.Execute(cmd, env),
             "unset" => AurShell.Commands.AurshUnsetCommand.Execute(cmd, env),
             "exit" => AurShell.Commands.AurshExitCommand.Execute(cmd),
             "history" or "aursh-history" => ExecuteHistory(cmd, env, workingDirectory),
             "echo" => AurShell.Commands.AurshEchoCommand.Execute(cmd),
-            "pwd" => ExecutePwd(workingDirectory),
+            "pwd" => AurShell.Commands.AurshPwdCommand.Execute(workingDirectory),
             "type" => ExecuteType(cmd, env, workingDirectory),
             "alias" => ExecuteAlias(cmd, env),
             "unalias" => ExecuteUnalias(cmd, env),

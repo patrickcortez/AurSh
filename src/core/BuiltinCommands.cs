@@ -11,8 +11,8 @@ namespace AurShell.Core;
 public static class BuiltinCommands
 {
 
-    private readonly static string version = "3.0";
-    private static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
+    public readonly static string Version = "3.0";
+    public static readonly HashSet<string> Builtins = new(StringComparer.OrdinalIgnoreCase)
     {
         "cd", "export", "unset", "exit", "history", "echo",
         "pwd", "type", "alias", "unalias", "source", "set", "env",
@@ -69,17 +69,17 @@ public static class BuiltinCommands
             "kill" => AurShell.Commands.AurshKillCommand.Execute(cmd, env),
             "aursh-plugin" => AurShell.Commands.AurshPluginCommand.Execute(cmd, env, workingDirectory),
             "aursh-assoc" => AurShell.Commands.AurshAssocCommand.Execute(cmd, env),
-            "aursh-reload" => ExecuteReload(env),
+            "aursh-reload" => AurShell.Commands.AurshReloadCommand.Execute(env),
             "aursh-about" => ExecuteAbout(cmd),
-            "aursh-ls" => ExecuteLs(cmd, env, ref workingDirectory),
+            "aursh-ls" => AurShell.Commands.AurshLsCommand.Execute(cmd, env, ref workingDirectory),
             "aursh-cat" => AurShell.Commands.AurshCatCommand.Execute(cmd, env, ref workingDirectory),
-            "aursh-update" => ExecuteUpdate(cmd),
-            "aursh-context" => ExecuteContext(cmd),
+            "aursh-update" => AurShell.Commands.AurshUpdateCommand.Execute(cmd),
+            "aursh-context" => AurShell.Commands.AurshContextCommand.Execute(cmd),
             "aursh-net" => AurshNetCommand.Execute(cmd, env, ref workingDirectory),
-            "aursh-view" => ExecuteAurshView(cmd, env, workingDirectory),
-            "aursh-music" => ExecuteAurshMusic(cmd),
-            "aursh-ssh" => ExecuteSsh(cmd, env, workingDirectory),
-            "help" => ExecuteHelp(),
+            "aursh-view" => AurShell.Commands.AurshViewCommand.Execute(cmd, env, workingDirectory),
+            "aursh-music" => AurShell.Commands.AurshMusicCommand.Execute(cmd),
+            "aursh-ssh" => AurShell.Commands.AurshSshCommand.Execute(cmd, env, workingDirectory),
+            "help" => AurShell.Commands.AurshHelpCommand.Execute(),
             "grm" => AurShell.Grm.GrmController.Execute(cmd, env, ref workingDirectory),
             _ => ExecuteFallback(cmd)
         };
@@ -136,7 +136,7 @@ public static class BuiltinCommands
     private static int ExecuteHelp()
     {
         Console.WriteLine($"AurShell Help");
-        Console.WriteLine($"Version {version}");
+        Console.WriteLine($"Version {Version}");
         Console.WriteLine();
         Console.WriteLine("These shell commands are defined internally. Type `help` to see this list.");
         Console.WriteLine("External commands are resolved from PATH. Core UNIX utilities are provided by the bundled BusyBox toolkit.");
@@ -827,7 +827,7 @@ public static class BuiltinCommands
 
                             {Ansi.FgBrightBlue}Current Platform: {Ansi.FgBrightMagenta}{GetPlatform()}
                             {Ansi.FgBrightBlue}Current Architecture: {Ansi.FgBrightMagenta}{GetArch().ToString()}
-                            {Ansi.FgBrightBlue}Current Version: {Ansi.FgBrightMagenta}{version}
+                            {Ansi.FgBrightBlue}Current Version: {Ansi.FgBrightMagenta}{Version}
 
                             {Ansi.FgBrightBlue}AurSh has some native commands that you can invoke/use:
                                 - {Ansi.FgBrightCyan}aursh-ls : {Ansi.FgBrightBlue}TUI file-system explorer.

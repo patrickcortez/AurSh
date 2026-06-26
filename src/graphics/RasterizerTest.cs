@@ -5,7 +5,7 @@ namespace AurShell.Graphics;
 
 public class WindowElement : UIElement
 {
-    public string Title { get; set; }
+    public string Title { get; set; } = string.Empty;
 
     public override void Render(GraphicsContext g)
     {

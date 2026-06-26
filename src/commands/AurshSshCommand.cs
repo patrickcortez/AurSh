@@ -1,7 +1,6 @@
 using System;
 using AurShell.Core;
 using AurShell.Parser;
-using AurShell.Core;
 
 namespace AurShell.Commands;
 

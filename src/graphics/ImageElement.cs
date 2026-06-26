@@ -2,8 +2,8 @@ namespace AurShell.Graphics;
 
 public class ImageElement : UIElement
 {
-    private VirtualScreen _image;
-    public VirtualScreen Image 
+    private VirtualScreen? _image;
+    public VirtualScreen? Image 
     { 
         get => _image; 
         set 

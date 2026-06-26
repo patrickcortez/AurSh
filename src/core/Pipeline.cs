@@ -46,7 +46,7 @@ public static class Pipeline
         return true;
     }
 
-    public static int ExecuteSingle(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, bool background, AstEvaluator evaluator = null, Stream? inStream = null, Stream? outStream = null, Stream? errStream = null)
+    public static int ExecuteSingle(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, bool background, AstEvaluator? evaluator = null, Stream? inStream = null, Stream? outStream = null, Stream? errStream = null)
     {
         if (BuiltinCommands.IsBuiltin(cmd.Name))
         {

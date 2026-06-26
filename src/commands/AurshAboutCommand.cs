@@ -2,7 +2,6 @@ using System;
 using AurShell.Core;
 using AurShell.Utils;
 using System.Runtime.InteropServices;
-using AurShell.Core;
 
 namespace AurShell.Commands;
 

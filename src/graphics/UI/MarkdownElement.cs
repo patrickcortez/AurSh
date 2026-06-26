@@ -370,11 +370,13 @@ public class MarkdownElement : PanelElement
                 client.DefaultRequestHeaders.Add("User-Agent", "AurSh-Browser/1.0");
                 var bytes = client.GetByteArrayAsync(url).Result;
 
-                bool isSvg = false, isPng = false, isJpg = false, isBmp = false;
+                bool isSvg = false, isPng = false, isBmp = false;
                 if (bytes.Length >= 8 && bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71 && bytes[4] == 13 && bytes[5] == 10 && bytes[6] == 26 && bytes[7] == 10)
                     isPng = true;
                 else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8)
-                    isJpg = true;
+                {
+                    // isJpg handled by fallback
+                }
                 else if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
                     isBmp = true;
                 else

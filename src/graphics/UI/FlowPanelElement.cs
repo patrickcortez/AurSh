@@ -19,7 +19,6 @@ public class FlowPanelElement : UIElement
         var rowWidths = new List<int>();
 
         int curX = 0;
-        int maxRowHeight = 0;
 
         foreach (var child in Children)
         {

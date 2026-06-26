@@ -41,7 +41,6 @@ public sealed class BlackBoxLiveRenderer
     private System.IO.TextWriter? _activeWriter;
     private int _lastRenderedWidth;
     private LayoutTier _lastRenderedTier;
-    private bool _passthrough;
     private bool _altScreen;
     private Action<int, int>? _resizeHandler;
 
@@ -74,7 +73,6 @@ public sealed class BlackBoxLiveRenderer
         {
             ResetState();
             _started = true;
-            _passthrough = true;
             _activeSession = session;
             _activeWriter = writer;
             _lastRenderedWidth = TerminalSize.Width;
@@ -407,7 +405,6 @@ public sealed class BlackBoxLiveRenderer
         _lastTransientRows = 0;
         _lastCursorRowOffset = 0;
         _lastUpdate = DateTime.MinValue;
-        _passthrough = false;
         _altScreen = false;
         _lastRenderedWidth = 0;
         _lastRenderedTier = LayoutTier.Full;

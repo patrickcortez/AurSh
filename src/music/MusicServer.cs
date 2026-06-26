@@ -167,7 +167,8 @@ public static class MusicServer
             var req = await System.Text.Json.JsonSerializer.DeserializeAsync(context.Request.Body, MusicJsonContext.Default.PlaylistUpdateRequest);
             if (req != null)
             {
-                if (userDataManager.UpdatePlaylist(playlistId, req.Name, req.Description, req.CoverArt, req.BannerArt))
+                if (req.Name != null && req.Description != null && req.CoverArt != null && req.BannerArt != null &&
+                    userDataManager.UpdatePlaylist(playlistId, req.Name, req.Description, req.CoverArt, req.BannerArt))
                 {
                     return Results.Json(userDataManager.Data, MusicJsonContext.Default.UserData);
                 }

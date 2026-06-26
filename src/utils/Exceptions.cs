@@ -6,7 +6,7 @@ namespace AurShell.Utils;
 internal class NUllAttributeException(string msg = "Attribute does not exist.")
 : Exception(msg)
 {
-    public string Message()
+    public new string Message()
     {
         return "Attribute does not exist";
     }

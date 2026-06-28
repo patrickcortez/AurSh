@@ -151,7 +151,7 @@ public class UserDataManager
     {
         bool changed = false;
         if (Data.LikedTracks.Remove(trackId)) changed = true;
-        
+
         foreach (var playlist in Data.Playlists)
         {
             if (playlist.TrackIds.Remove(trackId)) changed = true;

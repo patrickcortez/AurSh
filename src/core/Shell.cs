@@ -49,14 +49,14 @@ public class Shell
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
-            
+
             var clonedEnv = currentEnv.Clone();
             using var ms = new System.IO.MemoryStream();
             var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
-            
+
             // Redirect subshell output to our memory stream
             AstEvaluator.RunWithStreams(null, ms, null, () => evaluator.Visit(ast));
-            
+
             return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
         };
 
@@ -66,13 +66,14 @@ public class Shell
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
-            
+
             var clonedEnv = currentEnv.Clone();
             string tempFile = System.IO.Path.GetTempFileName();
-            
+
             if (isInput)
             {
-                System.Threading.Tasks.Task.Run(() => {
+                System.Threading.Tasks.Task.Run(() =>
+                {
                     using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
                     var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
                     AstEvaluator.RunWithStreams(null, fs, null, () => evaluator.Visit(ast));
@@ -80,14 +81,15 @@ public class Shell
             }
             else
             {
-                System.Threading.Tasks.Task.Run(async () => {
-                    await System.Threading.Tasks.Task.Delay(100); 
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(100);
                     using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Write);
                     var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
                     AstEvaluator.RunWithStreams(fs, null, null, () => evaluator.Visit(ast));
                 });
             }
-            
+
             return tempFile;
         };
 
@@ -127,13 +129,13 @@ public class Shell
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
-            
+
             var clonedEnv = currentEnv.Clone();
             using var ms = new System.IO.MemoryStream();
             var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
-            
+
             AstEvaluator.RunWithStreams(null, ms, null, () => evaluator.Visit(ast));
-            
+
             return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
         };
 
@@ -143,13 +145,14 @@ public class Shell
             var tokens = lexer.Tokenize();
             var parser = new Parser(tokens);
             var ast = parser.Parse();
-            
+
             var clonedEnv = currentEnv.Clone();
             string tempFile = System.IO.Path.GetTempFileName();
-            
+
             if (isInput)
             {
-                System.Threading.Tasks.Task.Run(() => {
+                System.Threading.Tasks.Task.Run(() =>
+                {
                     using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read);
                     var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
                     AstEvaluator.RunWithStreams(null, fs, null, () => evaluator.Visit(ast));
@@ -157,14 +160,15 @@ public class Shell
             }
             else
             {
-                System.Threading.Tasks.Task.Run(async () => {
-                    await System.Threading.Tasks.Task.Delay(100); 
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(100);
                     using var fs = new System.IO.FileStream(tempFile, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Write);
                     var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
                     AstEvaluator.RunWithStreams(fs, null, null, () => evaluator.Visit(ast));
                 });
             }
-            
+
             return tempFile;
         };
 

@@ -49,7 +49,7 @@ public static class MusicServer
         ExtractFrontendResources();
 
         var builder = WebApplication.CreateSlimBuilder(args);
-        
+
         // Listen on 7007
         builder.WebHost.UseUrls("http://127.0.0.1:7007");
 
@@ -204,7 +204,7 @@ public static class MusicServer
         });
 
         string uiPath = Path.Combine(Platform.HomeDirectory, ".aursh", "music-ui");
-        
+
         if (Directory.Exists(uiPath))
         {
             app.UseDefaultFiles(new DefaultFilesOptions

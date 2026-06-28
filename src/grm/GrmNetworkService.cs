@@ -14,7 +14,7 @@ public class GrmNetworkService
         var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("AurSh-GRM", "1.0"));
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-        
+
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -29,7 +29,7 @@ public class GrmNetworkService
         {
             using var client = CreateClient(token);
             string url = $"https://api.github.com/search/repositories?q={Uri.EscapeDataString(query)}&per_page=10";
-            
+
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
@@ -39,7 +39,7 @@ public class GrmNetworkService
 
             string content = await response.Content.ReadAsStringAsync();
             using JsonDocument doc = JsonDocument.Parse(content);
-            
+
             if (doc.RootElement.TryGetProperty("items", out JsonElement items))
             {
                 foreach (JsonElement item in items.EnumerateArray())
@@ -65,7 +65,7 @@ public class GrmNetworkService
         {
             using var client = CreateClient(token);
             string url = $"https://api.github.com/repos/{repoName}";
-            
+
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
@@ -75,13 +75,13 @@ public class GrmNetworkService
 
             string content = await response.Content.ReadAsStringAsync();
             using JsonDocument doc = JsonDocument.Parse(content);
-            
+
             var root = doc.RootElement;
-            string description = root.TryGetProperty("description", out var desc) && desc.ValueKind != JsonValueKind.Null 
+            string description = root.TryGetProperty("description", out var desc) && desc.ValueKind != JsonValueKind.Null
                 ? desc.GetString() ?? "No description" : "No description";
             int stars = root.TryGetProperty("stargazers_count", out var st) ? st.GetInt32() : 0;
             int forks = root.TryGetProperty("forks_count", out var fk) ? fk.GetInt32() : 0;
-            
+
             string license = "No license";
             if (root.TryGetProperty("license", out var lic) && lic.ValueKind != JsonValueKind.Null)
             {
@@ -111,10 +111,10 @@ License: {license}";
             using var client = CreateClient(token);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3.raw"));
-            
+
             string url = $"https://api.github.com/repos/{repoName}/readme";
             var response = await client.GetAsync(url);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 return null; // README might not exist, just return null silently

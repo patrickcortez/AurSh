@@ -60,7 +60,7 @@ public sealed class ConsoleSpinner : IDisposable
     {
         _counter++;
         string frame = Sequence[_counter % Sequence.Length];
-        
+
         try
         {
             // Use \r to return to the beginning of the line
@@ -102,7 +102,7 @@ public sealed class ConsoleSpinner : IDisposable
             {
                 finalLine = finalLine.PadRight(paddingLength);
             }
-            
+
             Console.WriteLine(finalLine);
         }
         else

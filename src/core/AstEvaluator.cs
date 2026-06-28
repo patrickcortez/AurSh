@@ -43,13 +43,14 @@ public class AstEvaluator
         var prevIn = _asyncIn.Value;
         var prevOut = _asyncOut.Value;
         var prevErr = _asyncErr.Value;
-        
+
         _asyncIn.Value = inStream;
         _asyncOut.Value = outStream;
         _asyncErr.Value = errStream;
-        
+
         try { action(); }
-        finally {
+        finally
+        {
             _asyncIn.Value = prevIn;
             _asyncOut.Value = prevOut;
             _asyncErr.Value = prevErr;
@@ -84,7 +85,7 @@ public class AstEvaluator
     public int Visit(PipelineNode pipeline)
     {
         if (pipeline.Commands.Count == 0) return 0;
-        
+
         if (pipeline.Commands.Count == 1)
         {
             return Visit(pipeline.Commands[0]);
@@ -123,7 +124,7 @@ public class AstEvaluator
                 catch (System.IO.IOException ex) when (ex.Message.Contains("broken", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("closed", StringComparison.OrdinalIgnoreCase))
                 {
                     // Simulated SIGPIPE
-                    return 141; 
+                    return 141;
                 }
                 catch (Exception ex)
                 {
@@ -246,11 +247,12 @@ public class AstEvaluator
                 var funcBody = _env.GetFunction(execCmd.Name);
                 if (funcBody != null)
                 {
-                    return ExecuteWithRedirections(execCmd, () => {
+                    return ExecuteWithRedirections(execCmd, () =>
+                    {
                         _env.PushFrame(new StackFrame(execCmd.Name, execCmd.Line, execCmd.Column, FrameType.Function));
                         _env.PushScope();
                         _env.PushPositionalArguments(execCmd.Args);
-                        
+
                         int exitCode = 1;
                         try
                         {
@@ -532,7 +534,7 @@ public class AstEvaluator
     private int Visit(ForNode node)
     {
         int lastExit = 0;
-        
+
         var expandedValues = new List<string>();
         if (node.IteratorValues.Count == 0)
         {
@@ -721,7 +723,7 @@ public class AstEvaluator
         {
             sb.Append(System.Text.RegularExpressions.Regex.Escape("\\"));
         }
-        
+
         return sb.ToString();
     }
 
@@ -806,9 +808,9 @@ public class AstEvaluator
         }
         else if (pos > 0 && isNonWhitespaceIfs(input[pos - 1]))
         {
-             // If string ends exactly on a non-whitespace IFS (and optional whitespace), 
-             // it generates a final empty field.
-             result.Add("");
+            // If string ends exactly on a non-whitespace IFS (and optional whitespace), 
+            // it generates a final empty field.
+            result.Add("");
         }
 
         return result;

@@ -46,7 +46,7 @@ public class GrmConfigManager
     public Dictionary<string, string> GetInstalledRepos()
     {
         var repos = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        
+
         try
         {
             if (!File.Exists(_configFile)) return repos;

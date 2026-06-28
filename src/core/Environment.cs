@@ -18,7 +18,7 @@ public class ShellEnvironment
     private int _lastExitCode;
 
     public Stack<StackFrame> CallStack { get; } = new();
-    
+
     public int LastExitCode
     {
         get => _lastExitCode;
@@ -197,10 +197,10 @@ public class ShellEnvironment
 
         if (name == "@" || name == "*")
             return string.Join(" ", PositionalArguments);
-            
+
         if (name == "#")
             return PositionalArguments.Count.ToString();
-            
+
         if (int.TryParse(name, out int index))
         {
             if (index > 0 && index <= PositionalArguments.Count)

@@ -14,9 +14,9 @@ public static class WordExpander
         var sb = new StringBuilder();
         bool inSingleQuote = false;
         bool inDoubleQuote = false;
-        
+
         List<string> words = new List<string>();
-        
+
         for (int i = 0; i < input.Length; i++)
         {
             char c = input[i];
@@ -207,9 +207,12 @@ public static class WordExpander
                     i++;
                 }
                 string expr = input.Substring(startExpr, i - startExpr - 2);
-                try {
+                try
+                {
                     expanded.Add(MathEvaluator.Evaluate(expr, env).ToString(System.Globalization.CultureInfo.InvariantCulture));
-                } catch {
+                }
+                catch
+                {
                     expanded.Add("");
                 }
                 return i;
@@ -277,7 +280,7 @@ public static class WordExpander
             nameBuf.Append(input[i]);
             i++;
         }
-        
+
         if (nameBuf.Length == 0) return startIdx;
 
         if (i < input.Length && input[i] == '.')
@@ -330,7 +333,7 @@ public static class WordExpander
         string defaultVal = "";
         bool hasDefault = false;
         bool isAssignDefault = false;
-        
+
         if (name.Contains(":-"))
         {
             int idx = name.IndexOf(":-");
@@ -346,7 +349,7 @@ public static class WordExpander
             hasDefault = true;
             isAssignDefault = true;
         }
-        
+
         string? substringOffset = null;
         string? substringLength = null;
         if (name.Contains(':') && !hasDefault)
@@ -476,7 +479,7 @@ public static class WordExpander
         for (int i = 0; i < result.Count; i++)
         {
             string val = result[i];
-            
+
             if (substringOffset != null)
             {
                 int offset = 0;
@@ -499,7 +502,7 @@ public static class WordExpander
                 // Basic glob-like implementation: match pattern with *
                 string pattern = prefixLong ?? prefixShort ?? suffixLong ?? suffixShort ?? "";
                 string regexPattern = GlobSegmentToRegex(pattern).TrimStart('^').TrimEnd('$');
-                
+
                 if (prefixLong != null || prefixShort != null)
                 {
                     regexPattern = "^" + regexPattern;
@@ -527,7 +530,7 @@ public static class WordExpander
                     }
                 }
             }
-            
+
             if (replacePattern != null && replaceStr != null)
             {
                 string regexPattern = GlobSegmentToRegex(replacePattern).TrimStart('^').TrimEnd('$');
@@ -601,7 +604,7 @@ public static class WordExpander
             startDir = startDir.Replace('\\', '/');
             if (!startDir.EndsWith("/")) startDir += "/";
             initialAccumulated = startDir;
-            
+
             if (Utils.Platform.CurrentOS == Utils.OperatingSystemType.Windows)
             {
                 if (segments.Length > 0 && segments[0].EndsWith(":"))
@@ -658,7 +661,7 @@ public static class WordExpander
                     string sub = d.Substring(currentPath.Length).Replace('\\', '/').TrimStart('/');
                     relPath = accumulatedPath == "" ? sub : (accumulatedPath.EndsWith("/") ? accumulatedPath + sub : accumulatedPath + "/" + sub);
                 }
-                
+
                 MatchSegments(d, segments, segmentIndex + 1, relPath, results);
             }
             return;
@@ -683,7 +686,7 @@ public static class WordExpander
                     if (accumulatedPath == "") newAccumulated = name;
                     else if (accumulatedPath.EndsWith("/")) newAccumulated = accumulatedPath + name;
                     else newAccumulated = accumulatedPath + "/" + name;
-                    
+
                     if (segmentIndex == segments.Length - 1)
                     {
                         results.Add(newAccumulated);
@@ -710,7 +713,7 @@ public static class WordExpander
         for (int i = 0; i < pattern.Length; i++)
         {
             char c = pattern[i];
-            
+
             if (i + 1 < pattern.Length && pattern[i + 1] == '(' && "?*+@!".Contains(c))
             {
                 extglobStack.Push(c);
@@ -719,13 +722,13 @@ public static class WordExpander
                 i++; // skip the '('
                 continue;
             }
-            
+
             if (c == '|' && extglobStack.Count > 0)
             {
                 sb.Append('|');
                 continue;
             }
-            
+
             if (c == ')' && extglobStack.Count > 0)
             {
                 char op = extglobStack.Pop();

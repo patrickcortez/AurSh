@@ -75,7 +75,7 @@ public static class GrmController
 
         string query = cmd.Args[1];
         Console.WriteLine($"Searching GitHub for '{query}'...");
-        
+
         var results = await Network.SearchRepositoriesAsync(query, GetToken(env));
         if (results.Count == 0)
         {
@@ -101,7 +101,7 @@ public static class GrmController
 
         string repoIdentifier = cmd.Args[1];
         string branch = "";
-        
+
         if (cmd.Args.Count >= 4 && cmd.Args[2] == "--branch")
         {
             branch = cmd.Args[3];
@@ -112,10 +112,10 @@ public static class GrmController
             Console.Error.WriteLine("grm install: repository must be in 'owner/repo' format");
             return 1;
         }
-        
+
         string owner = repoIdentifier.Split('/')[0];
         string repoName = repoIdentifier.Split('/')[1];
-        
+
         var installed = Config.GetInstalledRepos();
         if (installed.ContainsKey(repoIdentifier))
         {
@@ -128,7 +128,7 @@ public static class GrmController
         string targetPath = Path.Combine(reposDir, owner, repoName);
 
         Console.WriteLine($"Installing {repoIdentifier}...");
-        
+
         if (!Directory.Exists(Path.GetDirectoryName(targetPath)))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
@@ -144,7 +144,7 @@ public static class GrmController
         Console.WriteLine($"Installing {repoIdentifier} into {targetPath}...");
 
         string workDir = Path.GetDirectoryName(targetPath)!;
-        
+
         string gitArgs = $"clone {remoteUrl} \"{repoName}\"";
         if (!string.IsNullOrWhiteSpace(branch))
         {
@@ -179,7 +179,7 @@ public static class GrmController
             Console.WriteLine("[y] Yes");
             Console.WriteLine("[n] No");
             Console.WriteLine("[a] Always trust this repository.");
-            
+
             while (true)
             {
                 Console.Write("> ");
@@ -202,11 +202,11 @@ public static class GrmController
         }
 
         Console.WriteLine($"Running .grm script for {repoIdentifier} (Section: [{targetSection}])...");
-        
+
         string[] lines = File.ReadAllLines(grmFile);
         var declarationBlock = new System.Collections.Generic.List<string>();
         var executionBlock = new System.Collections.Generic.List<string>();
-        
+
         bool foundFirstSection = false;
         bool inTargetSection = false;
         bool inExecutionBlock = false;
@@ -214,7 +214,7 @@ public static class GrmController
         foreach (var line in lines)
         {
             string tLine = line.Trim();
-            
+
             if (tLine.StartsWith("[") && tLine.EndsWith("]"))
             {
                 foundFirstSection = true;
@@ -223,7 +223,7 @@ public static class GrmController
                 inExecutionBlock = false;
                 continue;
             }
-            
+
             if (!foundFirstSection)
             {
                 declarationBlock.Add(line);
@@ -254,7 +254,7 @@ public static class GrmController
             Console.Error.WriteLine($"\ngrm: Invalid .grm format. Expected explicit section headers (e.g. [INSTALL] or [RUN]).");
             return 1;
         }
-        
+
         if (executionBlock.Count == 0)
         {
             Console.Error.WriteLine($"\ngrm: Section [{targetSection}] not found or empty in .grm file.");
@@ -262,16 +262,16 @@ public static class GrmController
         }
 
         var executor = new AurShell.Core.Executor(env, targetPath);
-        
+
         bool oldStopOnError = env.StopOnError;
-        
+
         env.StopOnError = false;
         executor.ExecuteScript(string.Join(Environment.NewLine, declarationBlock));
 
         env.StopOnError = true;
         int rc = executor.ExecuteScript(string.Join(Environment.NewLine, executionBlock));
         env.StopOnError = oldStopOnError;
-        
+
         if (rc != 0)
         {
             Console.Error.WriteLine($"\ngrm: {targetSection} script failed with exit code {rc}.");
@@ -293,7 +293,7 @@ public static class GrmController
 
         string repoIdentifier = cmd.Args[1];
         string branch = "master";
-        
+
         if (cmd.Args.Count >= 4 && cmd.Args[2] == "--branch")
         {
             branch = cmd.Args[3];
@@ -352,14 +352,14 @@ public static class GrmController
         }
 
         Console.WriteLine($"Uninstalling {repoIdentifier}...");
-        
+
         try
         {
             if (Directory.Exists(targetPath))
             {
                 DeleteDirectory(targetPath);
             }
-            
+
             Config.RemoveRepo(repoIdentifier);
             Console.WriteLine($"grm: Successfully uninstalled {repoIdentifier}");
             return 0;
@@ -450,7 +450,7 @@ public static class GrmController
         }
 
         Console.WriteLine($"Upgrading {repoIdentifier}...");
-        
+
         int fetchCode = RunGit(targetPath, "fetch --dry-run");
         if (fetchCode != 0)
         {
@@ -534,19 +534,19 @@ public static class GrmController
 
         string oldDir = workingDirectory;
         workingDirectory = targetPath;
-        try 
+        try
         {
             Environment.CurrentDirectory = targetPath;
-        } 
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"grm: Failed to change directory: {ex.Message}");
             return 1;
         }
-        
+
         env.Set("OLDPWD", oldDir);
         env.Set("PWD", workingDirectory);
-        
+
         return 0;
     }
 
@@ -572,7 +572,7 @@ public static class GrmController
         }
 
         Console.WriteLine(info);
-        
+
         string? readme = await Network.GetRepoReadmeAsync(repoIdentifier, GetToken(env));
         if (!string.IsNullOrWhiteSpace(readme))
         {

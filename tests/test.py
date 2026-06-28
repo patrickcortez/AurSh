@@ -4,24 +4,29 @@ import time
 import os
 import platform
 
-def get_aursh_path():
+def get_aursh_cmd():
     ext = ".exe" if platform.system() == "Windows" else ""
     local_bin = os.path.join("bin", f"aursh{ext}")
     if os.path.exists(local_bin):
-        return local_bin
-    return "aursh"
+        return [local_bin]
+    
+    dll_path = os.path.join("bin", "aursh.dll")
+    if os.path.exists(dll_path):
+        return ["dotnet", dll_path]
+        
+    return ["aursh"]
 
-AURSH_BIN = get_aursh_path()
+AURSH_CMD = get_aursh_cmd()
 
 def test(args=None):
     if not args:
         print("testing AurSh...")
         time.sleep(4)
-        Executed = subprocess.run([AURSH_BIN, "-c", "echo ok"], capture_output=True, text=True)
+        Executed = subprocess.run(AURSH_CMD + ["-c", "echo ok"], capture_output=True, text=True)
     else:
         print("testing AurSh...")
         time.sleep(4)
-        Executed = subprocess.run([AURSH_BIN,"-c"] + args, capture_output=True, text=True)
+        Executed = subprocess.run(AURSH_CMD + ["-c"] + args, capture_output=True, text=True)
         
     if Executed.returncode != 0:
         print("ERROR: AurSh failed to run.")
@@ -35,7 +40,7 @@ def test(args=None):
 def test_ssh_registration():
     print("testing aursh-ssh registration...")
     time.sleep(1)
-    Executed = subprocess.run([AURSH_BIN, "-c", "type aursh-ssh"], capture_output=True, text=True)
+    Executed = subprocess.run(AURSH_CMD + ["-c", "type aursh-ssh"], capture_output=True, text=True)
     if Executed.returncode != 0:
         print("ERROR: aursh-ssh test failed.")
         print("--- STDOUT ---")
@@ -57,7 +62,7 @@ def test_interpreter_regressions():
         "",
     ])
     script_path = os.path.join("tests", "interpreter_regression.sh")
-    executed = subprocess.run([AURSH_BIN, script_path], capture_output=True, text=True)
+    executed = subprocess.run(AURSH_CMD + [script_path], capture_output=True, text=True)
 
     if executed.returncode != 0 or executed.stdout != expected:
         print("ERROR: interpreter regression test failed.")
@@ -70,7 +75,7 @@ def test_interpreter_regressions():
         return 1
 
     incomplete = subprocess.run(
-        [AURSH_BIN, "-c", "while true; do echo nope"],
+        AURSH_CMD + ["-c", "while true; do echo nope"],
         capture_output=True,
         text=True,
     )

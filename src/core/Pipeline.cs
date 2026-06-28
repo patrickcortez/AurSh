@@ -61,8 +61,8 @@ public static class Pipeline
             {
                 foreach (var redir in cmd.Redirections)
                 {
-                    string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc 
-                        ? redir.Target 
+                    string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc
+                        ? redir.Target
                         : ResolveRedirectionTarget(redir.Target, workingDirectory);
                     switch (redir.Type)
                     {
@@ -302,8 +302,8 @@ public static class Pipeline
 
         foreach (var redir in cmd.Redirections)
         {
-            string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc 
-                ? redir.Target 
+            string target = redir.Type == RedirectType.HereString || redir.Type == RedirectType.HereDoc
+                ? redir.Target
                 : ResolveRedirectionTarget(redir.Target, workingDirectory);
             switch (redir.Type)
             {
@@ -484,7 +484,7 @@ public static class Pipeline
         }
     }
 
-    
+
     private static ProcessStartInfo CreateProcessStartInfo(
         string executable, SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory)
     {

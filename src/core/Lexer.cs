@@ -125,16 +125,16 @@ public class Lexer
                     {
                         int lineStart = _pos;
                         while (_pos < _input.Length && _input[_pos] != '\n') _pos++;
-                        
+
                         string rawLine = _input.Substring(lineStart, _pos - lineStart);
                         string checkLine = hereDoc.stripTabs ? rawLine.TrimStart('\t') : rawLine;
-                        
+
                         if (checkLine == hereDoc.delimiter)
                         {
                             if (_pos < _input.Length && _input[_pos] == '\n') _pos++;
                             break;
                         }
-                        
+
                         sb.AppendLine(rawLine);
                         if (_pos < _input.Length && _input[_pos] == '\n') _pos++;
                     }
@@ -355,14 +355,14 @@ public class Lexer
                 rawSb.Append(c);
                 rawSb.Append('(');
                 _pos += 2;
-                
+
                 int depth = 1;
                 while (_pos < _input.Length && depth > 0)
                 {
                     char gc = _input[_pos];
                     if (gc == '(') depth++;
                     else if (gc == ')') depth--;
-                    
+
                     sb.Append(gc);
                     rawSb.Append(gc);
                     _pos++;
@@ -386,7 +386,7 @@ public class Lexer
                         char gc = _input[_pos];
                         if (gc == '(') depth++;
                         else if (gc == ')') depth--;
-                        
+
                         sb.Append(gc);
                         rawSb.Append(gc);
                         _pos++;

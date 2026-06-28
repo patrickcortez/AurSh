@@ -320,7 +320,7 @@ public class Parser
             if (Current.Value == "for") return ParseFor();
             if (Current.Value == "case") return ParseCase();
             if (Current.Value == "{") return ParseBlock();
-            
+
             if (Current.Value == "function" && Next.Type == TokenType.Word)
                 return ParseFunction();
         }
@@ -425,12 +425,12 @@ public class Parser
     {
         var node = InitNode(new IfNode());
         Advance(); // consume 'if'
-        
+
         node.Condition = ParseListUntilKeyword("then");
         ExpectKeyword("then", node.Line, node.Column);
-        
+
         node.ThenBlock = ParseListUntilKeyword("elif", "else", "fi");
-        
+
         while (Current.Type == TokenType.Word && Current.Value == "elif" && !Current.WasQuoted)
         {
             Advance();
@@ -465,7 +465,7 @@ public class Parser
     private FunctionNode? ParseFunction(string? name = null)
     {
         var node = InitNode(new FunctionNode());
-        
+
         if (name == null)
         {
             if (Current.Value == "function")
@@ -493,7 +493,7 @@ public class Parser
         }
 
         SkipNewlines();
-        
+
         if (Current.Type == TokenType.Word && Current.Value == "{" && !Current.WasQuoted)
         {
             node.Body = ParseBlock() ?? new BlockNode();
@@ -525,7 +525,7 @@ public class Parser
         node.Value = Current.Value.Substring(equalsIdx + 1);
         node.RawExpandedValue = Current.RawExpandedValue.Substring(equalsIdx + 1); // rough approximation
         Advance();
-        
+
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
@@ -536,7 +536,7 @@ public class Parser
         node.VariableName = name;
         Advance(); // consume 'var='
         Advance(); // consume '('
-        
+
         while (Current.Type != TokenType.EOF && Current.Type != TokenType.RightParen)
         {
             if (Current.Type == TokenType.Word)
@@ -545,7 +545,7 @@ public class Parser
             }
             Advance();
         }
-        
+
         if (Current.Type == TokenType.RightParen) Advance();
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
@@ -584,7 +584,7 @@ public class Parser
             node.VariableName = Current.Value;
             Advance();
         }
-        
+
         SkipNewlines();
 
         if (Current.Type == TokenType.Word && Current.Value == "in" && !Current.WasQuoted)
@@ -596,10 +596,10 @@ public class Parser
                 Advance();
             }
         }
-        
+
         if (Current.Type == TokenType.Semicolon || Current.Type == TokenType.Newline)
             Advance();
-            
+
         SkipNewlines();
 
         ExpectKeyword("do", node.Line, node.Column);
@@ -613,17 +613,17 @@ public class Parser
     {
         var node = InitNode(new CaseNode());
         Advance(); // consume 'case'
-        
+
         if (Current.Type == TokenType.Word)
         {
             node.Value = Current.RawExpandedValue;
             Advance();
         }
-        
+
         SkipNewlines();
         if (Current.Type == TokenType.Word && Current.Value == "in" && !Current.WasQuoted) Advance();
         SkipNewlines();
-        
+
         while (Current.Type != TokenType.EOF && !(Current.Type == TokenType.Word && Current.Value == "esac" && !Current.WasQuoted))
         {
             var patterns = new List<string>();
@@ -636,7 +636,7 @@ public class Parser
                 else
                     break;
             }
-            
+
             if (patterns.Count > 0)
             {
                 string last = patterns.Last();
@@ -648,15 +648,15 @@ public class Parser
 
             var body = ParseListUntilKeyword(";;", "esac");
             node.Cases.Add((patterns, body));
-            
+
             if (Current.Type == TokenType.DoubleSemicolon)
                 Advance();
             else if (Current.Type == TokenType.Word && Current.Value == ";;" && !Current.WasQuoted)
                 Advance();
-            
+
             SkipNewlines();
         }
-        
+
         ExpectKeyword("esac", node.Line, node.Column);
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;

@@ -154,7 +154,7 @@ public static class NetworkInfo
             using var client = new System.Net.Sockets.TcpClient();
             var connectTask = client.ConnectAsync("8.8.8.8", 53);
             bool success = connectTask.Wait(TimeSpan.FromMilliseconds(300));
-            if (!success) 
+            if (!success)
             {
                 // Explicitly observe the exception that will happen when we dispose the client
                 // to prevent an UnobservedTaskException from crashing the finalizer thread.

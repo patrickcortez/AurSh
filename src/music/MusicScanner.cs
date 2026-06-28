@@ -73,7 +73,7 @@ public class MusicScanner
         }
 
         if (string.IsNullOrEmpty(MusicDirectory) || !Directory.Exists(MusicDirectory)) return;
-        
+
         _watcher = new FileSystemWatcher(MusicDirectory);
         _watcher.IncludeSubdirectories = true;
         _watcher.Filter = "*.*";
@@ -159,7 +159,7 @@ public class MusicScanner
 
         Console.WriteLine($"[Music] Found {Tracks.Count} tracks.");
     }
-    
+
     public byte[]? GetCoverArt(string id)
     {
         var track = Tracks.FirstOrDefault(t => t.Id == id);

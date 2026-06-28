@@ -84,11 +84,24 @@ public class Lexer
         return new Token(type, value, line, col, wasQuoted, wasSingleQuoted, rawExpandedValue);
     }
 
-    public List<Token> Tokenize()
+    public List<Token> Tokenize(HashSet<string>? inheritedExpandedAliases = null)
     {
         var tokens = new List<Token>();
         bool isFirstWord = true;
         HashSet<string> expandedAliases = new HashSet<string>();
+        
+        void ResetExpandedAliases()
+        {
+            expandedAliases.Clear();
+            if (inheritedExpandedAliases != null)
+            {
+                foreach (var alias in inheritedExpandedAliases)
+                    expandedAliases.Add(alias);
+            }
+        }
+
+        ResetExpandedAliases();
+
         var pendingHereDocs = new Queue<(string delimiter, bool stripTabs, int insertIndex)>();
 
         while (_pos < _input.Length)
@@ -144,7 +157,7 @@ public class Lexer
                 }
 
                 isFirstWord = true;
-                expandedAliases.Clear();
+                ResetExpandedAliases();
                 continue;
             }
 
@@ -161,7 +174,7 @@ public class Lexer
                     tokens.Add(CreateToken(TokenType.Semicolon, ";", startPos));
                 }
                 isFirstWord = true;
-                expandedAliases.Clear();
+                ResetExpandedAliases();
                 continue;
             }
 
@@ -178,7 +191,7 @@ public class Lexer
                     tokens.Add(CreateToken(TokenType.Pipe, "|", startPos));
                 }
                 isFirstWord = true;
-                expandedAliases.Clear();
+                ResetExpandedAliases();
                 continue;
             }
 
@@ -195,7 +208,7 @@ public class Lexer
                     tokens.Add(CreateToken(TokenType.Background, "&", startPos));
                 }
                 isFirstWord = true;
-                expandedAliases.Clear();
+                ResetExpandedAliases();
                 continue;
             }
 
@@ -281,7 +294,7 @@ public class Lexer
                 tokens.Add(CreateToken(TokenType.LeftParen, "(", startPos));
                 _pos++;
                 isFirstWord = true;
-                expandedAliases.Clear();
+                ResetExpandedAliases();
                 continue;
             }
 
@@ -300,7 +313,7 @@ public class Lexer
                 {
                     expandedAliases.Add(wordToken.Value);
                     var subLexer = new Lexer(alias, _env);
-                    var subTokens = subLexer.Tokenize();
+                    var subTokens = subLexer.Tokenize(expandedAliases);
                     if (subTokens.Count > 0 && subTokens.Last().Type == TokenType.EOF)
                         subTokens.RemoveAt(subTokens.Count - 1);
                     tokens.AddRange(subTokens);

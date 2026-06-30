@@ -5,10 +5,12 @@
 PROJECT := src/AurShell.csproj
 UPDATE_PROJECT := src/aursh-update/AurShUpdate.csproj
 CONTEXT_PROJECT := src/Contexts/Contexts.csproj
+ISE_PROJECT := src-ise/AurShell.ISE/AurShell.ISE.csproj
 BIN_DIR := bin
 APP_NAME := aursh
 UPDATE_APP_NAME := aursh-update
 CONTEXT_APP_NAME := aursh-context
+ISE_APP_NAME := aursh-ise
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 3.0.0
@@ -98,6 +100,7 @@ ifeq ($(DETECTED_OS),Windows)
     EXE := $(APP_NAME).exe
     UPDATE_EXE := $(UPDATE_APP_NAME).exe
     CONTEXT_EXE := $(CONTEXT_APP_NAME).exe
+    ISE_EXE := $(ISE_APP_NAME).exe
     INSTALL_DIR := C:/Program Files/AurShell
     USER_INSTALL_DIR := $(subst \,/,$(LOCALAPPDATA))/AurShell
     ifeq ($(USER_INSTALL_DIR),/AurShell)
@@ -110,6 +113,7 @@ else ifeq ($(DETECTED_OS),macOS)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
+    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -119,6 +123,7 @@ else ifeq ($(DETECTED_OS),Termux)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
+    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := $(PREFIX)/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -129,6 +134,7 @@ else
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
+    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -137,7 +143,7 @@ endif
 
 # Targets
 
-.PHONY: all build release publish install install-user uninstall clean run test info help setfont deps
+.PHONY: all build release publish install install-user install-ise uninstall clean run test info help setfont deps
 
 all: build
 
@@ -213,12 +219,14 @@ ifeq ($(WIN_ENV),native)
 	@echo [build] Compiling debug build...
 	dotnet build $(PROJECT) -c Debug
 	dotnet build $(CONTEXT_PROJECT) -c Debug
-	@echo [build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)
+	dotnet build $(ISE_PROJECT) -c Debug
+	@echo [build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE) + $(BIN_DIR)/$(ISE_EXE)
 else
 	@echo "[build] Compiling debug build..."
 	dotnet build $(PROJECT) -c Debug
 	dotnet build $(CONTEXT_PROJECT) -c Debug
-	@echo "[build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
+	dotnet build $(ISE_PROJECT) -c Debug
+	@echo "[build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE) + $(BIN_DIR)/$(ISE_EXE)"
 endif
 
 release:
@@ -425,8 +433,43 @@ else
 	rm -f "$(INSTALL_DIR)/$(CONTEXT_EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(EXE)"
 	rm -f "$(USER_INSTALL_DIR)/$(UPDATE_EXE)"
-	rm -f "$(USER_INSTALL_DIR)/$(CONTEXT_EXE)"
 	@echo "[uninstall] Done."
+endif
+
+install-ise: publish-ise
+ifeq ($(WIN_ENV),native)
+	@echo [install] Installing ISE to $(INSTALL_DIR)...
+	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(ISE_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(ISE_EXE)' -NewName '$(ISE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE)' -Force"
+	@echo [install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)
+else ifeq ($(DETECTED_OS),Windows)
+	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
+	mkdir -p "$(INSTALL_DIR)"
+	cp "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
+	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
+else
+	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
+	install -d "$(INSTALL_DIR)"
+	install -m 755 "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
+	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
+endif
+
+publish-ise:
+ifeq ($(WIN_ENV),native)
+	@echo [publish] Publishing self-contained $(RID) ISE binary...
+	dotnet publish $(ISE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-ise/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true $(PUBLISH_FLAGS) -o $(PUBLISH_DIR)
+else
+	@echo "[publish] Publishing self-contained $(RID) ISE binary..."
+	dotnet publish $(ISE_PROJECT) \
+		-c Release \
+		-r $(RID) \
+		--self-contained true \
+		-p:OutputPath=obj/publish-build-ise/ \
+		-p:AppendTargetFrameworkToOutputPath=true \
+		-p:AppendRuntimeIdentifierToOutputPath=true \
+		$(PUBLISH_FLAGS) \
+		-o $(PUBLISH_DIR)
 endif
 
 # Utility Targets

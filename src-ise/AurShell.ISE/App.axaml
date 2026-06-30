@@ -1,0 +1,23 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AurShell.ISE.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <!-- Tokyo Night Theme Colors -->
+        <SolidColorBrush x:Key="TokyoBackground" Color="#1a1b26"/>
+        <SolidColorBrush x:Key="TokyoForeground" Color="#c0caf5"/>
+        <SolidColorBrush x:Key="TokyoComment" Color="#565f89"/>
+        <SolidColorBrush x:Key="TokyoKeyword" Color="#bb9af7"/>
+        <SolidColorBrush x:Key="TokyoString" Color="#9ece6a"/>
+        <SolidColorBrush x:Key="TokyoFunction" Color="#7aa2f7"/>
+        <SolidColorBrush x:Key="TokyoSelection" Color="#33467c"/>
+        <SolidColorBrush x:Key="TokyoPanelBg" Color="#16161e"/>
+        <SolidColorBrush x:Key="TokyoBorder" Color="#292e42"/>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+    </Application.Styles>
+</Application>

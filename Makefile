@@ -306,9 +306,9 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE).old') { Remove-Item '$(INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE).old') { Remove-Item '$(INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE).old') { Remove-Item '$(INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(EXE)' -NewName '$(EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(UPDATE_EXE)' -NewName '$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(CONTEXT_EXE)' -NewName '$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(EXE)') { Move-Item -Path '$(INSTALL_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(UPDATE_EXE)') { Move-Item -Path '$(INSTALL_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(CONTEXT_EXE)') { Move-Item -Path '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Destination '$(INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
@@ -359,9 +359,9 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE).old') { Remove-Item '$(USER_INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(EXE)' -NewName '$(EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -NewName '$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)') { Rename-Item -Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -NewName '$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(EXE)') { Move-Item -Path '$(USER_INSTALL_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)') { Move-Item -Path '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
+	@$(PS) "if (Test-Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)') { Move-Item -Path '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Destination '$(USER_INSTALL_DIR)/$(CONTEXT_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(EXE)' -Destination '$(USER_INSTALL_DIR)/$(EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(UPDATE_EXE)' -Destination '$(USER_INSTALL_DIR)/$(UPDATE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(CONTEXT_EXE)' -Destination '$(USER_INSTALL_DIR)/$(CONTEXT_EXE)' -Force"
@@ -439,11 +439,11 @@ endif
 install-ise: publish-ise
 ifeq ($(WIN_ENV),native)
 	@echo [install] Installing ISE to $(INSTALL_DIR)...
-	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
-	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(ISE_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(ISE_EXE)' -NewName '$(ISE_EXE).old' -Force -ErrorAction SilentlyContinue }"
+	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null; exit 0"
+	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(ISE_EXE)') { Move-Item -Path '$(INSTALL_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE)' -Force"
 	@$(PS) "Copy-Item -Path 'Assets' -Destination '$(INSTALL_DIR)' -Recurse -Force"
-	@$(PS) "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.IconLocation = '$(INSTALL_DIR)\Assets\Images\ISE.ico'; $$shortcut.Save()"
+	@$(PS) "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.IconLocation = '$(INSTALL_DIR)\Assets\Images\ISE.ico'; $$shortcut.Save(); exit 0"
 	@echo [install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)
 else ifeq ($(DETECTED_OS),Windows)
 	@echo "[install] Installing ISE to $(INSTALL_DIR)..."

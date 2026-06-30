@@ -112,10 +112,13 @@ public partial class MainWindow : Window
         sb.AppendLine("      <Begin>'</Begin>");
         sb.AppendLine("      <End>'</End>");
         sb.AppendLine("    </Span>");
-        sb.AppendLine("    <Rule color=\"Comment\">#.*</Rule>");
+        sb.AppendLine("    <Span color=\"Comment\">");
+        sb.AppendLine("      <Begin>\\#</Begin>");
+        sb.AppendLine("    </Span>");
         sb.AppendLine("    <Keywords color=\"Keyword\">");
         foreach (var cmd in _knownCommands)
         {
+            if (string.IsNullOrWhiteSpace(cmd) || !char.IsLetter(cmd[0])) continue;
             string safeCmd = cmd.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
             sb.AppendLine($"      <Word>{safeCmd}</Word>");
         }

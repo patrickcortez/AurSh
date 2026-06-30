@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AurShell.Core.Types;
 
@@ -167,15 +168,20 @@ public class AurObject : AurValue
     
     public override string ToString()
     {
-        var props = new List<string>();
-        foreach (var kvp in Properties)
+        try
         {
-            if (kvp.Value.Type == AurValueType.String)
-                props.Add($"\"{kvp.Key}\": \"{kvp.Value}\"");
-            else
-                props.Add($"\"{kvp.Key}\": {kvp.Value}");
+            if (Properties.Count == 0)
+            {
+                return "{}";
+            }
+            
+            var props = Properties.Select(kv => $"{kv.Key}: {kv.Value?.ToString() ?? "null"}");
+            return $"{{ {string.Join(", ", props)} }}";
         }
-        return "{ " + string.Join(", ", props) + " }";
+        catch (Exception ex)
+        {
+            return $"[object Object - Error: {ex.Message}]";
+        }
     }
     
     public override bool IsTruthy() => true;

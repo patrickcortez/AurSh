@@ -450,7 +450,7 @@ else ifeq ($(DETECTED_OS),Windows)
 	mkdir -p "$(INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
 	cp -r "Assets" "$(INSTALL_DIR)/"
-	@powershell -Command "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.IconLocation = '$(INSTALL_DIR)\Assets\Images\ISE.ico'; $$shortcut.Save()"
+	@powershell -Command '$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath("Desktop") + "\AurSh ISE.lnk"); $$shortcut.TargetPath = "$(INSTALL_DIR)\$(ISE_EXE)"; $$shortcut.IconLocation = "$(INSTALL_DIR)\Assets\Images\ISE.ico"; $$shortcut.Save()'
 	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
 else
 	@echo "[install] Installing ISE to $(INSTALL_DIR)..."

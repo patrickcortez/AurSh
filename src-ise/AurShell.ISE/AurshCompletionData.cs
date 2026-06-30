@@ -6,6 +6,7 @@ using AvaloniaEdit.Editing;
 
 namespace AurShell.ISE
 {
+    [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All)]
     public class AurshCompletionData : ICompletionData
     {
         public AurshCompletionData(string text)

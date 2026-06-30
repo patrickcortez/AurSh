@@ -148,7 +148,7 @@ public partial class MainWindow : Window
 
             foreach (var cmd in _knownCommands)
             {
-                if (cmd.ToLower().StartsWith(currentWord))
+                if (cmd.StartsWith(currentWord, StringComparison.OrdinalIgnoreCase))
                 {
                     data.Add(new AurshCompletionData(cmd));
                 }

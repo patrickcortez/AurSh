@@ -53,12 +53,15 @@ public partial class MainWindow : Window
             using var proc = Process.Start(psi);
             if (proc != null)
             {
-                string json = proc.StandardOutput.ReadToEnd();
+                string json = proc.StandardOutput.ReadToEnd().Trim();
                 proc.WaitForExit();
-                var builtins = json.Trim().Trim('[', ']').Split(',')
-                                   .Select(s => s.Trim().Trim('"'))
-                                   .Where(s => !string.IsNullOrEmpty(s));
-                _knownCommands.AddRange(builtins);
+                if (json.StartsWith("[") && json.EndsWith("]"))
+                {
+                    var builtins = json.Trim('[', ']').Split(',')
+                                       .Select(s => s.Trim().Trim('"'))
+                                       .Where(s => !string.IsNullOrEmpty(s));
+                    _knownCommands.AddRange(builtins);
+                }
             }
         }
         catch { }
@@ -109,9 +112,7 @@ public partial class MainWindow : Window
         sb.AppendLine("      <Begin>'</Begin>");
         sb.AppendLine("      <End>'</End>");
         sb.AppendLine("    </Span>");
-        sb.AppendLine("    <Span color=\"Comment\" multiline=\"false\">");
-        sb.AppendLine("      <Begin>#</Begin>");
-        sb.AppendLine("    </Span>");
+        sb.AppendLine("    <Rule color=\"Comment\">#.*</Rule>");
         sb.AppendLine("    <Keywords color=\"Keyword\">");
         foreach (var cmd in _knownCommands)
         {

@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>..\..\Assets\Images\ISE.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

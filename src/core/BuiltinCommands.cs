@@ -61,6 +61,7 @@ public static class BuiltinCommands
             "env" => AurShell.Commands.AurshEnvCommand.Execute(env),
             "true" => 0,
             "false" => 1,
+            "shift" => AurShell.Commands.AurshShiftCommand.Execute(cmd, env),
             "read" => AurShell.Commands.AurshReadCommand.Execute(cmd, env),
             "test" or "[" or "[[" => AurShell.Commands.AurshTestCommand.Execute(cmd),
             "return" => AurShell.Commands.AurshReturnCommand.Execute(cmd, env),

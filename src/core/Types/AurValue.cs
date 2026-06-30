@@ -11,7 +11,8 @@ public enum AurValueType
     Bool,
     List,
     Object,
-    Null
+    Null,
+    Function
 }
 
 public abstract class AurValue
@@ -21,10 +22,14 @@ public abstract class AurValue
     // Every value must be able to convert to a string for standard POSIX shell commands
     public abstract override string ToString();
     
-    // Utility for truthiness (like in Bash or JS)
     public virtual bool IsTruthy()
     {
         return true;
+    }
+
+    public virtual AurValue CallMethod(string methodName, List<AurValue> args)
+    {
+        throw new Exception($"Method '{methodName}' does not exist on type {Type}");
     }
 }
 
@@ -47,6 +52,21 @@ public class AurString : AurValue
     public override AurValueType Type => AurValueType.String;
     public override string ToString() => Value;
     public override bool IsTruthy() => !string.IsNullOrEmpty(Value);
+
+    public override AurValue CallMethod(string methodName, List<AurValue> args)
+    {
+        switch (methodName.ToLowerInvariant())
+        {
+            case "length":
+                return new AurInt(Value.Length);
+            case "toupper":
+                return new AurString(Value.ToUpperInvariant());
+            case "tolower":
+                return new AurString(Value.ToLowerInvariant());
+            default:
+                return base.CallMethod(methodName, args);
+        }
+    }
 }
 
 public class AurInt : AurValue
@@ -87,8 +107,24 @@ public class AurBool : AurValue
     }
     
     public override AurValueType Type => AurValueType.Bool;
-    public override string ToString() => Value ? "true" : "false"; // or "1"/"0"? We'll use JS style for now.
+    public override string ToString() => Value ? "true" : "false";
     public override bool IsTruthy() => Value;
+}
+
+public class AurFunction : AurValue
+{
+    public ICommandNode Node { get; set; }
+    public ShellEnvironment Env { get; set; }
+
+    public AurFunction(ICommandNode node, ShellEnvironment env)
+    {
+        Node = node;
+        Env = env;
+    }
+
+    public override AurValueType Type => AurValueType.Function;
+    public override string ToString() => "[object Function]";
+    public override bool IsTruthy() => true;
 }
 
 public class AurList : AurValue
@@ -102,6 +138,23 @@ public class AurList : AurValue
     {
         return string.Join(" ", Values);
     }
+
+    public override AurValue CallMethod(string methodName, List<AurValue> args)
+    {
+        switch (methodName.ToLowerInvariant())
+        {
+            case "length":
+                return new AurInt(Values.Count);
+            case "push":
+                Values.AddRange(args);
+                return new AurInt(Values.Count);
+            case "join":
+                string delimiter = args.Count > 0 ? args[0].ToString() : " ";
+                return new AurString(string.Join(delimiter, Values));
+            default:
+                return base.CallMethod(methodName, args);
+        }
+    }
     
     public override bool IsTruthy() => Values.Count > 0;
 }
@@ -114,8 +167,40 @@ public class AurObject : AurValue
     
     public override string ToString()
     {
-        return "[object Object]";
+        var props = new List<string>();
+        foreach (var kvp in Properties)
+        {
+            if (kvp.Value.Type == AurValueType.String)
+                props.Add($"\"{kvp.Key}\": \"{kvp.Value}\"");
+            else
+                props.Add($"\"{kvp.Key}\": {kvp.Value}");
+        }
+        return "{ " + string.Join(", ", props) + " }";
     }
     
     public override bool IsTruthy() => true;
+
+    public override AurValue CallMethod(string methodName, List<AurValue> args)
+    {
+        if (Properties.TryGetValue(methodName, out var value) && value is AurFunction func)
+        {
+            var executor = new Executor(func.Env, System.Environment.CurrentDirectory);
+            var evaluator = new AstEvaluator(func.Env, executor, System.Environment.CurrentDirectory);
+
+            var fnNode = func.Node as FunctionNode;
+            if (fnNode != null)
+            {
+                // Push positional args
+                var strArgs = new List<string>();
+                foreach(var arg in args) strArgs.Add(arg.ToString());
+                
+                func.Env.PushPositionalArguments(strArgs);
+                evaluator.Visit(fnNode.Body);
+                func.Env.PopPositionalArguments();
+                
+                return func.Env.LastReturnValue ?? new AurInt(func.Env.LastExitCode);
+            }
+        }
+        return base.CallMethod(methodName, args);
+    }
 }

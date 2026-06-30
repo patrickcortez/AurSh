@@ -1,12 +1,20 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using AurShell.Core.Types;
 
 namespace AurShell.Core;
 
 public class ShellEnvironment
 {
+    public ShellEnvironment? Parent { get; set; }
+    
     private readonly Dictionary<string, string> _variables = new(StringComparer.Ordinal);
     private readonly Stack<Dictionary<string, string>> _localScopes = new();
+    
+    // Phase 1: Rich Type System Storage
+    private readonly Dictionary<string, AurValue> _values = new(StringComparer.Ordinal);
+    private readonly Stack<Dictionary<string, AurValue>> _localValueScopes = new();
+    
     private readonly Dictionary<string, Dictionary<string, string>> _objects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _aliases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ICommandNode> _functions = new(StringComparer.Ordinal);
@@ -15,7 +23,13 @@ public class ShellEnvironment
     private readonly Dictionary<string, Dictionary<string, string>> _assocArrays = new(StringComparer.Ordinal);
     private readonly HashSet<string> _readonlyVars = new(StringComparer.Ordinal);
 
+    // Phase 6: Modularity
+    public Dictionary<string, AurValue> Exports { get; } = new(StringComparer.Ordinal);
+
     private int _lastExitCode;
+
+    // Phase 3: First-Class Returns
+    public AurValue? LastReturnValue { get; set; }
 
     public Stack<StackFrame> CallStack { get; } = new();
 
@@ -45,6 +59,13 @@ public class ShellEnvironment
             _positionalArgsStack.Pop();
     }
 
+    public void ShiftPositionalArguments(int count)
+    {
+        var args = PositionalArguments;
+        if (count > args.Count) count = args.Count;
+        if (count > 0) args.RemoveRange(0, count);
+    }
+
     public bool StopOnError { get; set; } = false;
 
     public JobTable Jobs { get; } = new();
@@ -67,12 +88,15 @@ public class ShellEnvironment
     public void PushScope()
     {
         _localScopes.Push(new Dictionary<string, string>(StringComparer.Ordinal));
+        _localValueScopes.Push(new Dictionary<string, AurValue>(StringComparer.Ordinal));
     }
 
     public void PopScope()
     {
         if (_localScopes.Count > 0)
             _localScopes.Pop();
+        if (_localValueScopes.Count > 0)
+            _localValueScopes.Pop();
     }
 
     public void PushFrame(StackFrame frame)
@@ -154,7 +178,86 @@ public class ShellEnvironment
                 return;
             }
         }
+
+        if (_variables.ContainsKey(name))
+        {
+            _variables[name] = value;
+            return;
+        }
+
+        if (Parent != null && Parent.Get(name) != null)
+        {
+            Parent.Set(name, value);
+            return;
+        }
+
         _variables[name] = value;
+    }
+
+    public void SetLocalAurValue(string name, AurValue value)
+    {
+        if (CheckReadonly(name)) return;
+        if (_localValueScopes.Count > 0)
+        {
+            _localValueScopes.Peek()[name] = value;
+        }
+        else
+        {
+            _values[name] = value;
+        }
+        // Backwards compatibility layer
+        SetLocal(name, value?.ToString() ?? "");
+    }
+
+    public void SetAurValue(string name, AurValue value)
+    {
+        if (CheckReadonly(name)) return;
+        foreach (var scope in _localValueScopes)
+        {
+            if (scope.ContainsKey(name))
+            {
+                scope[name] = value;
+                Set(name, value?.ToString() ?? "");
+                return;
+            }
+        }
+        
+        if (_values.ContainsKey(name))
+        {
+            _values[name] = value;
+            Set(name, value?.ToString() ?? "");
+            return;
+        }
+
+        if (Parent != null && Parent.GetAurValue(name) != null)
+        {
+            Parent.SetAurValue(name, value);
+            return;
+        }
+
+        _values[name] = value;
+        Set(name, value?.ToString() ?? "");
+    }
+
+    public AurValue? GetAurValue(string name)
+    {
+        foreach (var scope in _localValueScopes)
+        {
+            if (scope.TryGetValue(name, out AurValue? val))
+                return val;
+        }
+        if (_values.TryGetValue(name, out AurValue? globalVal))
+            return globalVal;
+            
+        if (Parent != null)
+        {
+            var pVal = Parent.GetAurValue(name);
+            if (pVal != null) return pVal;
+        }
+            
+        // Fallback to string env
+        var strVal = Get(name);
+        return strVal != null ? new AurString(strVal) : null;
     }
 
     public string? Get(string name)
@@ -212,6 +315,12 @@ public class ShellEnvironment
         if (_variables.TryGetValue(name, out string? globalVal))
             return globalVal;
 
+        if (Parent != null)
+        {
+            var pVal = Parent.Get(name);
+            if (pVal != null) return pVal;
+        }
+
         return System.Environment.GetEnvironmentVariable(name);
     }
 
@@ -242,7 +351,9 @@ public class ShellEnvironment
 
     public List<string>? GetArray(string name)
     {
-        return _arrays.TryGetValue(name, out var arr) ? arr : null;
+        if (_arrays.TryGetValue(name, out var arr)) return arr;
+        if (Parent != null) return Parent.GetArray(name);
+        return null;
     }
 
     public void SetArrayElement(string name, int index, string value)
@@ -250,6 +361,11 @@ public class ShellEnvironment
         if (CheckReadonly(name)) return;
         if (!_arrays.TryGetValue(name, out var arr))
         {
+            if (Parent != null && Parent.GetArray(name) != null)
+            {
+                Parent.SetArrayElement(name, index, value);
+                return;
+            }
             arr = new List<string>();
             _arrays[name] = arr;
         }
@@ -262,6 +378,7 @@ public class ShellEnvironment
     {
         if (_arrays.TryGetValue(name, out var arr) && index >= 0 && index < arr.Count)
             return arr[index];
+        if (Parent != null) return Parent.GetArrayElement(name, index);
         return null;
     }
 
@@ -269,18 +386,23 @@ public class ShellEnvironment
     {
         if (_arrays.TryGetValue(name, out var arr))
             return arr.Count;
+        if (Parent != null) return Parent.GetArrayLength(name);
         return 0;
     }
 
     public void SetAssocArray(string name, Dictionary<string, string> values)
     {
         if (CheckReadonly(name)) return;
+        if (_assocArrays.ContainsKey(name)) { _assocArrays[name] = new Dictionary<string, string>(values, StringComparer.Ordinal); return; }
+        if (Parent != null && Parent.GetAssocArray(name) != null) { Parent.SetAssocArray(name, values); return; }
         _assocArrays[name] = new Dictionary<string, string>(values, StringComparer.Ordinal);
     }
 
     public Dictionary<string, string>? GetAssocArray(string name)
     {
-        return _assocArrays.TryGetValue(name, out var dict) ? dict : null;
+        if (_assocArrays.TryGetValue(name, out var dict)) return dict;
+        if (Parent != null) return Parent.GetAssocArray(name);
+        return null;
     }
 
     public void SetAssocElement(string name, string key, string value)
@@ -288,6 +410,11 @@ public class ShellEnvironment
         if (CheckReadonly(name)) return;
         if (!_assocArrays.TryGetValue(name, out var dict))
         {
+            if (Parent != null && Parent.GetAssocArray(name) != null)
+            {
+                Parent.SetAssocElement(name, key, value);
+                return;
+            }
             dict = new Dictionary<string, string>(StringComparer.Ordinal);
             _assocArrays[name] = dict;
         }
@@ -298,6 +425,7 @@ public class ShellEnvironment
     {
         if (_assocArrays.TryGetValue(name, out var dict) && dict.TryGetValue(key, out var val))
             return val;
+        if (Parent != null) return Parent.GetAssocElement(name, key);
         return null;
     }
 
@@ -305,23 +433,39 @@ public class ShellEnvironment
     {
         if (_variables.TryGetValue(name, out string? val))
             System.Environment.SetEnvironmentVariable(name, val);
+        else if (Parent != null)
+            Parent.ExportToSystem(name);
     }
 
     public void SetObject(string name, Dictionary<string, string> obj)
     {
+        if (_objects.ContainsKey(name))
+        {
+            _objects[name] = new Dictionary<string, string>(obj, StringComparer.Ordinal);
+            _variables[name] = SerializeObject(obj);
+            return;
+        }
+        if (Parent != null && Parent.GetObject(name) != null)
+        {
+            Parent.SetObject(name, obj);
+            return;
+        }
         _objects[name] = new Dictionary<string, string>(obj, StringComparer.Ordinal);
         _variables[name] = SerializeObject(obj);
     }
 
     public Dictionary<string, string>? GetObject(string name)
     {
-        return _objects.TryGetValue(name, out var obj) ? obj : null;
+        if (_objects.TryGetValue(name, out var obj)) return obj;
+        if (Parent != null) return Parent.GetObject(name);
+        return null;
     }
 
     public string? GetObjectField(string name, string field)
     {
         if (_objects.TryGetValue(name, out var obj) && obj.TryGetValue(field, out string? val))
             return val;
+        if (Parent != null) return Parent.GetObjectField(name, field);
         return null;
     }
 
@@ -332,7 +476,9 @@ public class ShellEnvironment
 
     public string? GetAlias(string name)
     {
-        return _aliases.TryGetValue(name, out string? val) ? val : null;
+        if (_aliases.TryGetValue(name, out string? val)) return val;
+        if (Parent != null) return Parent.GetAlias(name);
+        return null;
     }
 
     public bool UnsetAlias(string name)
@@ -347,7 +493,13 @@ public class ShellEnvironment
 
     public ICommandNode? GetFunction(string name)
     {
-        return _functions.TryGetValue(name, out var body) ? body : null;
+        if (_functions.TryGetValue(name, out var body))
+            return body;
+            
+        if (Parent != null)
+            return Parent.GetFunction(name);
+            
+        return null;
     }
 
     public string Expand(string input)
@@ -482,25 +634,7 @@ public class ShellEnvironment
     public ShellEnvironment Clone()
     {
         var clone = new ShellEnvironment();
-        foreach (var kv in _variables)
-            clone._variables[kv.Key] = kv.Value;
-
-        foreach (var scope in _localScopes.Reverse())
-        {
-            foreach (var kv in scope)
-                clone._variables[kv.Key] = kv.Value;
-        }
-
-        foreach (var kv in _objects)
-            clone._objects[kv.Key] = new Dictionary<string, string>(kv.Value, StringComparer.Ordinal);
-        foreach (var kv in _arrays)
-            clone._arrays[kv.Key] = new List<string>(kv.Value);
-        foreach (var kv in _assocArrays)
-            clone._assocArrays[kv.Key] = new Dictionary<string, string>(kv.Value, StringComparer.Ordinal);
-        foreach (var kv in _aliases)
-            clone._aliases[kv.Key] = kv.Value;
-        foreach (var kv in _functions)
-            clone._functions[kv.Key] = kv.Value;
+        clone.Parent = this;
         clone._lastExitCode = _lastExitCode;
         clone.SubshellEvaluator = SubshellEvaluator;
         clone.ProcessSubstitutionEvaluator = ProcessSubstitutionEvaluator;

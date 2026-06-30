@@ -78,6 +78,11 @@ You can store and retrieve data in variables, use indexed and associative arrays
 # Accessing basic variables
 echo "My home is $HOME"
 
+# Rich Assignments with `let`
+# You can perform rich assignments that properly evaluate subshells or variables right during assignment!
+let version = $(git --version)
+echo "I am running $version"
+
 # Special Variables
 echo "Last exit code: $?"
 echo "Script name: $0"
@@ -127,6 +132,14 @@ AurSh supports POSIX-style logic blocks like `if/elif/else`, `case` statements, 
 # Condition Evaluation
 if [ -f "config.json" ]; then
     echo "Config found"
+fi
+
+# Strict Type Checking
+# When doing numeric comparisons (-eq, -ne, -lt, -gt), AurSh strictly enforces type safety.
+# Comparing a string to an integer throws an expected shell error, keeping your scripts predictable.
+# aursh: [: my_string: integer expression expected
+if [ "$count" -eq 0 ]; then
+    echo "Count is zero"
 fi
 
 # Case Statements

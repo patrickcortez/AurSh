@@ -24,6 +24,9 @@ public enum TokenType
     Newline,
     LeftParen,
     RightParen,
+    LeftBrace, RightBrace, LeftBracket, RightBracket, Dot, Comma, Colon,
+    Assign, Equal, NotEqual, LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual,
+    Plus, Minus, Multiply, Divide, Not,
     EOF
 }
 
@@ -36,8 +39,9 @@ public class Token
     public bool WasQuoted { get; }
     public bool WasSingleQuoted { get; }
     public string RawExpandedValue { get; }
+    public bool HasLeadingSpace { get; }
 
-    public Token(TokenType type, string value, int line, int column, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
+    public Token(TokenType type, string value, int line, int column, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null, bool hasLeadingSpace = false)
     {
         Type = type;
         Value = value;
@@ -46,6 +50,7 @@ public class Token
         WasQuoted = wasQuoted;
         WasSingleQuoted = wasSingleQuoted;
         RawExpandedValue = rawExpandedValue ?? value;
+        HasLeadingSpace = hasLeadingSpace;
     }
 
     public override string ToString() => $"[{Line}:{Column} {Type}: {Value}]";
@@ -78,10 +83,10 @@ public class Lexer
         return (line + 1, col); // 1-indexed
     }
 
-    private Token CreateToken(TokenType type, string value, int startPos, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null)
+    private Token CreateToken(TokenType type, string value, int startPos, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null, bool hasLeadingSpace = false)
     {
         var (line, col) = GetPosition(startPos);
-        return new Token(type, value, line, col, wasQuoted, wasSingleQuoted, rawExpandedValue);
+        return new Token(type, value, line, col, wasQuoted, wasSingleQuoted, rawExpandedValue, hasLeadingSpace);
     }
 
     public List<Token> Tokenize(HashSet<string>? inheritedExpandedAliases = null)
@@ -106,7 +111,7 @@ public class Lexer
 
         while (_pos < _input.Length)
         {
-            SkipWhitespace();
+            bool hasLeadingSpace = SkipWhitespace();
 
             int startPos = _pos;
             if (_pos >= _input.Length)
@@ -123,7 +128,7 @@ public class Lexer
 
             if (c == '\n')
             {
-                tokens.Add(CreateToken(TokenType.Newline, "\n", startPos));
+                tokens.Add(CreateToken(TokenType.Newline, "\n", startPos, hasLeadingSpace: hasLeadingSpace));
                 _pos++;
 
                 // Process pending HereDocs before continuing to the next line of commands
@@ -152,7 +157,7 @@ public class Lexer
                         if (_pos < _input.Length && _input[_pos] == '\n') _pos++;
                     }
 
-                    tokens.Insert(hereDoc.insertIndex + insertedTokens, CreateToken(TokenType.HereDocText, sb.ToString(), hereDocStartPos));
+                    tokens.Insert(hereDoc.insertIndex + insertedTokens, CreateToken(TokenType.HereDocText, sb.ToString(), hereDocStartPos, hasLeadingSpace: hasLeadingSpace));
                     insertedTokens++;
                 }
 
@@ -166,12 +171,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == ';')
                 {
-                    tokens.Add(CreateToken(TokenType.DoubleSemicolon, ";;", startPos));
+                    tokens.Add(CreateToken(TokenType.DoubleSemicolon, ";;", startPos, hasLeadingSpace: hasLeadingSpace));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(CreateToken(TokenType.Semicolon, ";", startPos));
+                    tokens.Add(CreateToken(TokenType.Semicolon, ";", startPos, hasLeadingSpace: hasLeadingSpace));
                 }
                 isFirstWord = true;
                 ResetExpandedAliases();
@@ -183,12 +188,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == '|')
                 {
-                    tokens.Add(CreateToken(TokenType.Or, "||", startPos));
+                    tokens.Add(CreateToken(TokenType.Or, "||", startPos, hasLeadingSpace: hasLeadingSpace));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(CreateToken(TokenType.Pipe, "|", startPos));
+                    tokens.Add(CreateToken(TokenType.Pipe, "|", startPos, hasLeadingSpace: hasLeadingSpace));
                 }
                 isFirstWord = true;
                 ResetExpandedAliases();
@@ -200,12 +205,12 @@ public class Lexer
                 _pos++;
                 if (_pos < _input.Length && _input[_pos] == '&')
                 {
-                    tokens.Add(CreateToken(TokenType.And, "&&", startPos));
+                    tokens.Add(CreateToken(TokenType.And, "&&", startPos, hasLeadingSpace: hasLeadingSpace));
                     _pos++;
                 }
                 else
                 {
-                    tokens.Add(CreateToken(TokenType.Background, "&", startPos));
+                    tokens.Add(CreateToken(TokenType.Background, "&", startPos, hasLeadingSpace: hasLeadingSpace));
                 }
                 isFirstWord = true;
                 ResetExpandedAliases();
@@ -217,17 +222,17 @@ public class Lexer
                 _pos += 2;
                 if (_pos < _input.Length && _input[_pos] == '>')
                 {
-                    tokens.Add(CreateToken(TokenType.RedirectErrAppend, "2>>", startPos));
+                    tokens.Add(CreateToken(TokenType.RedirectErrAppend, "2>>", startPos, hasLeadingSpace: hasLeadingSpace));
                     _pos++;
                 }
                 else if (_pos + 1 < _input.Length && _input[_pos] == '&' && _input[_pos + 1] == '1')
                 {
-                    tokens.Add(CreateToken(TokenType.RedirectErrToOut, "2>&1", startPos));
+                    tokens.Add(CreateToken(TokenType.RedirectErrToOut, "2>&1", startPos, hasLeadingSpace: hasLeadingSpace));
                     _pos += 2;
                 }
                 else
                 {
-                    tokens.Add(CreateToken(TokenType.RedirectErr, "2>", startPos));
+                    tokens.Add(CreateToken(TokenType.RedirectErr, "2>", startPos, hasLeadingSpace: hasLeadingSpace));
                 }
                 continue;
             }
@@ -243,12 +248,12 @@ public class Lexer
                     _pos++;
                     if (_pos < _input.Length && _input[_pos] == '>')
                     {
-                        tokens.Add(CreateToken(TokenType.RedirectAppend, ">>", startPos));
+                        tokens.Add(CreateToken(TokenType.RedirectAppend, ">>", startPos, hasLeadingSpace: hasLeadingSpace));
                         _pos++;
                     }
                     else
                     {
-                        tokens.Add(CreateToken(TokenType.RedirectOut, ">", startPos));
+                        tokens.Add(CreateToken(TokenType.RedirectOut, ">", startPos, hasLeadingSpace: hasLeadingSpace));
                     }
                     continue;
                 }
@@ -269,21 +274,21 @@ public class Lexer
                         if (_pos < _input.Length && _input[_pos] == '<')
                         {
                             _pos++;
-                            tokens.Add(CreateToken(TokenType.HereString, "<<<", startPos));
+                            tokens.Add(CreateToken(TokenType.HereString, "<<<", startPos, hasLeadingSpace: hasLeadingSpace));
                         }
                         else if (_pos < _input.Length && _input[_pos] == '-')
                         {
                             _pos++;
-                            tokens.Add(CreateToken(TokenType.HereDoc, "<<-", startPos));
+                            tokens.Add(CreateToken(TokenType.HereDoc, "<<-", startPos, hasLeadingSpace: hasLeadingSpace));
                         }
                         else
                         {
-                            tokens.Add(CreateToken(TokenType.HereDoc, "<<", startPos));
+                            tokens.Add(CreateToken(TokenType.HereDoc, "<<", startPos, hasLeadingSpace: hasLeadingSpace));
                         }
                     }
                     else
                     {
-                        tokens.Add(CreateToken(TokenType.RedirectIn, "<", startPos));
+                        tokens.Add(CreateToken(TokenType.RedirectIn, "<", startPos, hasLeadingSpace: hasLeadingSpace));
                     }
                     continue;
                 }
@@ -291,7 +296,7 @@ public class Lexer
 
             if (c == '(')
             {
-                tokens.Add(CreateToken(TokenType.LeftParen, "(", startPos));
+                tokens.Add(CreateToken(TokenType.LeftParen, "(", startPos, hasLeadingSpace: hasLeadingSpace));
                 _pos++;
                 isFirstWord = true;
                 ResetExpandedAliases();
@@ -300,12 +305,52 @@ public class Lexer
 
             if (c == ')')
             {
-                tokens.Add(CreateToken(TokenType.RightParen, ")", startPos));
+                tokens.Add(CreateToken(TokenType.RightParen, ")", startPos, hasLeadingSpace: hasLeadingSpace));
                 _pos++;
                 continue;
             }
 
-            Token wordToken = ReadWord(startPos);
+            if (c == '{') { tokens.Add(CreateToken(TokenType.LeftBrace, "{", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '}') { tokens.Add(CreateToken(TokenType.RightBrace, "}", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '[') { tokens.Add(CreateToken(TokenType.LeftBracket, "[", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == ']') { tokens.Add(CreateToken(TokenType.RightBracket, "]", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '.') { tokens.Add(CreateToken(TokenType.Dot, ".", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == ',') { tokens.Add(CreateToken(TokenType.Comma, ",", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == ':') { tokens.Add(CreateToken(TokenType.Colon, ":", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '+') { tokens.Add(CreateToken(TokenType.Plus, "+", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '-') { tokens.Add(CreateToken(TokenType.Minus, "-", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '*') { tokens.Add(CreateToken(TokenType.Multiply, "*", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '/') { tokens.Add(CreateToken(TokenType.Divide, "/", startPos, hasLeadingSpace: hasLeadingSpace)); _pos++; continue; }
+            if (c == '!') 
+            {
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '=')
+                {
+                    tokens.Add(CreateToken(TokenType.NotEqual, "!=", startPos, hasLeadingSpace: hasLeadingSpace));
+                    _pos += 2;
+                }
+                else
+                {
+                    tokens.Add(CreateToken(TokenType.Not, "!", startPos, hasLeadingSpace: hasLeadingSpace));
+                    _pos++;
+                }
+                continue;
+            }
+            if (c == '=')
+            {
+                if (_pos + 1 < _input.Length && _input[_pos + 1] == '=')
+                {
+                    tokens.Add(CreateToken(TokenType.Equal, "==", startPos, hasLeadingSpace: hasLeadingSpace));
+                    _pos += 2;
+                }
+                else
+                {
+                    tokens.Add(CreateToken(TokenType.Assign, "=", startPos, hasLeadingSpace: hasLeadingSpace));
+                    _pos++;
+                }
+                continue;
+            }
+
+            Token wordToken = ReadWord(startPos, hasLeadingSpace);
             if (isFirstWord && !wordToken.WasQuoted)
             {
                 string? alias = _env.GetAlias(wordToken.Value);
@@ -341,13 +386,18 @@ public class Lexer
         return tokens;
     }
 
-    private void SkipWhitespace()
+    private bool SkipWhitespace()
     {
+        bool skipped = false;
         while (_pos < _input.Length && _input[_pos] != '\n' && char.IsWhiteSpace(_input[_pos]))
+        {
             _pos++;
+            skipped = true;
+        }
+        return skipped;
     }
 
-    private Token ReadWord(int startPos)
+    private Token ReadWord(int startPos, bool hasLeadingSpace)
     {
         var sb = new StringBuilder();
         var rawSb = new StringBuilder();
@@ -420,6 +470,9 @@ public class Lexer
                 break;
 
             if (c == '#' && sb.Length == 0)
+                break;
+
+            if ("+-*/=<>!.,{}[]:".Contains(c))
                 break;
 
             if (c == '\\' && _pos + 1 < _input.Length)
@@ -532,7 +585,7 @@ public class Lexer
             wasSingleQuoted = false;
         }
 
-        return CreateToken(TokenType.Word, sb.ToString(), startPos, wasQuoted, wasSingleQuoted, rawSb.ToString());
+        return CreateToken(TokenType.Word, sb.ToString(), startPos, wasQuoted, wasSingleQuoted, rawSb.ToString(), hasLeadingSpace);
     }
 
     private string ReadSubCommand()

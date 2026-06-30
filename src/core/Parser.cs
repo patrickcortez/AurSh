@@ -125,6 +125,7 @@ public class FunctionNode : ICommandNode
     public int Column { get; set; }
     public string Name { get; set; } = "";
     public BlockNode Body { get; set; } = new();
+    public bool IsExported { get; set; } = false;
     public List<Redirection> Redirections { get; } = new();
 }
 
@@ -135,6 +136,36 @@ public class AssignmentNode : ICommandNode
     public string VariableName { get; set; } = "";
     public string Value { get; set; } = "";
     public string RawExpandedValue { get; set; } = "";
+    public List<Redirection> Redirections { get; } = new();
+}
+
+public class LetNode : ICommandNode
+{
+    public int Line { get; set; }
+    public int Column { get; set; }
+    public string VariableName { get; set; } = "";
+    public AST.ExpressionNode? Expression { get; set; }
+    public bool IsExported { get; set; } = false;
+    public List<Redirection> Redirections { get; } = new();
+}
+
+public class ConstNode : ICommandNode
+{
+    public int Line { get; set; }
+    public int Column { get; set; }
+    public string VariableName { get; set; } = "";
+    public AST.ExpressionNode? Expression { get; set; }
+    public bool IsExported { get; set; } = false;
+    public List<Redirection> Redirections { get; } = new();
+}
+
+public class TryCatchNode : ICommandNode
+{
+    public int Line { get; set; }
+    public int Column { get; set; }
+    public BlockNode TryBlock { get; set; } = new();
+    public string CatchVariable { get; set; } = "err";
+    public BlockNode CatchBlock { get; set; } = new();
     public List<Redirection> Redirections { get; } = new();
 }
 
@@ -312,6 +343,9 @@ public class Parser
         if (Current.Type == TokenType.LeftParen)
             return ParseSubshell();
 
+        if (Current.Type == TokenType.LeftBrace || (Current.Type == TokenType.Word && Current.Value == "{"))
+            return ParseBlock();
+
         if (Current.Type == TokenType.Word && !Current.WasQuoted)
         {
             if (Current.Value == "if") return ParseIf();
@@ -319,15 +353,50 @@ public class Parser
             if (Current.Value == "until") return ParseUntil();
             if (Current.Value == "for") return ParseFor();
             if (Current.Value == "case") return ParseCase();
-            if (Current.Value == "{") return ParseBlock();
+            if (Current.Value == "let") return ParseLet();
+            if (Current.Value == "const") return ParseConst();
+            if (Current.Value == "try") return ParseTryCatch();
 
             if (Current.Value == "function" && Next.Type == TokenType.Word)
                 return ParseFunction();
+                
+            if (Current.Value == "export")
+            {
+                if (Next.Type == TokenType.Word && Next.Value == "function")
+                {
+                    Advance(); // consume 'export'
+                    var funcNode = ParseFunction();
+                    if (funcNode != null) funcNode.IsExported = true;
+                    return funcNode;
+                }
+                else if (Next.Type == TokenType.Word && Next.Value == "let")
+                {
+                    Advance(); // consume 'export'
+                    var letNode = ParseLet();
+                    if (letNode != null) letNode.IsExported = true;
+                    return letNode;
+                }
+                else if (Next.Type == TokenType.Word && Next.Value == "const")
+                {
+                    Advance(); // consume 'export'
+                    var constNode = ParseConst();
+                    if (constNode != null) constNode.IsExported = true;
+                    return constNode;
+                }
+            }
         }
 
         if (Current.Type == TokenType.Word && Next.Type == TokenType.LeftParen && LookAhead(2).Type == TokenType.RightParen)
         {
-            return ParseFunction();
+            var la3 = LookAhead(3);
+            var la4 = LookAhead(4);
+            bool hasBrace = la3.Type == TokenType.LeftBrace || (la3.Type == TokenType.Word && la3.Value == "{") ||
+                            (la3.Type == TokenType.Newline && (la4.Type == TokenType.LeftBrace || (la4.Type == TokenType.Word && la4.Value == "{")));
+            
+            if (hasBrace)
+            {
+                return ParseFunction();
+            }
         }
 
         if (Current.Type == TokenType.Word && Current.Value.Contains("="))
@@ -352,40 +421,103 @@ public class Parser
             }
         }
 
+        int startPos = _pos;
+        var exprParser = new AST.ExpressionParser(_tokens, _pos);
+        try
+        {
+            var expr = exprParser.ParseExpression();
+            if (expr != null)
+            {
+                int nextPos = exprParser.GetCurrentPosition();
+                var nextToken = nextPos < _tokens.Count ? _tokens[nextPos] : new Token(TokenType.EOF, "", 0, 0);
+
+                if (nextToken.Type == TokenType.Newline || nextToken.Type == TokenType.Semicolon || nextToken.Type == TokenType.EOF || nextToken.Type == TokenType.Pipe || IsRedirect(nextToken.Type))
+                {
+                    if (expr is AST.AssignmentExpressionNode || expr is AST.CallExpressionNode || expr is AST.MemberExpressionNode || expr is AST.IndexExpressionNode)
+                    {
+                        _pos = nextPos;
+                        var exprNode = InitNode(new AST.ExpressionStatementNode(expr));
+                        while (IsRedirect(Current.Type)) ParseRedirection(exprNode);
+                        return exprNode;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // fallback to SimpleCommand
+        }
+        
+        _pos = startPos; // reset in case expression partially parsed but failed
         return ParseSimpleCommand();
+    }
+
+    private bool IsSimpleCommandArg(TokenType type)
+    {
+        return type == TokenType.Word || type == TokenType.Plus || type == TokenType.Minus || 
+               type == TokenType.Multiply || type == TokenType.Divide || type == TokenType.Dot || 
+               type == TokenType.Comma || type == TokenType.Colon || type == TokenType.Equal || 
+               type == TokenType.NotEqual || type == TokenType.LessThan || type == TokenType.GreaterThan || 
+               type == TokenType.LessThanOrEqual || type == TokenType.GreaterThanOrEqual || 
+               type == TokenType.Assign || type == TokenType.Not || type == TokenType.LeftBracket || 
+               type == TokenType.RightBracket || type == TokenType.LeftBrace || type == TokenType.RightBrace ||
+               type == TokenType.LeftParen || type == TokenType.RightParen;
     }
 
     private SimpleCommandNode? ParseSimpleCommand()
     {
         var cmd = InitNode(new SimpleCommandNode());
         bool hasContent = false;
+        var argBuilder = new System.Text.StringBuilder();
+        var rawArgBuilder = new System.Text.StringBuilder();
 
-        while (Current.Type == TokenType.Word)
+        while (IsSimpleCommandArg(Current.Type))
         {
-            if (!hasContent && IsValidAssignment(Current.Value) && StartsAssignmentPrefixedCommand())
+            if (!hasContent && Current.Type == TokenType.Word && IsValidAssignment(Current.Value) && StartsAssignmentPrefixedCommand())
             {
                 cmd.PrefixAssignments.Add(CreateAssignmentFromCurrent());
                 Advance();
                 continue;
             }
 
-            if (!hasContent)
+            if (Current.HasLeadingSpace && argBuilder.Length > 0)
             {
-                cmd.Name = Current.Value;
-                cmd.RawExpandedName = Current.RawExpandedValue;
-                hasContent = true;
+                if (!hasContent)
+                {
+                    cmd.Name = argBuilder.ToString();
+                    cmd.RawExpandedName = rawArgBuilder.ToString();
+                    hasContent = true;
+                }
+                else
+                {
+                    cmd.Args.Add(argBuilder.ToString());
+                    cmd.RawExpandedArgs.Add(rawArgBuilder.ToString());
+                }
+                argBuilder.Clear();
+                rawArgBuilder.Clear();
             }
-            else
-            {
-                cmd.Args.Add(Current.Value);
-                cmd.RawExpandedArgs.Add(Current.RawExpandedValue);
-            }
+
+            argBuilder.Append(Current.Value);
+            rawArgBuilder.Append(Current.RawExpandedValue);
             Advance();
 
             while (IsRedirect(Current.Type))
             {
+                if (argBuilder.Length > 0)
+                {
+                    if (!hasContent) { cmd.Name = argBuilder.ToString(); cmd.RawExpandedName = rawArgBuilder.ToString(); hasContent = true; }
+                    else { cmd.Args.Add(argBuilder.ToString()); cmd.RawExpandedArgs.Add(rawArgBuilder.ToString()); }
+                    argBuilder.Clear(); rawArgBuilder.Clear();
+                }
                 ParseRedirection(cmd);
+                hasContent = true;
             }
+        }
+
+        if (argBuilder.Length > 0)
+        {
+            if (!hasContent) { cmd.Name = argBuilder.ToString(); cmd.RawExpandedName = rawArgBuilder.ToString(); hasContent = true; }
+            else { cmd.Args.Add(argBuilder.ToString()); cmd.RawExpandedArgs.Add(rawArgBuilder.ToString()); }
         }
 
         while (IsRedirect(Current.Type))
@@ -418,6 +550,156 @@ public class Parser
             ? Current.RawExpandedValue.Substring(rawEqualsIdx + 1)
             : node.Value;
 
+        return node;
+    }
+
+    private LetNode? ParseLet()
+    {
+        var node = InitNode(new LetNode());
+        Advance(); // consume 'let'
+
+        if (Current.Type != TokenType.Word)
+        {
+            Console.Error.WriteLine($"aursh: let: missing variable name");
+            return null;
+        }
+
+        string rawToken = Current.Value;
+        if (rawToken.Contains("="))
+        {
+            int eqIdx = rawToken.IndexOf("=");
+            node.VariableName = rawToken.Substring(0, eqIdx);
+            
+            // For now, if they attached it like x=5, we just parse the rest as string in ExpressionParser?
+            // Actually, Lexer now spits out '=' as its own token if there are spaces, but if it's attached like let x=5, 
+            // Lexer gives Word("x=5"). We should probably split the token or just leave it.
+            // Wait, Lexer splits `=` into a TokenType.Equal if we added it as an operator!
+            // Let's assume Lexer doesn't split it yet for words starting with a character?
+            // If it DOES contain `=`, then we need to parse the rest. But since Lexer was updated to tokenize `=`, `x=5` should be `Word(x)`, `Equal`, `Word(5)`!
+            // Ah, so Lexer doesn't output `x=5` as a single word anymore if it sees `=`? Wait, Lexer was updated to treat `=` as an operator.
+        }
+        
+        node.VariableName = Current.Value;
+        Advance();
+
+        if (Current.Type == TokenType.Equal)
+        {
+            Advance(); // consume '='
+        }
+        else if (Current.Type == TokenType.Assign) // Just in case Lexer emitted Assign
+        {
+            Advance();
+        }
+        else if (Current.Value == "=")
+        {
+            Advance();
+        }
+        else
+        {
+            Console.Error.WriteLine($"aursh: let: expected '=' after '{node.VariableName}'");
+            return null;
+        }
+        
+        var exprParser = new AST.ExpressionParser(_tokens, _pos);
+        var expr = exprParser.ParseExpression();
+        if (expr != null)
+        {
+            node.Expression = expr;
+            _pos = exprParser.GetCurrentPosition();
+        }
+        else
+        {
+            Console.Error.WriteLine($"aursh: let: expected expression after '='");
+            return null;
+        }
+
+        while (IsRedirect(Current.Type)) ParseRedirection(node);
+        return node;
+    }
+
+    private ConstNode? ParseConst()
+    {
+        var node = InitNode(new ConstNode());
+        Advance(); // consume 'const'
+
+        if (Current.Type != TokenType.Word)
+        {
+            Console.Error.WriteLine($"aursh: const: missing variable name");
+            return null;
+        }
+
+        node.VariableName = Current.Value;
+        Advance();
+
+        if (Current.Type == TokenType.Equal)
+        {
+            Advance(); // consume '='
+        }
+        else if (Current.Type == TokenType.Assign)
+        {
+            Advance();
+        }
+        else if (Current.Value == "=")
+        {
+            Advance();
+        }
+        else
+        {
+            Console.Error.WriteLine($"aursh: const: expected '=' after '{node.VariableName}'");
+            return null;
+        }
+
+        var exprParser = new AST.ExpressionParser(_tokens, _pos);
+        var expr = exprParser.ParseExpression();
+        if (expr != null)
+        {
+            node.Expression = expr;
+            _pos = exprParser.GetCurrentPosition();
+        }
+        else
+        {
+            Console.Error.WriteLine($"aursh: const: expected expression after '='");
+            return null;
+        }
+
+        while (IsRedirect(Current.Type)) ParseRedirection(node);
+        return node;
+    }
+
+    private TryCatchNode? ParseTryCatch()
+    {
+        var node = InitNode(new TryCatchNode());
+        Advance(); // consume 'try'
+
+        if (Current.Type == TokenType.LeftBrace || (Current.Type == TokenType.Word && Current.Value == "{"))
+        {
+            node.TryBlock = ParseBlock()!;
+        }
+        else
+        {
+            Console.Error.WriteLine("aursh: try must be followed by a block '{ ... }'");
+            return null;
+        }
+
+        ExpectKeyword("catch", node.Line, node.Column);
+
+        if (Current.Type == TokenType.Word && Current.Value != "{")
+        {
+            node.CatchVariable = Current.Value;
+            Advance();
+        }
+
+        if (Current.Type == TokenType.LeftBrace || (Current.Type == TokenType.Word && Current.Value == "{"))
+        {
+            node.CatchBlock = ParseBlock()!;
+        }
+        else
+        {
+            Console.Error.WriteLine("aursh: catch must be followed by a block '{ ... }'");
+            return null;
+        }
+
+        while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }
 
@@ -494,7 +776,7 @@ public class Parser
 
         SkipNewlines();
 
-        if (Current.Type == TokenType.Word && Current.Value == "{" && !Current.WasQuoted)
+        if (Current.Type == TokenType.LeftBrace || (Current.Type == TokenType.Word && Current.Value == "{" && !Current.WasQuoted))
         {
             node.Body = ParseBlock() ?? new BlockNode();
         }
@@ -667,7 +949,15 @@ public class Parser
         var node = InitNode(new BlockNode());
         Advance(); // consume '{'
         node.Body = ParseListUntilKeyword("}");
-        ExpectKeyword("}", node.Line, node.Column);
+        
+        if (Current.Type == TokenType.RightBrace || (Current.Type == TokenType.Word && Current.Value == "}"))
+        {
+            Advance();
+        }
+        else
+        {
+            ExpectKeyword("}", node.Line, node.Column);
+        }
         while (IsRedirect(Current.Type)) ParseRedirection(node);
         return node;
     }

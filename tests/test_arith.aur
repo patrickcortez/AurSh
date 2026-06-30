@@ -1,2 +1,3 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
 echo "Should not see this" > nul
 echo "Should see this"

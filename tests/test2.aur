@@ -1,3 +1,4 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
 echo "test starting"
 
 git --version

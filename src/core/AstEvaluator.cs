@@ -169,6 +169,10 @@ public class AstEvaluator
             FunctionNode fnod => Visit(fnod),
             AssignmentNode an => Visit(an),
             ArrayAssignmentNode aan => Visit(aan),
+            LetNode ln => Visit(ln),
+            ConstNode cnn => Visit(cnn),
+            AST.ExpressionStatementNode esn => Visit(esn),
+            TryCatchNode tcn => ExecuteWithRedirections(tcn, () => Visit(tcn)),
             _ => 1
         };
     }
@@ -236,9 +240,257 @@ public class AstEvaluator
             if (execCmd.Name == "return")
             {
                 _returnRequested = true;
-                if (execCmd.Args.Count > 0 && int.TryParse(execCmd.Args[0], out int retCode))
-                    return retCode;
+                if (execCmd.Args.Count > 0)
+                {
+                    // If it parses purely as int, set exit code too for backward compatibility
+                    if (int.TryParse(execCmd.Args[0], out int retCode))
+                    {
+                        _env.LastReturnValue = new Types.AurInt(retCode);
+                        return retCode;
+                    }
+                    else
+                    {
+                        string returnVal = string.Join(" ", execCmd.Args);
+                        _env.LastReturnValue = new Types.AurString(returnVal);
+                        return 0;
+                    }
+                }
+                
+                _env.LastReturnValue = null;
                 return 0;
+            }
+            if (execCmd.Name == "throw")
+            {
+                string errMsg = string.Join(" ", execCmd.Args);
+                throw new Exception(errMsg); // Bubble up to try/catch or exit
+            }
+            if (execCmd.Name == "export")
+            {
+                if (execCmd.Args.Count == 0) return 0;
+                string innerCmdStr = string.Join(" ", cmd.RawExpandedArgs);
+                var lexer = new Lexer(innerCmdStr, _env);
+                var innerCmd = new Parser(lexer.Tokenize()).Parse();
+                
+                int result = 0;
+                if (innerCmd != null && innerCmd is ListNode listNode)
+                {
+                    result = Visit(listNode);
+                    if (listNode.Entries.Count > 0 && listNode.Entries[0].Pipeline.Commands.Count > 0)
+                    {
+                        var firstCmd = listNode.Entries[0].Pipeline.Commands[0];
+                        if (firstCmd is LetNode letNode)
+                        {
+                            _env.Exports[letNode.VariableName] = _env.GetAurValue(letNode.VariableName);
+                        }
+                        else if (firstCmd is ConstNode constNode)
+                        {
+                            _env.Exports[constNode.VariableName] = _env.GetAurValue(constNode.VariableName);
+                        }
+                        else if (firstCmd is AssignmentNode assign)
+                        {
+                            _env.Exports[assign.VariableName] = _env.GetAurValue(assign.VariableName);
+                        }
+                        else if (firstCmd is FunctionNode func)
+                        {
+                            _env.Exports[func.Name] = new Types.AurFunction(func, _env);
+                        }
+                    }
+                }
+                return result;
+            }
+            if (execCmd.Name == "import")
+            {
+                if (execCmd.Args.Count != 1) {
+                    Console.Error.WriteLine("aursh: import requires exactly 1 argument (the path to the script)");
+                    return 1;
+                }
+                
+                string scriptPath = execCmd.Args[0].Trim('\"', '\'');
+                string resolvedPath = AurShell.Utils.FileSystem.ResolvePath(scriptPath, _workingDirectory);
+                if (!System.IO.File.Exists(resolvedPath)) {
+                    throw new Exception($"Import failed: Cannot find module '{resolvedPath}'");
+                }
+                
+                string scriptContent = System.IO.File.ReadAllText(resolvedPath);
+                
+                try
+                {
+                    AurShell.Utils.ScriptValidator.Validate(resolvedPath, scriptContent);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex.Message);
+                    return 1;
+                }
+
+                // Execute in a new environment
+                var childEnv = new ShellEnvironment();
+                var lexer = new Lexer(scriptContent, childEnv);
+                var tokens = lexer.Tokenize();
+                var parser = new Parser(tokens);
+                var ast = parser.Parse();
+                
+                var evaluator = new AstEvaluator(childEnv, _executor, _workingDirectory);
+                if (ast is ListNode listAst) evaluator.Visit(listAst);
+                
+                var moduleObj = new Types.AurObject();
+                foreach (var kvp in childEnv.Exports)
+                {
+                    moduleObj.Properties[kvp.Key] = kvp.Value;
+                }
+                
+                _env.LastReturnValue = moduleObj;
+                return 0;
+            }
+
+            // Phase 5.5: Check for Index Assignment (e.g. obj[0] = val or obj["key"] = val)
+            var indexMatch = System.Text.RegularExpressions.Regex.Match(execCmd.Name, @"^([a-zA-Z0-9_]+)\[(.+)\]$");
+            if (indexMatch.Success)
+            {
+                string objName = indexMatch.Groups[1].Value;
+                string indexStr = indexMatch.Groups[2].Value.Trim('"', '\'');
+                var methodArgs = execCmd.Args;
+
+                if (methodArgs.Count >= 2 && methodArgs[0] == "=")
+                {
+                    var obj = _env.GetAurValue(objName);
+                    if (obj != null)
+                    {
+                        var argsToExpand = methodArgs.Skip(1).ToList();
+                        var expandedValArgs = new List<string>();
+                        foreach (var arg in argsToExpand)
+                            expandedValArgs.AddRange(WordExpander.ExpandWord(arg, _env));
+                            
+                        string valStr = string.Join(" ", expandedValArgs);
+                        var parsedVal = AurValueParser.Parse(valStr);
+
+                        if (obj is Types.AurList aurList)
+                        {
+                            if (int.TryParse(indexStr, out int idx) && idx >= 0 && idx < aurList.Values.Count)
+                            {
+                                aurList.Values[idx] = parsedVal;
+                                return 0;
+                            }
+                            else if (idx == aurList.Values.Count)
+                            {
+                                aurList.Values.Add(parsedVal);
+                                return 0;
+                            }
+                            throw new Exception($"Index '{indexStr}' is out of bounds for list '{objName}'");
+                        }
+                        else if (obj is Types.AurObject aurObj)
+                        {
+                            aurObj.Properties[indexStr] = parsedVal;
+                            return 0;
+                        }
+                        throw new Exception($"Cannot assign index on non-list/object '{objName}'");
+                    }
+                }
+            }
+
+            // Phase 5: Check for Object Method Calls or Property Assignment (e.g. obj.method(), obj.prop = val)
+            var methodMatch = System.Text.RegularExpressions.Regex.Match(execCmd.Name, @"^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)$");
+            if (methodMatch.Success)
+            {
+                string objName = methodMatch.Groups[1].Value;
+                string propOrMethodName = methodMatch.Groups[2].Value;
+
+                var obj = _env.GetAurValue(objName);
+                if (obj != null)
+                {
+                    var methodArgs = execCmd.Args;
+
+                    // Property Assignment: obj.prop = value
+                    if (methodArgs.Count >= 2 && methodArgs[0] == "=")
+                    {
+                        if (obj is Types.AurObject aurObj)
+                        {
+                            var argsToExpand = methodArgs.Skip(1).ToList();
+                            var expandedValArgs = new List<string>();
+                            foreach (var arg in argsToExpand)
+                                expandedValArgs.AddRange(WordExpander.ExpandWord(arg, _env));
+                            
+                            string valStr = string.Join(" ", expandedValArgs);
+                            aurObj.Properties[propOrMethodName] = AurValueParser.Parse(valStr);
+                            return 0;
+                        }
+                        throw new Exception($"Cannot assign property '{propOrMethodName}' on non-object '{objName}'");
+                    }
+
+                    // Method Call: obj.method(...)
+                    var args = new List<Types.AurValue>();
+                    if (methodArgs.Count >= 2 && methodArgs[0] == "(" && methodArgs[methodArgs.Count - 1] == ")")
+                    {
+                        for (int i = 1; i < methodArgs.Count - 1; i++)
+                        {
+                            if (methodArgs[i] != ",")
+                                args.Add(new Types.AurString(string.Join(" ", WordExpander.ExpandWord(methodArgs[i], _env))));
+                        }
+                    }
+                    var ret = obj.CallMethod(propOrMethodName, args);
+                    _env.LastReturnValue = ret;
+                    return 0; // Success
+                }
+                else
+                {
+                    throw new Exception($"Object '{objName}' not found.");
+                }
+            }
+
+            // Phase 6: Check for JavaScript-style function calls (e.g. funcName(arg1, arg2))
+            var funcCallMatch = System.Text.RegularExpressions.Regex.Match(execCmd.Name, @"^([a-zA-Z0-9_]+)\((.*)\)$");
+            if (funcCallMatch.Success)
+            {
+                string funcName = funcCallMatch.Groups[1].Value;
+                string argsStr = funcCallMatch.Groups[2].Value;
+
+                var fBody = _env.GetFunction(funcName);
+                if (fBody != null)
+                {
+                    return ExecuteWithRedirections(execCmd, () =>
+                    {
+                        var args = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(argsStr))
+                        {
+                            foreach (var arg in argsStr.Split(','))
+                                args.Add(string.Join(" ", WordExpander.ExpandWord(arg.Trim(), _env)));
+                        }
+
+                        _env.PushFrame(new StackFrame(funcName, execCmd.Line, execCmd.Column, FrameType.Function));
+                        _env.PushScope();
+                        _env.PushPositionalArguments(args);
+
+                        int exitCode = 1;
+                        try
+                        {
+                            exitCode = Visit(fBody);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"aursh: error in function '{funcName}': {ex.Message}");
+                            _env.PrintCallStack();
+                        }
+                        finally
+                        {
+                            _env.PopPositionalArguments();
+                            _env.PopScope();
+                            _env.PopFrame();
+                            _returnRequested = false;
+                        }
+
+                        // If LastReturnValue is set, print it so $(...) captures it.
+                        if (_env.LastReturnValue != null)
+                        {
+                            string retStr = _env.LastReturnValue.ToString();
+                            if (!string.IsNullOrEmpty(retStr))
+                            {
+                                BuiltinCommands.WriteOut(retStr);
+                            }
+                        }
+
+                        return exitCode;
+                    });
+                }
             }
 
             // Before executing an external command or builtin, check if it's a user-defined function.
@@ -428,6 +680,11 @@ public class AstEvaluator
     private int Visit(FunctionNode node)
     {
         _env.SetFunction(node.Name, node.Body);
+        if (node.IsExported)
+        {
+            var funcObj = new Types.AurFunction(node, _env);
+            _env.Exports[node.Name] = funcObj;
+        }
         return 0;
     }
 
@@ -447,6 +704,334 @@ public class AstEvaluator
         }
         _env.SetArray(node.VariableName, expanded);
         return 0;
+    }
+
+    private int Visit(LetNode node)
+    {
+        var val = node.Expression != null ? EvaluateExpression(node.Expression) : new Types.AurString("");
+        _env.SetLocalAurValue(node.VariableName, val);
+        if (node.IsExported)
+        {
+            _env.Exports[node.VariableName] = val;
+        }
+        return 0;
+    }
+
+    private int Visit(ConstNode node)
+    {
+        var val = node.Expression != null ? EvaluateExpression(node.Expression) : new Types.AurString("");
+        _env.SetLocalAurValue(node.VariableName, val);
+        _env.MarkReadonly(node.VariableName);
+        if (node.IsExported)
+        {
+            _env.Exports[node.VariableName] = val;
+        }
+        return 0;
+    }
+
+    private int Visit(AST.ExpressionStatementNode node)
+    {
+        var val = EvaluateExpression(node.Expression);
+        
+        // If there's an OutStream and the expression is not an assignment, output it
+        // Actually, for a top-level expression, we should only output if it's evaluated in a context that captures it, 
+        // or just let it set _env.LastReturnValue
+        _env.LastReturnValue = val;
+        
+        if (!(node.Expression is AST.AssignmentExpressionNode) && OutStream != null)
+        {
+            var strVal = val.ToString();
+            if (!string.IsNullOrEmpty(strVal))
+            {
+                var writer = new StreamWriter(OutStream, System.Text.Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+                writer.WriteLine(strVal);
+            }
+        }
+        return 0;
+    }
+
+    private int Visit(TryCatchNode node)
+    {
+        try 
+        {
+            return Visit(node.TryBlock);
+        }
+        catch (Exception ex)
+        {
+            _env.PushScope(); // new lexical block for catch
+            _env.SetLocalAurValue(node.CatchVariable, new Types.AurString(ex.Message));
+            int code = Visit(node.CatchBlock);
+            _env.PopScope();
+            return code;
+        }
+    }
+
+    private Types.AurValue EvaluateExpression(AST.ExpressionNode expr)
+    {
+        if (expr is AST.LiteralExpressionNode lit)
+        {
+            return lit.Value ?? new Types.AurString("");
+        }
+        
+        if (expr is AST.IdentifierExpressionNode id)
+        {
+            if (id.Name.Contains("$") || id.Name.Contains("~") || id.Name.Contains("\\"))
+            {
+                var expanded = WordExpander.ExpandWord(id.Name, _env);
+                if (expanded.Count > 0)
+                {
+                    return new Types.AurString(string.Join(" ", expanded));
+                }
+                return new Types.AurString("");
+            }
+
+            var val = _env.GetAurValue(id.Name);
+            if (val != null) return val;
+
+            if (id.Name == "true" || id.Name == "false")
+                return new Types.AurString(id.Name);
+
+            return new Types.AurString("");
+        }
+
+        if (expr is AST.BinaryExpressionNode bin)
+        {
+            var left = EvaluateExpression(bin.Left);
+            var right = EvaluateExpression(bin.Right);
+
+            // Simple math if both are ints
+            if (left is Types.AurInt lInt && right is Types.AurInt rInt)
+            {
+                return bin.Operator switch
+                {
+                    AST.BinaryOperator.Add => new Types.AurInt(lInt.Value + rInt.Value),
+                    AST.BinaryOperator.Subtract => new Types.AurInt(lInt.Value - rInt.Value),
+                    AST.BinaryOperator.Multiply => new Types.AurInt(lInt.Value * rInt.Value),
+                    AST.BinaryOperator.Divide => new Types.AurInt(lInt.Value / rInt.Value),
+                    AST.BinaryOperator.Equal => new Types.AurString(lInt.Value == rInt.Value ? "true" : "false"),
+                    AST.BinaryOperator.NotEqual => new Types.AurString(lInt.Value != rInt.Value ? "true" : "false"),
+                    AST.BinaryOperator.LessThan => new Types.AurString(lInt.Value < rInt.Value ? "true" : "false"),
+                    AST.BinaryOperator.GreaterThan => new Types.AurString(lInt.Value > rInt.Value ? "true" : "false"),
+                    AST.BinaryOperator.LessThanOrEqual => new Types.AurString(lInt.Value <= rInt.Value ? "true" : "false"),
+                    AST.BinaryOperator.GreaterThanOrEqual => new Types.AurString(lInt.Value >= rInt.Value ? "true" : "false"),
+                    _ => throw new Exception($"Unknown operator {bin.Operator} on ints")
+                };
+            }
+            
+            // String concatenation
+            if (bin.Operator == AST.BinaryOperator.Add)
+            {
+                return new Types.AurString(left.ToString() + right.ToString());
+            }
+            
+            if (bin.Operator == AST.BinaryOperator.Equal) return new Types.AurString(left.ToString() == right.ToString() ? "true" : "false");
+            if (bin.Operator == AST.BinaryOperator.NotEqual) return new Types.AurString(left.ToString() != right.ToString() ? "true" : "false");
+
+            throw new Exception($"Unsupported operator {bin.Operator} between {left} and {right}");
+        }
+
+        if (expr is AST.AssignmentExpressionNode assign)
+        {
+            if (assign.Left is AST.IdentifierExpressionNode idAssign)
+            {
+                var val = EvaluateExpression(assign.Right);
+                _env.Set(idAssign.Name, val.ToString());
+                // Actually it should use SetLocalAurValue if we want to store objects!
+                _env.SetLocalAurValue(idAssign.Name, val);
+                return val;
+            }
+            if (assign.Left is AST.MemberExpressionNode memAssign)
+            {
+                var objVal = EvaluateExpression(memAssign.Object);
+                var rightVal = EvaluateExpression(assign.Right);
+                if (objVal is Types.AurObject obj)
+                {
+                    obj.Properties[memAssign.PropertyName] = rightVal;
+                    return rightVal;
+                }
+                throw new Exception("Cannot assign to property of non-object");
+            }
+            if (assign.Left is AST.IndexExpressionNode idxAssign)
+            {
+                var objVal = EvaluateExpression(idxAssign.Object);
+                var idxVal = EvaluateExpression(idxAssign.Index);
+                var rightVal = EvaluateExpression(assign.Right);
+                
+                if (objVal is Types.AurList list)
+                {
+                    if (int.TryParse(idxVal.ToString(), out int i))
+                    {
+                        if (i >= 0 && i < list.Values.Count) list.Values[i] = rightVal;
+                        else if (i == list.Values.Count) list.Values.Add(rightVal);
+                        else throw new Exception("Index out of bounds");
+                        return rightVal;
+                    }
+                }
+                else if (objVal is Types.AurObject obj)
+                {
+                    obj.Properties[idxVal.ToString()!] = rightVal;
+                    return rightVal;
+                }
+                throw new Exception("Cannot index into non-list/object");
+            }
+            throw new Exception("Invalid assignment target");
+        }
+
+        if (expr is AST.MemberExpressionNode member)
+        {
+            var objVal = EvaluateExpression(member.Object);
+            if (objVal is Types.AurObject obj)
+            {
+                if (obj.Properties.TryGetValue(member.PropertyName, out var propVal))
+                    return propVal;
+            }
+            return new Types.AurString("");
+        }
+
+        if (expr is AST.IndexExpressionNode idx)
+        {
+            var objVal = EvaluateExpression(idx.Object);
+            var idxVal = EvaluateExpression(idx.Index);
+            
+            if (objVal is Types.AurList list)
+            {
+                if (int.TryParse(idxVal.ToString(), out int i) && i >= 0 && i < list.Values.Count)
+                {
+                    return list.Values[i];
+                }
+            }
+            else if (objVal is Types.AurObject obj)
+            {
+                if (obj.Properties.TryGetValue(idxVal.ToString()!, out var propVal))
+                    return propVal;
+            }
+            return new Types.AurString("");
+        }
+
+        if (expr is AST.CallExpressionNode call)
+        {
+            if (call.Callee is AST.MemberExpressionNode methodCall)
+            {
+                var objVal = EvaluateExpression(methodCall.Object);
+                if (objVal != null)
+                {
+                    var args = new List<Types.AurValue>();
+                    foreach (var a in call.Arguments) args.Add(EvaluateExpression(a));
+                    return objVal.CallMethod(methodCall.PropertyName, args);
+                }
+                throw new Exception($"Cannot call method {methodCall.PropertyName} on null");
+            }
+            else if (call.Callee is AST.IdentifierExpressionNode funcId)
+            {
+                if (funcId.Name == "print" || funcId.Name == "echo")
+                {
+                    var argsStrings = new List<string>();
+                    foreach (var a in call.Arguments) argsStrings.Add(EvaluateExpression(a).ToString() ?? "");
+                    var output = string.Join(" ", argsStrings);
+                    if (OutStream != null)
+                    {
+                        var writer = new StreamWriter(OutStream, System.Text.Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+                        writer.WriteLine(output);
+                    }
+                    else
+                    {
+                        Console.WriteLine(output);
+                    }
+                    return new Types.AurString(output);
+                }
+
+                if (funcId.Name == "import")
+                {
+                    if (call.Arguments.Count != 1)
+                        throw new Exception("import requires exactly 1 argument (the path to the module)");
+                    
+                    string scriptPath = EvaluateExpression(call.Arguments[0]).ToString()!.Trim('\"', '\'');
+                    string resolvedPath = AurShell.Utils.FileSystem.ResolvePath(scriptPath, _workingDirectory);
+                    if (!System.IO.File.Exists(resolvedPath)) {
+                        throw new Exception($"Import failed: Cannot find module '{resolvedPath}'");
+                    }
+                    
+                    string scriptContent = System.IO.File.ReadAllText(resolvedPath);
+                    
+                    try
+                    {
+                        AurShell.Utils.ScriptValidator.Validate(resolvedPath, scriptContent);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(ex.Message);
+                        return new Types.AurString("1");
+                    }
+                    
+                    // Execute in a new environment
+                    var childEnv = new ShellEnvironment();
+                    var lexer = new Lexer(scriptContent, childEnv);
+                    var tokens = lexer.Tokenize();
+                    var parser = new Parser(tokens);
+                    var ast = parser.Parse();
+                    
+                    var evaluator = new AstEvaluator(childEnv, _executor, _workingDirectory);
+                    if (ast is ListNode listAst) evaluator.Visit(listAst);
+                    
+                    var moduleObj = new Types.AurObject();
+                    foreach (var kvp in childEnv.Exports)
+                    {
+                        moduleObj.Properties[kvp.Key] = kvp.Value;
+                    }
+                    
+                    return moduleObj;
+                }
+
+                var funcBody = _env.GetFunction(funcId.Name);
+                if (funcBody != null)
+                {
+                    var args = new List<string>();
+                    foreach (var a in call.Arguments) args.Add(EvaluateExpression(a).ToString()!);
+
+                    _env.PushFrame(new StackFrame(funcId.Name, 0, 0, FrameType.Function));
+                    _env.PushScope();
+                    _env.PushPositionalArguments(args);
+
+                    try
+                    {
+                        Visit(funcBody);
+                    }
+                    finally
+                    {
+                        _env.PopPositionalArguments();
+                        _env.PopScope();
+                        _env.PopFrame();
+                        _returnRequested = false;
+                    }
+
+                    return _env.LastReturnValue ?? new Types.AurString("");
+                }
+                throw new Exception($"Function {funcId.Name} not found");
+            }
+            throw new Exception("Invalid function call target");
+        }
+
+        if (expr is AST.ObjectExpressionNode objNode)
+        {
+            var aurObj = new Types.AurObject();
+            foreach (var kvp in objNode.Properties)
+            {
+                aurObj.Properties[kvp.Key] = EvaluateExpression(kvp.Value);
+            }
+            return aurObj;
+        }
+        
+        if (expr is AST.ArrayExpressionNode arrNode)
+        {
+            var aurList = new Types.AurList();
+            foreach (var element in arrNode.Elements)
+            {
+                aurList.Values.Add(EvaluateExpression(element));
+            }
+            return aurList;
+        }
+
+        return new Types.AurString("");
     }
 
     private int Visit(IfNode node)

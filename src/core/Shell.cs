@@ -459,6 +459,17 @@ public class Shell
             try
             {
                 string content = System.IO.File.ReadAllText(path);
+                
+                try 
+                {
+                    AurShell.Utils.ScriptValidator.Validate(path, content);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex.Message);
+                    return 1;
+                }
+                
                 return _executor.ExecuteScript(content);
             }
             finally

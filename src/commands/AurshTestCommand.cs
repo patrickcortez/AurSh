@@ -72,8 +72,21 @@ public static class AurshTestCommand
 
     private static int ParseIntCompare(string left, string right, Func<int, int, bool> predicate)
     {
-        if (int.TryParse(left, out int l) && int.TryParse(right, out int r))
+        bool leftParsed = int.TryParse(left, out int l);
+        bool rightParsed = int.TryParse(right, out int r);
+
+        if (!leftParsed)
+        {
+            Console.Error.WriteLine($"aursh: [: {left}: integer expression expected");
+        }
+        else if (!rightParsed)
+        {
+            Console.Error.WriteLine($"aursh: [: {right}: integer expression expected");
+        }
+
+        if (leftParsed && rightParsed)
             return predicate(l, r) ? 0 : 1;
+
         return 2;
     }
 }

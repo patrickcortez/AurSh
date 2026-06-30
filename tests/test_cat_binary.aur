@@ -1,3 +1,4 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
 # Test that aursh-cat preserves binary data (including newlines and null bytes)
 echo -ne "test\n\0binary\r\ndata" > temp_binary.dat
 aursh-cat temp_binary.dat > temp_binary_out.dat

@@ -442,16 +442,21 @@ ifeq ($(WIN_ENV),native)
 	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null"
 	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(ISE_EXE)') { Rename-Item -Path '$(INSTALL_DIR)/$(ISE_EXE)' -NewName '$(ISE_EXE).old' -Force -ErrorAction SilentlyContinue }"
 	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE)' -Force"
+	@$(PS) "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.Save()"
 	@echo [install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)
 else ifeq ($(DETECTED_OS),Windows)
 	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
 	mkdir -p "$(INSTALL_DIR)"
 	cp "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
+	@powershell -Command "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.Save()"
 	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
 else
 	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
 	install -d "$(INSTALL_DIR)"
 	install -m 755 "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
+	@echo "[Desktop Entry]\nVersion=1.0\nType=Application\nName=AurSh ISE\nExec=$(INSTALL_DIR)/$(ISE_EXE)\nIcon=utilities-terminal\nTerminal=false" > ~/.local/share/applications/aursh-ise.desktop
+	@cp ~/.local/share/applications/aursh-ise.desktop ~/Desktop/aursh-ise.desktop 2>/dev/null || true
+	@chmod +x ~/Desktop/aursh-ise.desktop 2>/dev/null || true
 	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
 endif
 
@@ -501,14 +506,14 @@ ifeq ($(WIN_ENV),native)
 	-@dotnet clean $(UPDATE_PROJECT) -c Release --nologo -v q 2>nul
 	-@dotnet clean $(CONTEXT_PROJECT) -c Debug --nologo -v q 2>nul
 	-@dotnet clean $(CONTEXT_PROJECT) -c Release --nologo -v q 2>nul
-	@$(PS) "if (Test-Path '$(BIN_DIR)') { Remove-Item '$(BIN_DIR)/*' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'publish') { Remove-Item 'publish' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/obj') { Remove-Item 'src/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/bin') { Remove-Item 'src/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/aursh-update/obj') { Remove-Item 'src/aursh-update/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/aursh-update/bin') { Remove-Item 'src/aursh-update/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/Contexts/obj') { Remove-Item 'src/Contexts/obj' -Recurse -Force -ErrorAction SilentlyContinue }"
-	@$(PS) "if (Test-Path 'src/Contexts/bin') { Remove-Item 'src/Contexts/bin' -Recurse -Force -ErrorAction SilentlyContinue }"
+	-@$(PS) "if (Test-Path '$(BIN_DIR)') { Remove-Item '$(BIN_DIR)/*' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'publish') { Remove-Item 'publish' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/obj') { Remove-Item 'src/obj' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/bin') { Remove-Item 'src/bin' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/aursh-update/obj') { Remove-Item 'src/aursh-update/obj' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/aursh-update/bin') { Remove-Item 'src/aursh-update/bin' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/Contexts/obj') { Remove-Item 'src/Contexts/obj' -Recurse -Force -ErrorAction Ignore }"
+	-@$(PS) "if (Test-Path 'src/Contexts/bin') { Remove-Item 'src/Contexts/bin' -Recurse -Force -ErrorAction Ignore }"
 	@echo [clean] Done.
 else
 	@echo "[clean] Removing build artifacts..."

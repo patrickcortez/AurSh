@@ -58,6 +58,13 @@ public class Program
             return 0;
         }
 
+        if (args[0] == "--dump-commands")
+        {
+            var builtins = Core.BuiltinCommands.Builtins.Select(b => "\\\"" + b + "\\\"");
+            Console.WriteLine("[" + string.Join(",", builtins) + "]");
+            return 0;
+        }
+
         string scriptPath = args[0];
         string[] scriptArgs = args.Length > 1 ? args.Skip(1).ToArray() : Array.Empty<string>();
 

@@ -143,7 +143,7 @@ endif
 
 # Targets
 
-.PHONY: all build release publish install install-user install-ise uninstall clean run test info help setfont deps
+.PHONY: all build release publish install install-user uninstall clean run test info help setfont deps
 
 all: build
 
@@ -436,49 +436,6 @@ else
 	@echo "[uninstall] Done."
 endif
 
-install-ise: publish-ise
-ifeq ($(WIN_ENV),native)
-	@echo [install] Installing ISE to $(INSTALL_DIR)...
-	@$(PS) "New-Item -Path '$(INSTALL_DIR)' -ItemType Directory -Force | Out-Null; exit 0"
-	@$(PS) "if (Test-Path '$(INSTALL_DIR)/$(ISE_EXE)') { Move-Item -Path '$(INSTALL_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE).old' -Force -ErrorAction SilentlyContinue }; exit 0"
-	@$(PS) "Copy-Item -Path '$(PUBLISH_DIR)/$(ISE_EXE)' -Destination '$(INSTALL_DIR)/$(ISE_EXE)' -Force"
-	@$(PS) "Copy-Item -Path 'Assets' -Destination '$(INSTALL_DIR)' -Recurse -Force"
-	@$(PS) "$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\AurSh ISE.lnk'); $$shortcut.TargetPath = '$(INSTALL_DIR)\$(ISE_EXE)'; $$shortcut.IconLocation = '$(INSTALL_DIR)\Assets\Images\ISE.ico'; $$shortcut.Save(); exit 0"
-	@echo [install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)
-else ifeq ($(DETECTED_OS),Windows)
-	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
-	mkdir -p "$(INSTALL_DIR)"
-	cp "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
-	cp -r "Assets" "$(INSTALL_DIR)/"
-	@powershell -Command '$$wshell = New-Object -ComObject WScript.Shell; $$shortcut = $$wshell.CreateShortcut([Environment]::GetFolderPath("Desktop") + "\AurSh ISE.lnk"); $$shortcut.TargetPath = "$(INSTALL_DIR)\$(ISE_EXE)"; $$shortcut.IconLocation = "$(INSTALL_DIR)\Assets\Images\ISE.ico"; $$shortcut.Save()'
-	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
-else
-	@echo "[install] Installing ISE to $(INSTALL_DIR)..."
-	install -d "$(INSTALL_DIR)"
-	install -m 755 "$(PUBLISH_DIR)/$(ISE_EXE)" "$(INSTALL_DIR)/$(ISE_EXE)"
-	cp -r "Assets" "$(INSTALL_DIR)/"
-	@echo "[Desktop Entry]\nVersion=1.0\nType=Application\nName=AurSh ISE\nExec=$(INSTALL_DIR)/$(ISE_EXE)\nIcon=$(INSTALL_DIR)/Assets/Images/ISE.ico\nTerminal=false" > ~/.local/share/applications/aursh-ise.desktop
-	@cp ~/.local/share/applications/aursh-ise.desktop ~/Desktop/aursh-ise.desktop 2>/dev/null || true
-	@chmod +x ~/Desktop/aursh-ise.desktop 2>/dev/null || true
-	@echo "[install] Installed ISE to $(INSTALL_DIR)/$(ISE_EXE)"
-endif
-
-publish-ise:
-ifeq ($(WIN_ENV),native)
-	@echo [publish] Publishing self-contained $(RID) ISE binary...
-	dotnet publish $(ISE_PROJECT) -c Release -r $(RID) --self-contained true -p:OutputPath=obj/publish-build-ise/ -p:AppendTargetFrameworkToOutputPath=true -p:AppendRuntimeIdentifierToOutputPath=true $(PUBLISH_FLAGS) -o $(PUBLISH_DIR)
-else
-	@echo "[publish] Publishing self-contained $(RID) ISE binary..."
-	dotnet publish $(ISE_PROJECT) \
-		-c Release \
-		-r $(RID) \
-		--self-contained true \
-		-p:OutputPath=obj/publish-build-ise/ \
-		-p:AppendTargetFrameworkToOutputPath=true \
-		-p:AppendRuntimeIdentifierToOutputPath=true \
-		$(PUBLISH_FLAGS) \
-		-o $(PUBLISH_DIR)
-endif
 
 # Utility Targets
 

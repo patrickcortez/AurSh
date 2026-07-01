@@ -972,14 +972,24 @@ public class Parser
         // 2>&1 does not require a target word
         if (redirectType != TokenType.RedirectErrToOut)
         {
-            if (Current.Type != TokenType.Word)
+            if (!IsSimpleCommandArg(Current.Type))
             {
                 Console.Error.WriteLine("aursh: syntax error near unexpected token");
                 return;
             }
 
-            target = Current.Value;
-            Advance();
+            var targetBuilder = new System.Text.StringBuilder();
+            
+            while (IsSimpleCommandArg(Current.Type))
+            {
+                if (targetBuilder.Length > 0 && Current.HasLeadingSpace)
+                    break;
+                    
+                targetBuilder.Append(Current.Value);
+                Advance();
+            }
+            
+            target = targetBuilder.ToString();
 
             if (redirectType == TokenType.HereDoc && Current.Type == TokenType.HereDocText)
             {

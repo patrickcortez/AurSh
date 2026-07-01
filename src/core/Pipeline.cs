@@ -5,7 +5,7 @@ namespace AurShell.Core;
 
 public static class Pipeline
 {
-    public static int Execute(PipelineNode pipeline, ShellEnvironment env, string workingDirectory)
+    public static int ExecutePipeline(PipelineNode pipeline, ShellEnvironment env, string workingDirectory, AstEvaluator? evaluator = null)
     {
         if (pipeline.Commands.Count == 0)
             return 0;
@@ -13,7 +13,7 @@ public static class Pipeline
         if (pipeline.Commands.Count == 1)
         {
             if (pipeline.Commands[0] is SimpleCommandNode scn)
-                return ExecuteSingle(scn, env, workingDirectory, pipeline.Background);
+                return ExecuteSingle(scn, env, workingDirectory, pipeline.Background, evaluator);
             // Non-simple nodes don't normally arrive here, but just in case:
             return 0;
         }
@@ -114,22 +114,27 @@ public static class Pipeline
                 TextWriter? boxOutOrigOut = null;
                 TextWriter? boxOutOrigErr = null;
 
-                if (originalOut == null && outStream != null)
-                {
-                    originalOut = Console.Out;
-                    Console.SetOut(new StreamWriter(outStream) { AutoFlush = true });
-                }
+                bool isBypassedTui = BypassList.IsBypassed(cmd.Name, BlackBox.Current?.Config ?? new BlackBoxConfig());
 
-                if (originalErr == null && errStream != null)
+                if (!isBypassedTui)
                 {
-                    originalErr = Console.Error;
-                    Console.SetError(new StreamWriter(errStream) { AutoFlush = true });
-                }
+                    if (originalOut == null && outStream != null)
+                    {
+                        originalOut = Console.Out;
+                        Console.SetOut(new StreamWriter(outStream) { AutoFlush = true });
+                    }
 
-                if (originalIn == null && inStream != null)
-                {
-                    originalIn = Console.In;
-                    Console.SetIn(new StreamReader(inStream));
+                    if (originalErr == null && errStream != null)
+                    {
+                        originalErr = Console.Error;
+                        Console.SetError(new StreamWriter(errStream) { AutoFlush = true });
+                    }
+
+                    if (originalIn == null && inStream != null)
+                    {
+                        originalIn = Console.In;
+                        Console.SetIn(new StreamReader(inStream));
+                    }
                 }
 
                 if (ShouldRouteToBlackBox(cmd, out var box, out var sess))
@@ -351,16 +356,20 @@ public static class Pipeline
         }
 
         bool routeToBox = ShouldRouteToBlackBox(cmd, out var boxOwner, out var boxSession);
+        bool isBypassedTui = BypassList.IsBypassed(cmd.Name, BlackBox.Current?.Config ?? new BlackBoxConfig());
         var boxFlags = new BoxRedirectFlags
         {
-            StdoutRedirected = redirectStdout || outStream != null,
-            StderrRedirected = redirectStderr || errToOut || errStream != null,
-            StdinRedirected = redirectStdin || inStream != null
+            StdoutRedirected = redirectStdout || (!isBypassedTui && outStream != null),
+            StderrRedirected = redirectStderr || errToOut || (!isBypassedTui && errStream != null),
+            StdinRedirected = redirectStdin || (!isBypassedTui && inStream != null)
         };
 
-        if (inStream != null && !redirectStdin) psi.RedirectStandardInput = true;
-        if (outStream != null && !redirectStdout) psi.RedirectStandardOutput = true;
-        if (errStream != null && !redirectStderr && !errToOut) psi.RedirectStandardError = true;
+        if (!isBypassedTui)
+        {
+            if (inStream != null && !redirectStdin) psi.RedirectStandardInput = true;
+            if (outStream != null && !redirectStdout) psi.RedirectStandardOutput = true;
+            if (errStream != null && !redirectStderr && !errToOut) psi.RedirectStandardError = true;
+        }
 
         if (routeToBox)
         {

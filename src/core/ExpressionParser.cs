@@ -271,6 +271,9 @@ public class ExpressionParser
 
     private ExpressionNode ParseCallExpression(ExpressionNode left, Token token)
     {
+        if (token.HasLeadingSpace)
+            throw new Exception("Space not allowed before '(' in call expression");
+
         var args = new List<ExpressionNode>();
         if (Peek().Type != TokenType.RightParen)
         {
@@ -289,6 +292,9 @@ public class ExpressionParser
 
     private ExpressionNode ParseIndexExpression(ExpressionNode left, Token token)
     {
+        if (token.HasLeadingSpace)
+            throw new Exception("Space not allowed before '[' in index expression");
+
         var indexExp = ParseExpression(Precedence.Lowest);
         if (indexExp == null) throw new Exception("Expected expression inside '['");
 
@@ -300,7 +306,13 @@ public class ExpressionParser
 
     private ExpressionNode ParseMemberExpression(ExpressionNode left, Token token)
     {
+        if (token.HasLeadingSpace)
+            throw new Exception("Space not allowed before '.' in member expression");
+
         var propToken = Advance();
+        if (propToken.HasLeadingSpace)
+            throw new Exception("Space not allowed after '.' in member expression");
+
         if (propToken.Type != TokenType.Word)
             throw new Exception("Expected property name after '.'");
 

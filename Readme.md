@@ -1,4 +1,4 @@
-<h2 align="center">AurSh</h2>
+<h1 align="center">AurSh</h1>
 
 <h3 align="center"> <i> A cross platform shell to make the command line aesthetically pleasing</i> </h3>
 
@@ -26,8 +26,6 @@ Make sure you use the font *JetBrainsMono Nerd Font* installed for the prompt to
 
 When using the shell, make sure you put any process/app that you have installed that takes over the terminal in the bypass list: `~/.aursh/bypass.txt`.
 
-</div>
-
 Has:
 
 - Shell Scripting: .aur scripts
@@ -48,6 +46,8 @@ round edges.
 - `Contexts`: A disk backed object like that can hold multiple attributes to structurize and organize variables.
 - A built in Network Helper tool for connecting,disconnecting and recieving/sending data through
 the command-line.
+- A music player that can be invoked in the command line `aursh-music` accessible at `http://127.0.0.1:7007`.
+- A Dedicated ISE called AurSh-ISE, which is installed seperately from AurSh. It is a Integrated Scripting Environment for AurSh, for creating,modifying and debugging scripts.
 
 ---
 
@@ -103,7 +103,7 @@ This repositories structure is relatively simple:
 
 ## Installation
 
-Clone this repository first then make sure you have *.NET SDK* installed and *make* is optional since there is a *MSBuild* alternative.
+Clone this repository first then make sure you have *.NET SDK* installed and *make*.
 
 Once you have them installed simply run `make install-user` for current user installation and `make install` for system wide installation or you can use .Net's *MSBuild* to install the shell: `dotnet msbuild build.proj -t:Install` for system wide installation or `dotnet msbuild build.proj -t:InstallUser` for current user installation.
 

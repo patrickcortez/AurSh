@@ -164,6 +164,7 @@ public class AstEvaluator
         return node switch
         {
             SimpleCommandNode scn => ExecuteSimpleCommand(scn),
+            PipelineNode pn => Pipeline.ExecutePipeline(pn, _env, _workingDirectory, this),
             IfNode inod => ExecuteWithRedirections(inod, () => Visit(inod)),
             WhileNode wn => ExecuteWithRedirections(wn, () => Visit(wn)),
             UntilNode un => ExecuteWithRedirections(un, () => Visit(un)),

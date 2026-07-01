@@ -35,8 +35,43 @@ public static class AurshCdCommand
 
         if (!Directory.Exists(target))
         {
-            Console.Error.WriteLine($"aursh: cd: {cmd.Args.FirstOrDefault() ?? target}: No such file or directory");
-            return 1;
+            // Fallback: if the target starts with "." (dotfile/dotdir convention) and
+            // doesn't exist relative to CWD, try resolving from $HOME.
+            // This handles the common case of `cd .aursh` from any directory.
+            string arg = cmd.Args.FirstOrDefault() ?? "";
+            if (arg.StartsWith(".") && !arg.StartsWith("..") && !arg.StartsWith("./") && !arg.StartsWith(".\\"))
+            {
+                string homeTarget = Utils.FileSystem.ResolvePath(arg, Utils.Platform.HomeDirectory);
+                if (Directory.Exists(homeTarget))
+                {
+                    target = homeTarget;
+                }
+            }
+
+            // Also check CDPATH (POSIX convention)
+            if (!Directory.Exists(target))
+            {
+                string? cdpath = env.Get("CDPATH");
+                if (!string.IsNullOrEmpty(cdpath))
+                {
+                    foreach (string dir in cdpath.Split(Path.PathSeparator))
+                    {
+                        if (string.IsNullOrWhiteSpace(dir)) continue;
+                        string candidate = Utils.FileSystem.ResolvePath(arg, dir.Trim());
+                        if (Directory.Exists(candidate))
+                        {
+                            target = candidate;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!Directory.Exists(target))
+            {
+                Console.Error.WriteLine($"aursh: cd: {arg}: No such file or directory");
+                return 1;
+            }
         }
 
         string oldDir = workingDirectory;
@@ -46,7 +81,10 @@ public static class AurshCdCommand
         {
             Directory.SetCurrentDirectory(workingDirectory);
         }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"aursh: cd: failed to set working directory: {ex.Message}");
+        }
 
         env.Set("OLDPWD", oldDir);
         env.Set("PWD", workingDirectory);

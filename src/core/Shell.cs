@@ -60,6 +60,24 @@ public class Shell
             return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
         };
 
+        _env.ExitCodeSubshellEvaluator = (cmd, currentEnv) =>
+        {
+            var lexer = new Lexer(cmd, currentEnv);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+
+            var clonedEnv = currentEnv.Clone();
+            var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+
+            int exitCode = 0;
+            // Throw stdout and stderr to dev null
+            using var devNull = System.IO.Stream.Null;
+            AstEvaluator.RunWithStreams(null, devNull, devNull, () => exitCode = evaluator.Visit(ast));
+
+            return exitCode;
+        };
+
         _env.ProcessSubstitutionEvaluator = (cmd, isInput, currentEnv) =>
         {
             var lexer = new Lexer(cmd, currentEnv);
@@ -137,6 +155,23 @@ public class Shell
             AstEvaluator.RunWithStreams(null, ms, null, () => evaluator.Visit(ast));
 
             return System.Text.Encoding.UTF8.GetString(ms.ToArray()).TrimEnd('\n', '\r');
+        };
+
+        _env.ExitCodeSubshellEvaluator = (cmd, currentEnv) =>
+        {
+            var lexer = new Lexer(cmd, currentEnv);
+            var tokens = lexer.Tokenize();
+            var parser = new Parser(tokens);
+            var ast = parser.Parse();
+
+            var clonedEnv = currentEnv.Clone();
+            var evaluator = new AstEvaluator(clonedEnv, _executor, _executor.WorkingDirectory);
+
+            int exitCode = 0;
+            using var devNull = System.IO.Stream.Null;
+            AstEvaluator.RunWithStreams(null, devNull, devNull, () => exitCode = evaluator.Visit(ast));
+
+            return exitCode;
         };
 
         _env.ProcessSubstitutionEvaluator = (cmd, isInput, currentEnv) =>
@@ -229,7 +264,7 @@ public class Shell
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     public void Run()
@@ -262,9 +297,9 @@ public class Shell
                             Console.WriteLine(Utils.Ansi.FgBlack + Utils.Ansi.BgWhite + "%" + Utils.Ansi.Reset);
                         }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        // Some terminals might not support CursorLeft. We just ignore and move on.
+                        System.Diagnostics.Debug.WriteLine($"aursh shell error: {ex.Message}");
                     }
 
                     NotifyFinishedJobs();
@@ -313,7 +348,7 @@ public class Shell
                         }
                         finally
                         {
-                            try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception) { }
+                            try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh shell error: {ex.Message}"); }
                         }
                         continue;
                     }
@@ -347,7 +382,7 @@ public class Shell
                             _blackBox.LiveRenderer.Finish(session, session.TerminalOut);
                         session.Dispose();
 
-                        try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception) { }
+                        try { Console.Write($"\x1b]133;D;{_env.LastExitCode}\x07"); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh shell error: {ex.Message}"); }
                     }
                 }
                 catch (Exception loopEx)

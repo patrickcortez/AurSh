@@ -46,7 +46,7 @@ public static class AurshCdCommand
         {
             Directory.SetCurrentDirectory(workingDirectory);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
         env.Set("OLDPWD", oldDir);
         env.Set("PWD", workingDirectory);

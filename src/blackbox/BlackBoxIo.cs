@@ -84,7 +84,7 @@ public static class BlackBoxIo
             stdinCancel?.Cancel();
             if (stdinTask != null)
             {
-                try { await stdinTask.ConfigureAwait(false); } catch { }
+                try { await stdinTask.ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
             }
             stdinCancel?.Dispose();
         }
@@ -120,7 +120,7 @@ public static class BlackBoxIo
                         await forwardTo.WriteAsync(buffer, 0, read, cancellation).ConfigureAwait(false);
                         await forwardTo.FlushAsync(cancellation).ConfigureAwait(false);
                     }
-                    catch { }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 }
 
                 if (owner.LiveRenderer.IsAltScreenActive)
@@ -131,7 +131,7 @@ public static class BlackBoxIo
                         await rawOut.WriteAsync(buffer, 0, read, cancellation).ConfigureAwait(false);
                         await rawOut.FlushAsync(cancellation).ConfigureAwait(false);
                     }
-                    catch { }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                     continue;
                 }
 
@@ -285,7 +285,7 @@ public static class BlackBoxIo
                                 await rawOut.WriteAsync(buffer, i + 1, read - (i + 1), cancellation).ConfigureAwait(false);
                             await rawOut.FlushAsync(cancellation).ConfigureAwait(false);
                         }
-                        catch { }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
                         break;
                     }
@@ -613,7 +613,7 @@ public static class BlackBoxIo
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         finally
         {
             rawMode?.Dispose();
@@ -676,7 +676,7 @@ public static class BlackBoxIo
             }
         }
         catch (OperationCanceledException) { }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 }
 

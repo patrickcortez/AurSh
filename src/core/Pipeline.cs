@@ -393,7 +393,7 @@ public static class Pipeline
             }
             else if (inStream != null)
             {
-                tasks.Add(PumpStreamAsync(inStream, process.StandardInput.BaseStream).ContinueWith(_ => { try { process.StandardInput.Close(); } catch { } }));
+                tasks.Add(PumpStreamAsync(inStream, process.StandardInput.BaseStream).ContinueWith(_ => { try { process.StandardInput.Close(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh pipeline error: {ex.Message}"); } }));
             }
 
             if (errToOut && stdoutFile != null)
@@ -460,11 +460,11 @@ public static class Pipeline
                 // naturally. Give it a generous window; 5 seconds is well
                 // beyond any realistic pipe-drain time. Only cancel as a
                 // safety fallback so the shell never hangs on a broken pipe.
-                try { boxPumpTask.Wait(System.TimeSpan.FromSeconds(5)); } catch { }
+                try { boxPumpTask.Wait(System.TimeSpan.FromSeconds(5)); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh pipeline error: {ex.Message}"); }
                 if (!boxPumpTask.IsCompleted)
                 {
                     boxPumpCancel?.Cancel();
-                    try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch { }
+                    try { boxPumpTask.Wait(System.TimeSpan.FromMilliseconds(500)); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh pipeline error: {ex.Message}"); }
                 }
                 boxPumpCancel?.Dispose();
             }

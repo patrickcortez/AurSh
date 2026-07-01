@@ -268,7 +268,29 @@ public static class WordExpander
             return i;
         }
 
-        if (next == '?' || next == '$' || next == '!' || next == '-' || next == '#' || next == '@' || next == '*')
+        if (next == '?')
+        {
+            if (i + 1 < input.Length && input[i + 1] == '(')
+            {
+                i++;
+                int depth = 1;
+                int startCmd = i + 1;
+                while (i + 1 < input.Length && depth > 0)
+                {
+                    i++;
+                    if (input[i] == '(') depth++;
+                    else if (input[i] == ')') depth--;
+                }
+                string cmd = input.Substring(startCmd, i - startCmd);
+                int exitCode = env.ExitCodeSubshellEvaluator?.Invoke(cmd, env) ?? 0;
+                expanded.Add(exitCode.ToString());
+                return i + 1;
+            }
+            expanded = ExpandVariable(next.ToString(), env, inDoubleQuote);
+            return i + 1;
+        }
+
+        if (next == '$' || next == '!' || next == '-' || next == '#' || next == '@' || next == '*')
         {
             expanded = ExpandVariable(next.ToString(), env, inDoubleQuote);
             return i + 1;
@@ -650,7 +672,7 @@ public static class WordExpander
                 allDirs.Add(currentPath);
                 allDirs.AddRange(Directory.GetDirectories(currentPath, "*", SearchOption.AllDirectories));
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
             foreach (var d in allDirs)
             {
@@ -701,7 +723,7 @@ public static class WordExpander
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     public static string GlobSegmentToRegex(string pattern)

@@ -31,7 +31,7 @@ public class Executor
         }
         finally
         {
-            try { System.IO.File.Delete(tempFile); } catch { }
+            try { System.IO.File.Delete(tempFile); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
     }
 
@@ -75,7 +75,7 @@ public class Executor
             {
                 string oldDir = _workingDirectory;
                 _workingDirectory = Utils.FileSystem.NormalizePath(resolved);
-                try { Directory.SetCurrentDirectory(_workingDirectory); } catch { }
+                try { Directory.SetCurrentDirectory(_workingDirectory); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 _env.Set("OLDPWD", oldDir);
                 _env.Set("PWD", _workingDirectory);
                 return 0;
@@ -271,7 +271,7 @@ public class Executor
             if (Directory.Exists(envCwd))
                 _workingDirectory = envCwd;
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private bool IsAutoCdPath(string input)
@@ -310,7 +310,7 @@ public class Executor
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
             bool hasSpaces = false;
             for (int i = 0; i < input.Length; i++)

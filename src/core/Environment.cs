@@ -79,6 +79,7 @@ public class ShellEnvironment
     public bool SshAvailable { get; set; }
 
     public Func<string, ShellEnvironment, string>? SubshellEvaluator { get; set; }
+    public Func<string, ShellEnvironment, int>? ExitCodeSubshellEvaluator { get; set; }
     public Func<string, bool, ShellEnvironment, string>? ProcessSubstitutionEvaluator { get; set; }
 
     public IReadOnlyDictionary<string, string> Variables => _variables;
@@ -652,6 +653,27 @@ public class ShellEnvironment
         if (input[i] == '?')
         {
             i++;
+            if (i < input.Length && input[i] == '(')
+            {
+                i++;
+                int start = i;
+                int depth = 1;
+                while (i < input.Length && depth > 0)
+                {
+                    if (input[i] == '(') depth++;
+                    else if (input[i] == ')') depth--;
+                    if (depth > 0) i++;
+                }
+                if (depth == 0)
+                {
+                    string cmd = input.Substring(start, i - start - 1);
+                    i++; // skip last )
+                    int exitCode = ExitCodeSubshellEvaluator?.Invoke(cmd, this) ?? 0;
+                    return exitCode.ToString();
+                }
+                // Unbalanced, fallback
+                i = start - 1;
+            }
             return _lastExitCode.ToString();
         }
 

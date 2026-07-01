@@ -243,7 +243,7 @@ public static class TerminalSize
             // 250ms is plenty for these probes; if they hang, give up.
             if (!proc.WaitForExit(250))
             {
-                try { proc.Kill(); } catch { }
+                try { proc.Kill(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 return false;
             }
             if (proc.ExitCode != 0) return false;

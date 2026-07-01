@@ -283,7 +283,7 @@ public class GitInfo
             else if (File.Exists(Path.Combine(gitDir, "REVERT_HEAD"))) ActionState = "REVERTING";
             else if (File.Exists(Path.Combine(gitDir, "BISECT_LOG"))) ActionState = "BISECTING";
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private void ReadAheadBehind(string workingDirectory)

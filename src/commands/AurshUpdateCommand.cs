@@ -213,7 +213,7 @@ public static class AurshUpdateCommand
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
         Console.Error.WriteLine("aursh: aursh-update: repository does not have the expected remote (https://github.com/patrickcortez/AurSh.git).");
         return false;
@@ -302,8 +302,8 @@ public static class AurshUpdateCommand
                 });
 
                 proc.WaitForExit();
-                try { outTask.Wait(System.TimeSpan.FromSeconds(2)); } catch { }
-                try { errTask.Wait(System.TimeSpan.FromSeconds(2)); } catch { }
+                try { outTask.Wait(System.TimeSpan.FromSeconds(2)); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
+                try { errTask.Wait(System.TimeSpan.FromSeconds(2)); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 return proc.ExitCode;
             }
             catch (Exception ex)

@@ -75,7 +75,7 @@ public static class NetworkInfo
                             break;
                     }
                 }
-                catch { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
             }
             else if (ethernetAdapter != null)
             {

@@ -100,7 +100,7 @@ public sealed class BlackBoxLiveRenderer
                 writer.Write("\r\n");
                 writer.Flush();
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
             _renderer.RenderFooterOnly(session, writer, _lastRenderedWidth, _lastRenderedTier);
             DetachResize();
@@ -174,12 +174,12 @@ public sealed class BlackBoxLiveRenderer
             if (_altScreen) return;
 
             // Flush whatever rows we had buffered up to the alt-screen entry.
-            try { EmitPending(session, writer); } catch { }
+            try { EmitPending(session, writer); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
             _altScreen = true;
 
             ShowCursor(writer);
-            try { writer.Flush(); } catch { }
+            try { writer.Flush(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
     }
 
@@ -208,7 +208,7 @@ public sealed class BlackBoxLiveRenderer
                     writer.Write("\x1b[?1049l");
                     writer.Flush();
                 }
-                catch { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 _altScreen = false;
             }
 
@@ -237,7 +237,7 @@ public sealed class BlackBoxLiveRenderer
                     writer.Write("\x1b[?1049l");
                     writer.Flush();
                 }
-                catch { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 _altScreen = false;
             }
 
@@ -442,12 +442,12 @@ public sealed class BlackBoxLiveRenderer
     private void HideCursor(System.IO.TextWriter writer)
     {
         if (_cursorHidden) return;
-        try { writer.Write(Ansi.CursorHide); writer.Flush(); _cursorHidden = true; } catch { }
+        try { writer.Write(Ansi.CursorHide); writer.Flush(); _cursorHidden = true; } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private void ShowCursor(System.IO.TextWriter writer)
     {
         if (!_cursorHidden) return;
-        try { writer.Write(Ansi.CursorShow); writer.Flush(); _cursorHidden = false; } catch { }
+        try { writer.Write(Ansi.CursorShow); writer.Flush(); _cursorHidden = false; } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 }

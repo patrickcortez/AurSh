@@ -163,7 +163,7 @@ public class InputHandler
                             // Output phase started!
                             Console.Write("\x1b]133;C\x07");
                         }
-                        catch (Exception) { }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh input error: {ex.Message}"); }
                         _multilineActive = false;
                         return pasted;
                     }
@@ -188,7 +188,7 @@ public class InputHandler
                     // Output phase started for single-line input!
                     Console.Write("\x1b]133;C\x07");
                 }
-                catch (Exception) { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 _multilineActive = false;
                 return currentInput;
             }
@@ -750,7 +750,7 @@ public class InputHandler
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh input error: {ex.Message}"); }
 
             if (isDir) sb.Append(Ansi.Underline);
 
@@ -906,7 +906,7 @@ public class InputHandler
             }
             Console.Write($"\x1b[{currentCursorPos.Col + 1}G");
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh input error: {ex.Message}"); }
 
         Console.Write(Utils.Ansi.CursorShow);
     }
@@ -1282,7 +1282,7 @@ public class InputHandler
                                 completions.Add(name);
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh input error: {ex.Message}"); }
                 }
             }
         }
@@ -1413,7 +1413,7 @@ public class InputHandler
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh input error: {ex.Message}"); }
 
         completions.Sort(StringComparer.OrdinalIgnoreCase);
         return completions;

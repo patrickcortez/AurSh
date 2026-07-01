@@ -126,7 +126,7 @@ public class GrmConfigManager
                     return true;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         return false;
     }
 

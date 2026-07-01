@@ -233,7 +233,7 @@ public static class MusicServer
         string uiPath = Path.Combine(Platform.HomeDirectory, ".aursh", "music-ui");
         if (Directory.Exists(uiPath))
         {
-            try { Directory.Delete(uiPath, true); } catch { }
+            try { Directory.Delete(uiPath, true); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
         Directory.CreateDirectory(uiPath);
 

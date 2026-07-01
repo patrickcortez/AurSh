@@ -53,7 +53,7 @@ public static class VsCodeIntegration
                 Directory.CreateDirectory(aurshDir);
                 File.WriteAllText(sentinelPath, $"Configured at {System.DateTime.UtcNow:O}\n");
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
     }
 

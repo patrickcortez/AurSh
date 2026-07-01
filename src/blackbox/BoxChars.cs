@@ -87,7 +87,7 @@ public static class BoxChars
         {
             bool windowsUtf8 = false;
             try { windowsUtf8 = System.Console.OutputEncoding.CodePage == 65001; }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
             bool windowsTerminal = !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("WT_SESSION"))
                                 || !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("ConEmuPID"));
             if (windowsUtf8 || windowsTerminal)

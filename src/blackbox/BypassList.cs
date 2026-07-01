@@ -211,7 +211,7 @@ public static class BypassList
                     shells.Add(basename);
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private static void DiscoverWindowsShells(HashSet<string> shells)
@@ -256,7 +256,7 @@ public static class BypassList
                         shells.Add(exeName);
                 }
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
     }
 
@@ -316,7 +316,7 @@ public static class BypassList
                     entries.Add(basename);
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
         return entries;
     }

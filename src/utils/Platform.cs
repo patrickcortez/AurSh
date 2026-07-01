@@ -114,7 +114,7 @@ public static class Platform
                             return output;
                     }
                 }
-                catch { }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh platform error: {ex.Message}"); }
             }
             return "user";
         }
@@ -206,7 +206,7 @@ public static class Platform
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.InputEncoding = System.Text.Encoding.UTF8;
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh platform error: {ex.Message}"); }
     }
 
     public static string ExpandTilde(string path)
@@ -318,7 +318,7 @@ public static class Platform
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh platform error: {ex.Message}"); }
 
         // Fallback: try getprop via process if build.prop wasn't readable
         try
@@ -338,7 +338,7 @@ public static class Platform
                     return propVer;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh platform error: {ex.Message}"); }
 
         return 0;
     }
@@ -397,7 +397,7 @@ public static class Platform
                 var chmodInfo = new System.Diagnostics.ProcessStartInfo("chmod", $"+x \"{busyboxPath}\"") { CreateNoWindow = true };
                 System.Diagnostics.Process.Start(chmodInfo)?.WaitForExit();
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh platform error: {ex.Message}"); }
         }
     }
 

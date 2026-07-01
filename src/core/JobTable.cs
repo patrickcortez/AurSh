@@ -270,7 +270,7 @@ public class JobTable
                     {
                         job.Process.Kill();
                     }
-                    catch { }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
                 }
                 job.State = JobState.Killed;
                 job.ExitCode = 137;

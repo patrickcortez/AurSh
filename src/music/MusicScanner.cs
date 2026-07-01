@@ -174,7 +174,7 @@ public class MusicScanner
                 return tag.Pictures[0].Data.Data;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         return null;
     }
 

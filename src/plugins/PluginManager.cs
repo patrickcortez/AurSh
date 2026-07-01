@@ -31,7 +31,7 @@ public class PluginManager
             if (!Directory.Exists(_pluginsDir))
                 Directory.CreateDirectory(_pluginsDir);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     public void LoadAll()
@@ -372,7 +372,7 @@ public class PluginManager
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
             if (matchedDir == null)
             {

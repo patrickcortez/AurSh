@@ -91,7 +91,7 @@ public static class AurshNetCommand
                 GetTermuxNetworks(networks);
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
         return networks.GroupBy(n => n.Ssid).Select(g => g.First()).ToList();
     }
@@ -759,7 +759,7 @@ public static class AurshNetCommand
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
 
         Console.WriteLine(Ansi.FgBrightMagenta + "--- Network Information ---" + Ansi.Reset);
         Console.WriteLine($"{Ansi.FgBrightBlue}Status:{Ansi.Reset}       {(NetworkInfo.IsConnected ? Ansi.FgBrightGreen + "Connected" : Ansi.FgRed + "Disconnected")}{Ansi.Reset}");

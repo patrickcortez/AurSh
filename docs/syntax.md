@@ -1,9 +1,9 @@
 # AurShell Syntax Guide
 
 **What it does**
-AurShell is a fast, cross-platform shell. Its syntax is designed to feel instantly familiar to users of `bash` or `zsh`. 
+AurShell is a fast, cross-platform shell. Its syntax is designed to feel instantly familiar to users of `bash` or `zsh`, while introducing modern, JavaScript-like features for advanced scripting. 
 
-It supports pipelines, variables, loops, conditional statements, and custom `.aur` shell scripts natively.
+It supports pipelines, variables, loops, object-oriented syntax, and custom `.aur` shell scripts natively.
 
 ### Example
 ```bash
@@ -14,146 +14,121 @@ else
     echo "Access Denied"
 fi
 
-# Pipelining
-cat output.log | grep "Error" > errors.txt
+# Modern Data Structures
+let config = { "theme": "dark", "version": 2 }
+echo "Theme: ${config.theme}"
 ```
 
 ### How it works internally
-1. **Lexer**: Reads your command and breaks it into tokens (words, pipes, strings).
-2. **Parser**: Builds a hierarchical tree (AST) identifying pipelines, loops, and conditional blocks.
-3. **Linter**: Scans for common syntax errors (missing spaces, unclosed quotes) to warn you early.
-4. **Evaluator**: Securely executes the tree, managing variables and native OS processes.
+1. **Lexer**: Reads your command and breaks it into tokens.
+2. **Parser**: Builds an Abstract Syntax Tree (AST) for commands, expressions, and blocks.
+3. **Linter**: Scans for common syntax errors early.
+4. **Evaluator**: Executes the tree, managing variables and OS processes natively.
 
 ---
 
 ## Script Execution
 
 **What it does**
-AurSh can execute batch script files with the `.aur` extension.
+AurSh executes batch script files with the `.aur` extension natively.
 
 **Example Usage**
 ```bash
 # Invoke AurSh manually
 aursh my_script.aur arg1
 
-# Or associate the extension and run it directly
-aursh-assoc .aur aursh
+# Or run directly if associated
 ./my_script.aur arg1
 ```
+
+---
 
 ## Basic Commands and Execution
 
 **What it does**
-You can chain multiple commands together using standard operators.
+Chain multiple commands together using standard POSIX operators.
 
 **Example Usage**
-*   **Pipes (`|`)**: Passes the output of one command as input to the next. For Windows users running PowerShell commands, object pipelines are perfectly preserved natively without the need to double-escape strings!
+*   **Pipes (`|`)**: Passes output to the next command. Preserves PowerShell objects natively on Windows.
     ```bash
-    # Standard byte-stream piping
     cat file.txt | grep "search"
-    
-    # Native PowerShell object piping (Double wrap your strings)
-    Get-ChildItem | Where-Object {$_.Extension -eq "'.txt'"}
     ```
-*   **Logical AND (`&&`)**: Executes the second command only if the first succeeds.
+*   **Logical AND (`&&`) / OR (`||`)**: Conditional execution based on success or failure.
     ```bash
     make build && ./run
-    ```
-*   **Logical OR (`||`)**: Executes the second command only if the first fails.
-    ```bash
     cat file.txt || echo "File not found"
     ```
-*   **Sequential (`;`)**: Executes commands sequentially.
+*   **Sequential (`;`)**: Executes sequentially.
     ```bash
     echo "First"; echo "Second"
     ```
 
-## Variables, Arrays and Expansion
+---
+
+## Variables, Arrays, and Objects
 
 **What it does**
-You can store and retrieve data in variables, use indexed and associative arrays, and access special shell states (like exit codes).
+Store and retrieve data using `let` and `const`. AurShell natively supports JSON-like arrays and objects, making it incredibly powerful for structured data.
 
 **Example Usage**
 ```bash
-# Accessing basic variables
-echo "My home is $HOME"
-
-# Rich Assignments with `let`
-# You can perform rich assignments that properly evaluate subshells or variables right during assignment!
+# Basic assignment
+const PI = 3.14
 let version = $(git --version)
 echo "I am running $version"
 
-# Special Variables
-echo "Last exit code: $?"
-echo "Script name: $0"
-echo "First argument: $1"
-
-# Advanced Expansion
-# Use default value 'production' if ENV is not set
-echo "Running in ${ENV:-production} mode"
-
 # Indexed Arrays
-my_array=("apple" "banana" "cherry")
+let my_array = ["apple", "banana", "cherry"]
 echo "First item: ${my_array[0]}"
 
-# Associative Arrays (Dictionaries)
-declare -A my_dict
-my_dict["name"]="AurSh"
-echo "Name is ${my_dict["name"]}"
-```
+# Array Methods
+my_array.push("date")
+let total = my_array.length()
 
-## Interactive Multi-line Commands
+# Objects (Dictionaries)
+let my_dict = { "name": "AurSh", "version": "1.0" }
+echo "Name is ${my_dict.name}"
 
-**What it does**
-When using the interactive shell prompt, AurSh automatically detects if you've opened a block (like an `if` statement, `while` loop, `for` loop, or unclosed quote) and elegantly drops you into a multi-line continuation prompt (`>`) until the block is successfully closed.
-
-**Example Usage**
-```bash
-$ for i in 1 2 3
-> do
->   echo "Number $i"
-> done
-Number 1
-Number 2
-Number 3
-$ 
+# Property Assignment
+my_dict.author = "Cortez"
 ```
 
 **How it works internally**
-The `InputHandler` inspects your current line before execution. If it sees keywords like `if`, `while`, `for`, or unclosed brackets/quotes, it buffers your input instead of executing it. Once the terminal detects `fi`, `done`, or matching quotes, it consolidates the buffer and securely executes the whole block through the internal `Parser` and `AstEvaluator`.
+The `AurValueParser` securely evaluates JSON-like syntax during assignment. Variables are stored as rich types (`AurInt`, `AurString`, `AurList`, `AurObject`), allowing you to call methods natively on them.
+
+---
+
+## Modern Expressions and Math
+
+**What it does**
+Evaluate arithmetic and logical expressions natively without external utilities. Use `let` or `const` for direct assignments.
+
+**Example Usage**
+```bash
+# Direct Evaluation
+let x = 5
+let result = x + 10 * 2
+
+# Logical Comparisons
+let is_valid = (x > 0 && result == 25)
+```
+
+**How it works internally**
+The `ExpressionParser` processes mathematical and logical operators using an Abstract Syntax Tree (AST) directly in C#, honoring standard operator precedence.
+
+---
 
 ## Control Flow (Scripting)
 
 **What it does**
-AurSh supports POSIX-style logic blocks like `if/elif/else`, `case` statements, `for`, `while`, and `until` loops. You can also manipulate loop execution dynamically using `break` and `continue`.
+AurSh supports POSIX-style logic blocks (`if/elif/else`, `case`, `for`, `while`) and modern flow controls like `break` and `continue`.
 
 **Example Usage**
 ```bash
 # Condition Evaluation
-if [ -f "config.json" ]; then
-    echo "Config found"
-fi
-
-# Strict Type Checking
-# When doing numeric comparisons (-eq, -ne, -lt, -gt), AurSh strictly enforces type safety.
-# Comparing a string to an integer throws an expected shell error, keeping your scripts predictable.
-# aursh: [: my_string: integer expression expected
 if [ "$count" -eq 0 ]; then
     echo "Count is zero"
 fi
-
-# Case Statements
-case "$1" in
-    start)
-        echo "Starting service..."
-        ;;
-    stop)
-        echo "Stopping service..."
-        ;;
-    *)
-        echo "Unknown command"
-        ;;
-esac
 
 # For Loop with continue
 for file in *.txt; do
@@ -162,116 +137,119 @@ for file in *.txt; do
     fi
     echo "Processing $file"
 done
-
-# Until Loop with break
-count=0
-until [ $count -ge 10 ]; do
-    if [ $count -eq 5 ]; then
-        break
-    fi
-    echo $count
-    count=$((count + 1))
-done
 ```
 
-## Math Evaluation
+---
+
+## Error Handling (Try / Catch)
 
 **What it does**
-AurSh natively evaluates arithmetic expressions using double parentheses `$(( ))`. It supports basic operations (`+`, `-`, `*`, `/`, `%`) and honors standard mathematical operator precedence.
+Modern exception handling directly in the shell using `try`, `catch`, and `throw`.
 
 **Example Usage**
 ```bash
-# Simple Arithmetic
-result=$(( 5 + 10 * 2 ))
-echo "Result is $result"
-
-# Variable Incrementing
-x=5
-x=$(( x + 1 ))
+try {
+    if [ ! -f "config.json" ]; then
+        throw "Configuration file is missing!"
+    fi
+    echo "Config loaded."
+} catch e {
+    echo "Error caught: $e"
+}
 ```
 
 **How it works internally**
-The shell intercepts `$(( ))` syntax during parsing and forwards the raw expression to the internal `MathEvaluator.cs`, which processes standard mathematical operations seamlessly in C# without shelling out to external utilities like `expr`.
+The evaluator wraps the try block execution. If a `throw` command or internal exception occurs, execution safely jumps to the catch block and assigns the error to the catch variable.
+
+---
+
+## Modules (Import and Export)
+
+**What it does**
+AurShell supports modular scripting! `export` variables or functions from one file and `import` them into another as an object.
+
+**Example Usage**
+```bash
+# In utils.aur
+export function greet(name) {
+    echo "Hello, $name"
+}
+export const AppName = "AurSh"
+
+# In main.aur
+let utils = import "utils.aur"
+utils.greet("User")
+echo "App: ${utils.AppName}"
+```
+
+**How it works internally**
+The `import` command runs the target script in an isolated environment. `export` commands register values, which are then returned as a rich `AurObject` to the caller.
+
+---
 
 ## Command Substitution
 
 **What it does**
-Execute a command in the background and capture its text output directly into another command.
+Execute a command in the background and capture its text output, or capture its exit code directly.
 
-### Example
+**Example Usage**
 ```bash
-# Using $()
+# Capture stdout into a variable
 current_dir=$(pwd)
 echo "I am currently in $current_dir"
 
-# Using classic backticks
-files=`ls -l`
-echo "Directory contents: $files"
+# Inline Exit Code Evaluation ($?)
+# Suppresses stdout and stderr, returning the integer exit code directly
+let success = $?(git push origin main)
+if [ $success -eq 0 ]; then
+    echo "Pushed successfully!"
+fi
 ```
-
-### How it works internally
-AurSh isolates the command, runs it silently in a subshell, strips any trailing newlines, and injects the output string seamlessly back into your command.
 
 ---
 
 ## Process Substitution
 
 **What it does**
-Process substitution allows you to treat the output of a command like a temporary file. This is incredibly useful for commands that only accept files as arguments (like `diff` or `cat`).
+Treat the output of a command like a temporary file.
 
-### Example
+**Example Usage**
 ```bash
-# Compare the output of two different commands directly!
 diff <(ls folderA) <(ls folderB)
-
-# Feed output directly into a while loop
-while read line; do
-    echo "Log: $line"
-done < <(cat server.log | grep "ERROR")
 ```
 
-### How it works internally
-AurSh executes the inner command asynchronously, connects its output to an anonymous Named Pipe (or temporary file descriptors), and passes the path to that pipe (e.g., `/dev/fd/63` or `\\.\pipe\...`) to the outer command.
+**How it works internally**
+Executes the inner command asynchronously and connects its output to an anonymous Named Pipe.
 
 ---
 
 ## Here Strings and Here Docs
 
 **What it does**
-Easily pass multi-line strings or blocks of text directly into the standard input of a command without creating temporary files.
+Pass strings or multi-line text directly into standard input without temporary files.
 
-### Example
+**Example Usage**
 ```bash
-# Here String (<<<): Pass a single string directly to a command
+# Here String
 grep "admin" <<< "user1 admin user2"
 
-# Here Doc (<<): Pass a multi-line block of text
+# Here Doc
 cat <<EOF > config.txt
 Server=127.0.0.1
-Port=8080
 EOF
 ```
-
-### How it works internally
-AurSh captures the text on the right-hand side, writes it directly to the process's standard input stream, and handles the `EOF` delimiter parsing natively in the Lexer.
 
 ---
 
 ## Functions and Scoping
 
 **What it does**
-You can define reusable blocks of code using functions. Functions accept POSIX positional arguments dynamically and support safe, local variable scoping to avoid polluting the global environment. The `return` command can cleanly halt function execution and assign a return code.
+Define reusable blocks of code. Functions accept arguments dynamically and support safe local variable scoping.
 
 **Example Usage**
 ```bash
-# Define a function
 function greet() {
-    # 'local' ensures the variable disappears when the function ends
     local name=$1
-    if [ -z "$name" ]; then
-        echo "Error: Name required"
-        return 1
-    fi
     echo "Hello, $name! You passed $# arguments."
     return 0
 }
@@ -281,21 +259,17 @@ greet "AurSh User"
 ```
 
 **How it works internally**
-When the `AstEvaluator` encounters a function definition, it saves the AST block into the environment without executing it. When you call the function, the evaluator pushes a new Call Stack Frame and Scope via `_env.PushScope()`, assigns `$1`, `$2`, `$@` and `$#` based on the passed arguments, executes the function body, handles any `return` signals, and finally safely cleans up by popping the scope.
+When called, the evaluator pushes a new Call Stack Frame, assigns `$1`, `$2`, executes the function, handles `return` signals, and pops the scope.
+
+---
 
 ## File Associations
 
 **What it does**
-AurShell natively handles cross-platform file extension associations via the `aursh-assoc` builtin. This allows you to execute script files directly (like `./script.py`) without needing to type `python` first or relying on OS-level handlers.
+Native cross-platform file extension associations via `aursh-assoc`.
 
 **Example Usage**
 ```bash
-# Add an association (Use {0} for the file path, {1} for arguments)
 aursh-assoc .py "python \"{0}\" {1}"
-
-# Execute directly
 ./script.py arg1
 ```
-
-**How it works internally**
-When you invoke a file that has a registered association, AurShell intercepts the execution, replaces `{0}` with the script's path and `{1}` with the supplied arguments, and runs the substituted command behind the scenes.

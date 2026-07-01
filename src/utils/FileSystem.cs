@@ -67,7 +67,7 @@ public static class FileSystem
             if (File.Exists(filePath))
                 return File.ReadAllLines(filePath);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return Array.Empty<string>();
     }
 
@@ -78,7 +78,7 @@ public static class FileSystem
             if (File.Exists(filePath))
                 return File.ReadAllText(filePath);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return "";
     }
 
@@ -90,7 +90,7 @@ public static class FileSystem
             File.WriteAllLines(filePath, lines);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); return false; }
     }
 
     public static bool WriteAllTextSafe(string filePath, string content)
@@ -101,7 +101,7 @@ public static class FileSystem
             File.WriteAllText(filePath, content);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); return false; }
     }
 
     public static bool AppendLineSafe(string filePath, string line)
@@ -112,7 +112,7 @@ public static class FileSystem
             File.AppendAllText(filePath, line + System.Environment.NewLine);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); return false; }
     }
 
     public static bool AppendLinesSafe(string filePath, IEnumerable<string> lines)
@@ -123,7 +123,7 @@ public static class FileSystem
             File.AppendAllLines(filePath, lines);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); return false; }
     }
 
     public static long GetFileSizeSafe(string filePath)
@@ -133,7 +133,7 @@ public static class FileSystem
             if (File.Exists(filePath))
                 return new FileInfo(filePath).Length;
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return -1;
     }
 
@@ -157,7 +157,7 @@ public static class FileSystem
                     return true;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return false;
     }
 
@@ -175,7 +175,7 @@ public static class FileSystem
                     return f;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return null;
     }
 
@@ -192,7 +192,7 @@ public static class FileSystem
                 FileAttributes attrs = File.GetAttributes(path);
                 return (attrs & FileAttributes.Hidden) != 0;
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         }
 
         return false;
@@ -208,7 +208,7 @@ public static class FileSystem
                 return true;
             }
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); }
         return false;
     }
 
@@ -220,7 +220,7 @@ public static class FileSystem
             File.Copy(source, destination, true);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh fs error: {ex.Message}"); return false; }
     }
 
     public static string ResolvePath(string path, string workingDirectory)

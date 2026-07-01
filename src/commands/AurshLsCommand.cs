@@ -36,7 +36,7 @@ public static class AurshLsCommand
         {
             string oldDir = workingDirectory;
             workingDirectory = Utils.FileSystem.NormalizePath(selected);
-            try { Directory.SetCurrentDirectory(workingDirectory); } catch { }
+            try { Directory.SetCurrentDirectory(workingDirectory); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
             env.Set("OLDPWD", oldDir);
             env.Set("PWD", workingDirectory);
         }

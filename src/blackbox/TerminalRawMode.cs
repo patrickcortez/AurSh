@@ -111,7 +111,7 @@ public sealed class TerminalRawMode : System.IDisposable
             using var rawProc = System.Diagnostics.Process.Start(rawPsi);
             rawProc?.WaitForExit();
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private void ExitPosix()
@@ -131,7 +131,7 @@ public sealed class TerminalRawMode : System.IDisposable
                 using var proc = System.Diagnostics.Process.Start(psi);
                 proc?.WaitForExit();
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
             return;
         }
 
@@ -163,7 +163,7 @@ public sealed class TerminalRawMode : System.IDisposable
                 using var proc = System.Diagnostics.Process.Start(psi);
                 proc?.WaitForExit();
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         }
     }
 
@@ -190,7 +190,7 @@ public sealed class TerminalRawMode : System.IDisposable
 
             SetConsoleMode(handle, rawMode);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
     }
 
     private void ExitWindows()
@@ -202,7 +202,7 @@ public sealed class TerminalRawMode : System.IDisposable
             if (handle != System.IntPtr.Zero && handle != new System.IntPtr(-1))
                 SetConsoleMode(handle, _savedConsoleMode);
         }
-        catch { }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"aursh error: {ex.Message}"); }
         _windowsModeWasSaved = false;
     }
 }

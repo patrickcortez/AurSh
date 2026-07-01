@@ -540,9 +540,18 @@ public class Lexer
                     continue;
                 }
 
+                if (_pos + 2 < _input.Length && _input[_pos + 1] == '?' && _input[_pos + 2] == '(')
+                {
+                    string sub = ReadSubCommand(true);
+                    sb.Append(sub);
+                    rawSb.Append(sub);
+                    wasSingleQuoted = false;
+                    continue;
+                }
+
                 if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
-                    string sub = ReadSubCommand();
+                    string sub = ReadSubCommand(false);
                     sb.Append(sub);
                     rawSb.Append(sub);
                     wasSingleQuoted = false;
@@ -588,12 +597,13 @@ public class Lexer
         return CreateToken(TokenType.Word, sb.ToString(), startPos, wasQuoted, wasSingleQuoted, rawSb.ToString(), hasLeadingSpace);
     }
 
-    private string ReadSubCommand()
+    private string ReadSubCommand(bool isExitCode)
     {
         _pos++;
         _pos++;
+        if (isExitCode) _pos++;
         var sb = new StringBuilder();
-        sb.Append("$(");
+        sb.Append(isExitCode ? "$?(" : "$(");
 
         int depth = 1;
         bool inSingleQuote = false;
@@ -707,9 +717,15 @@ public class Lexer
                     continue;
                 }
 
+                if (_pos + 2 < _input.Length && _input[_pos + 1] == '?' && _input[_pos + 2] == '(')
+                {
+                    sb.Append(ReadSubCommand(true));
+                    continue;
+                }
+
                 if (_pos + 1 < _input.Length && _input[_pos + 1] == '(')
                 {
-                    sb.Append(ReadSubCommand());
+                    sb.Append(ReadSubCommand(false));
                     continue;
                 }
                 sb.Append(ExpandInline());

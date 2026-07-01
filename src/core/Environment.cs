@@ -71,6 +71,8 @@ public class ShellEnvironment
     public JobTable Jobs { get; } = new();
 
     public Plugins.PluginManager? PluginManager { get; set; }
+    
+    public DebuggerClient? Debugger { get; set; }
 
     public SuggestionProvider? Suggestions { get; set; }
 
@@ -640,6 +642,7 @@ public class ShellEnvironment
         clone.SubshellEvaluator = SubshellEvaluator;
         clone.ProcessSubstitutionEvaluator = ProcessSubstitutionEvaluator;
         clone.Suggestions = Suggestions;
+        clone.Debugger = Debugger;
         return clone;
     }
 

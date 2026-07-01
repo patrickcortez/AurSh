@@ -25,9 +25,19 @@ public class Program
             args = args.Skip(1).ToArray();
         }
 
+        int debugPort = 0;
+        if (args.Length >= 2 && args[0] == "--debug-port")
+        {
+            if (int.TryParse(args[1], out int port))
+            {
+                debugPort = port;
+            }
+            args = args.Skip(2).ToArray();
+        }
+
         if (args.Length == 0)
         {
-            var shell = new Core.Shell(forceInteractive);
+            var shell = new Core.Shell(forceInteractive, debugPort);
             shell.Run();
             return 0;
         }
@@ -35,7 +45,7 @@ public class Program
         if (args[0] == "-c" && args.Length >= 2)
         {
             string command = args[1];
-            var shell = new Core.Shell();
+            var shell = new Core.Shell(false, debugPort);
             return shell.ExecuteCommand(command);
         }
 
@@ -79,7 +89,7 @@ public class Program
             scriptPath = resolved;
         }
 
-        var runner = new Core.Shell();
+        var runner = new Core.Shell(false, debugPort);
         return runner.RunScript(scriptPath, scriptArgs);
     }
 

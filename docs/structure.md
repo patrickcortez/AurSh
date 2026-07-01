@@ -9,6 +9,7 @@ When navigating the repository, you'll find the following key directories:
 - `bin/` — Contains the compiled executable binaries.
 - `docs/` — Contains the documentation you are reading now.
 - `Assets/` — Contains fonts, icons, and images used by the project.
+- `AurSh-ISE/` — Contains the Integrated Scripting Environment editor for AurSh.
 
 **How it works internally**
 1. **The Core**: AurSh intercepts your commands, but instead of reinventing the wheel, it hands off standard commands directly to your underlying Operating System (Windows, macOS, or Linux).

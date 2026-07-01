@@ -156,6 +156,11 @@ public class AstEvaluator
 
     public int Visit(ICommandNode node)
     {
+        if (_env.Debugger != null && _env.Debugger.ShouldPause(node.Line))
+        {
+            _env.Debugger.PauseAndBlock(node.Line, _env);
+        }
+
         return node switch
         {
             SimpleCommandNode scn => ExecuteSimpleCommand(scn),

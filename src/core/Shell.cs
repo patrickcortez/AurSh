@@ -23,10 +23,17 @@ public class Shell
     public BlackBox BlackBox => _blackBox;
     public string WorkingDirectory => _executor.WorkingDirectory;
 
-    public Shell(bool forceInteractive = false)
+    public Shell(bool forceInteractive = false, int debugPort = 0)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = new ShellEnvironment();
+        
+        if (debugPort > 0)
+        {
+            _env.Debugger = new DebuggerClient(debugPort);
+            _env.Debugger.Connect();
+        }
+
         _env.ImportFromSystem();
 
         string startDir;
@@ -133,10 +140,17 @@ public class Shell
         AurshNetTransfer.StartReceiverDaemon();
     }
 
-    public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false)
+    public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false, int debugPort = 0)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = env;
+        
+        if (debugPort > 0 && _env.Debugger == null)
+        {
+            _env.Debugger = new DebuggerClient(debugPort);
+            _env.Debugger.Connect();
+        }
+        
         _executor = new Executor(_env, workingDirectory);
         _history = new History(Utils.Platform.HistoryFilePath);
         _prompt = new Prompt(_env);

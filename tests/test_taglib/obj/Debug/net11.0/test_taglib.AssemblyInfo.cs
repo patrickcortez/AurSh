@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("test_taglib")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a8d3a2b37b4591a268c1ed11083d5dbe55f6461d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c7e144f6f05d9ab6cb4e28d120fb023862c60b24")]
 [assembly: System.Reflection.AssemblyProductAttribute("test_taglib")]
 [assembly: System.Reflection.AssemblyTitleAttribute("test_taglib")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

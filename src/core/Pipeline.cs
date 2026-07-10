@@ -215,36 +215,42 @@ public static class Pipeline
 
     private static int ExecuteExternal(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, bool background, Stream? inStream = null, Stream? outStream = null, Stream? errStream = null)
     {
-        if (TryGetAssociationShellCommand(cmd, env, workingDirectory, out string assocCmd))
+        if (TryResolveAssociation(cmd, env, workingDirectory, out string? assocExe, out List<string>? assocArgs))
         {
-            var parts = assocCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 0)
+            string? resolvedAssocExe = ResolveCommand(assocExe!, workingDirectory);
+            if (resolvedAssocExe == null)
             {
-                string? resolvedAssocExe = ResolveCommand(parts[0], workingDirectory);
-                if (resolvedAssocExe == null)
-                {
-                    Console.Error.WriteLine($"aursh: {parts[0]}: command not found");
-                    return 127;
-                }
-                var tempCmd = new SimpleCommandNode { Name = resolvedAssocExe };
-                for (int i = 1; i < parts.Length; i++) tempCmd.Args.Add(parts[i]);
-                foreach (var r in cmd.Redirections) tempCmd.Redirections.Add(r);
+                Console.Error.WriteLine($"aursh: {assocExe}: command not found");
+                return 127;
+            }
 
-                var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
-                try
+            var tempCmd = new SimpleCommandNode { Name = resolvedAssocExe };
+            foreach (string arg in assocArgs!)
+            {
+                tempCmd.Args.Add(arg);
+            }
+            foreach (var r in cmd.Redirections)
+            {
+                tempCmd.Redirections.Add(r);
+            }
+
+            var assocPsi = CreateProcessStartInfo(resolvedAssocExe, tempCmd, env, workingDirectory);
+            try
+            {
+                var process = Process.Start(assocPsi);
+                if (process != null)
                 {
-                    var process = Process.Start(assocPsi);
-                    if (process != null)
+                    if (!background)
                     {
-                        if (!background) process.WaitForExit();
-                        return background ? 0 : process.ExitCode;
+                        process.WaitForExit();
                     }
+                    return background ? 0 : process.ExitCode;
                 }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"aursh: failed to execute associated program: {ex.Message}");
-                    return 126;
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"aursh: failed to execute associated program: {ex.Message}");
+                return 126;
             }
             return 126;
         }
@@ -658,45 +664,132 @@ public static class Pipeline
         }
     }
 
-    private static bool TryGetAssociationShellCommand(SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory, out string shellCommand)
+    /// <summary>
+    /// Resolves a file-association template into a structured executable + args list.
+    /// Avoids flattening args into a single string which would break paths/args with spaces.
+    /// </summary>
+    private static bool TryResolveAssociation(
+        SimpleCommandNode cmd, ShellEnvironment env, string workingDirectory,
+        out string? executable, out List<string>? args)
     {
-        shellCommand = "";
+        executable = null;
+        args = null;
 
         if (string.IsNullOrEmpty(cmd.Name))
+        {
             return false;
+        }
 
         bool isFilePath = cmd.Name.Contains('/') || cmd.Name.Contains('\\') || cmd.Name.StartsWith(".");
         if (!isFilePath)
         {
             string fullTestPath = Utils.FileSystem.ResolvePath(cmd.Name, workingDirectory);
             if (File.Exists(fullTestPath))
-                isFilePath = true;
-        }
-
-        if (isFilePath)
-        {
-            string fullPath = Utils.FileSystem.ResolvePath(cmd.Name, workingDirectory);
-            if (File.Exists(fullPath))
             {
-                string ext = Path.GetExtension(fullPath);
-                if (!string.IsNullOrEmpty(ext))
-                {
-                    string? template = env.Associator.GetAssociation(ext);
-                    if (template != null)
-                    {
-                        if (!template.Contains("{0}"))
-                        {
-                            template += " \"{0}\" {1}";
-                        }
-
-                        string newArgsStr = string.Join(" ", cmd.RawExpandedArgs);
-                        shellCommand = template.Replace("{0}", fullPath).Replace("{1}", newArgsStr).Trim();
-                        return true;
-                    }
-                }
+                isFilePath = true;
             }
         }
-        return false;
+
+        if (!isFilePath)
+        {
+            return false;
+        }
+
+        string fullPath = Utils.FileSystem.ResolvePath(cmd.Name, workingDirectory);
+        if (!File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        string ext = Path.GetExtension(fullPath);
+        if (string.IsNullOrEmpty(ext))
+        {
+            return false;
+        }
+
+        string? template = env.Associator.GetAssociation(ext);
+        if (template == null)
+        {
+            return false;
+        }
+
+        // Parse the template into tokens, preserving quoted segments as single tokens
+        var templateParts = SplitTemplateTokens(template);
+
+        if (templateParts.Count == 0)
+        {
+            return false;
+        }
+
+        // Build the final argument list by expanding {0} and {1} placeholders
+        var result = new List<string>();
+        foreach (string part in templateParts)
+        {
+            if (part == "{1}")
+            {
+                // Expand {1} by copying original args as-is (preserving spaces within each arg)
+                result.AddRange(cmd.Args);
+            }
+            else
+            {
+                // Replace {0} with the resolved file path
+                result.Add(part.Replace("{0}", fullPath));
+            }
+        }
+
+        if (result.Count == 0)
+        {
+            return false;
+        }
+
+        executable = result[0];
+        args = result.GetRange(1, result.Count - 1);
+        return true;
+    }
+
+    /// <summary>
+    /// Splits a template string into tokens, respecting double-quoted segments.
+    /// Quotes are stripped from the result. Unquoted whitespace delimits tokens.
+    /// If no {0} placeholder exists, appends the default "{0}" {1} pattern.
+    /// </summary>
+    private static List<string> SplitTemplateTokens(string template)
+    {
+        if (!template.Contains("{0}"))
+        {
+            template += " \"{0}\" {1}";
+        }
+
+        var tokens = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool inQuotes = false;
+
+        for (int i = 0; i < template.Length; i++)
+        {
+            char c = template[i];
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (char.IsWhiteSpace(c) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+
+        if (current.Length > 0)
+        {
+            tokens.Add(current.ToString());
+        }
+
+        return tokens;
     }
 
     private static string ResolveRedirectionTarget(string target, string workingDirectory)

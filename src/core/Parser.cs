@@ -480,7 +480,7 @@ public class Parser
                 continue;
             }
 
-            if (Current.HasLeadingSpace && argBuilder.Length > 0)
+            if (Current.HasLeadingSpace && rawArgBuilder.Length > 0)
             {
                 if (!hasContent)
                 {
@@ -503,7 +503,7 @@ public class Parser
 
             while (IsRedirect(Current.Type))
             {
-                if (argBuilder.Length > 0)
+                if (rawArgBuilder.Length > 0)
                 {
                     if (!hasContent) { cmd.Name = argBuilder.ToString(); cmd.RawExpandedName = rawArgBuilder.ToString(); hasContent = true; }
                     else { cmd.Args.Add(argBuilder.ToString()); cmd.RawExpandedArgs.Add(rawArgBuilder.ToString()); }
@@ -514,7 +514,7 @@ public class Parser
             }
         }
 
-        if (argBuilder.Length > 0)
+        if (rawArgBuilder.Length > 0)
         {
             if (!hasContent) { cmd.Name = argBuilder.ToString(); cmd.RawExpandedName = rawArgBuilder.ToString(); hasContent = true; }
             else { cmd.Args.Add(argBuilder.ToString()); cmd.RawExpandedArgs.Add(rawArgBuilder.ToString()); }

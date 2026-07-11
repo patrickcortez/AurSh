@@ -1,8 +1,8 @@
 #!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
-users=(guest admin bob)
+guest_list=(guest admin bob)
 count=0
 
-for u in ${users[@]}; do
+for u in ${guest_list[@]}; do
     if [ "$u" = "admin" ]; then
         echo "Found admin! Breaking early."
         break

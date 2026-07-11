@@ -1,0 +1,10 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+if [[ "hello" == @(hello|world) ]]; then
+  echo "yes"
+else
+  echo "no"
+fi
+
+if [[ "world" == !(hello) ]]; then
+  echo "yes2"
+fi

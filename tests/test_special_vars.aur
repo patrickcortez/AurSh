@@ -1,0 +1,17 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+
+echo "Test FUNCNAME"
+function identify() {
+  echo "I am in function: $FUNCNAME"
+}
+identify
+
+echo "Test exit code"
+false
+echo "Exit code: $?"
+
+echo "Test background pid"
+# Start a simple command in background
+sleep 1 &
+echo "Background PID: $!"

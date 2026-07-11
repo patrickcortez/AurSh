@@ -1,0 +1,46 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+
+echo "=== Test 1: Simple conditions ==="
+if [ "a" == "a" ]; then
+  echo "a is a"
+fi
+
+if [ "a" != "b" ]; then
+  echo "a is not b"
+fi
+
+echo "=== Test 2: Logical AND (-a) ==="
+if [ "a" == "a" -a "b" == "b" ]; then
+  echo "AND works"
+fi
+
+echo "=== Test 3: Logical OR (-o) ==="
+if [ "a" == "b" -o "c" == "c" ]; then
+  echo "OR works"
+fi
+
+echo "=== Test 4: Nested logicals with && and || ==="
+if [[ "a" == "a" && "b" == "b" ]]; then
+  echo "&& works"
+fi
+
+if [[ "a" == "b" || "c" == "c" ]]; then
+  echo "|| works"
+fi
+
+echo "=== Test 5: Negation (!) ==="
+if [ ! "a" == "b" ]; then
+  echo "NOT works"
+fi
+
+if [ ! -z "notempty" ]; then
+  echo "NOT -z works"
+fi
+
+echo "=== Test 6: Parentheses ==="
+if [ \( "a" == "a" -o "a" == "b" \) -a "c" == "c" ]; then
+  echo "Parens works"
+fi
+
+echo "=== All test conditions passed ==="

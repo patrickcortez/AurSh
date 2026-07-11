@@ -1,0 +1,11 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+echo testing
+function test(){
+let msi = $(git --version)
+echo "msi is: $msi"
+if [ "$msi" -eq 0 ];then
+echo ok
+fi
+return "$msi"
+}
+echo "$(test())"

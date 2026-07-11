@@ -1,0 +1,11 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+export let shared_var = "Hello from Module!"
+
+export function math_add() {
+    let a = $1
+    let b = $2
+    echo "Debug: a is $a, b is $b"
+    let c = $(( $a + $b ))
+    echo "Debug: c is $c"
+    return $c
+}

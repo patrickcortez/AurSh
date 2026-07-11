@@ -1,0 +1,52 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+echo "--- Variable Expansion ---"
+v1="Hello"
+echo "$v1 World"
+echo "${v1}World"
+
+echo "--- Quote Removal ---"
+echo "single 'quotes'"
+echo 'double "quotes"'
+echo 'literal $v1'
+
+echo "--- Word Splitting ---"
+v2="a b c"
+for i in $v2; do
+    echo "word: $i"
+done
+for i in "$v2"; do
+    echo "quoted word: $i"
+done
+
+echo "--- Globbing ---"
+echo tests/*.aur
+
+echo "--- Subshells ---"
+v3=$(echo subshell output)
+echo "v3 is $v3"
+
+echo "--- Arithmetic ---"
+v4=$((1 + 2 * 3))
+echo "v4 is $v4"
+
+echo "--- Case node globbing ---"
+case "$v1" in
+    H*)
+        echo "Matches H*"
+        ;;
+    *)
+        echo "Does not match"
+        ;;
+esac
+
+echo "--- Full Globbing Tests ---"
+echo src/**/*.cs | wc -w
+echo tests/[a-z]*.aur | wc -w
+echo tests/[!a]*.aur | wc -w
+echo src/core/W?rdExpander.cs
+
+echo "--- Full Globbing Tests Without wc ---"
+echo src/**/*.cs
+echo tests/[a-z]*.aur
+echo tests/[!a]*.aur
+echo tests/t?st_*.aur

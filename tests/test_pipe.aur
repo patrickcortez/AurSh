@@ -1,0 +1,1 @@
+Get-ChildItem | Where-Object {$_.Extension -eq ".txt"}

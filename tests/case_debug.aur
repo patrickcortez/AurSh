@@ -1,0 +1,6 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+word=abc
+case "$word" in
+  a*) echo match ;;
+  *) echo miss ;;
+esac

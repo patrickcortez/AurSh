@@ -1,0 +1,9 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+var="hello world"
+echo ${var:0:5}
+echo ${var#*l}
+echo ${var##*l}
+echo ${var%l*}
+echo ${var%%l*}
+echo ${var/l/L}
+echo ${var//l/L}

@@ -1,0 +1,35 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+# Test arithmetic expansion
+
+echo "=== Test 1: Basic arithmetic ==="
+echo $(( 10 + 5 ))
+echo $(( 10 - 5 ))
+echo $(( 10 * 5 ))
+echo $(( 10 / 5 ))
+
+echo "=== Test 2: Precedence and parens ==="
+echo $(( 2 + 3 * 4 ))
+echo $(( (2 + 3) * 4 ))
+
+echo "=== Test 3: Modulo and Power ==="
+echo $(( 10 % 3 ))
+echo $(( 2 ** 3 ))
+
+echo "=== Test 4: Variables in arithmetic ==="
+A=5
+B=2
+echo $(( A + B ))
+echo $(( $A * $B ))
+
+echo "=== Test 5: Logical comparisons ==="
+echo $(( 5 == 5 ))
+echo $(( 5 != 4 ))
+echo $(( 5 > 3 ))
+echo $(( 5 <= 10 ))
+
+echo "=== Test 6: Ternary operator ==="
+echo $(( 5 > 3 ? 100 : 200 ))
+echo $(( 5 < 3 ? 100 : 200 ))
+
+echo "=== All arithmetic tests passed ==="

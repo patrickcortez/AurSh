@@ -1,0 +1,14 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+
+G="global_val"
+
+function myfunc() {
+  local L="local_val"
+  local G="shadowed_val"
+  echo "Inside func: L=$L, G=$G"
+}
+
+myfunc
+
+echo "Outside func: L=$L, G=$G"

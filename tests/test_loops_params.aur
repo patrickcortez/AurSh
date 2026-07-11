@@ -1,0 +1,26 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+
+echo "--- Positional Parameters ---"
+echo "$@ counts: $#"
+echo "$@ is: $@"
+echo "$* is: $*"
+
+echo "--- While Loop ---"
+count=3
+while [ $count -gt 0 ]; do
+  echo "Count: $count"
+  count=$((count - 1))
+done
+
+echo "--- Default Parameters ---"
+echo "${undef:-my_default}"
+
+echo "FINAL COUNT: $count"
+
+echo "DEBUG COUNT: $count"
+
+echo "DEBUG AFTER ASSIGN: $count"
+
+echo "DEBUG AFTER ASSIGN: $count"
+
+echo "Count end: $count"

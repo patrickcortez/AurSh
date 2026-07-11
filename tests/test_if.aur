@@ -1,0 +1,4 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+if [ "" -eq 0 ]; then
+echo ok
+fi

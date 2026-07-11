@@ -1,0 +1,66 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+# Test case/esac statements
+
+echo "=== Test 1: Simple exact match ==="
+VAL="apple"
+case $VAL in
+  banana)
+    echo "It's a banana"
+    ;;
+  apple)
+    echo "It's an apple"
+    ;;
+  *)
+    echo "Unknown"
+    ;;
+esac
+
+echo "=== Test 2: Wildcard match ==="
+VAL="hello.txt"
+case $VAL in
+  *.csv)
+    echo "CSV file"
+    ;;
+  *.txt)
+    echo "Text file"
+    ;;
+  *)
+    echo "Unknown file"
+    ;;
+esac
+
+echo "=== Test 3: Multiple patterns (OR) ==="
+VAL="yes"
+case $VAL in
+  y|yes|Y|YES)
+    echo "Agreed"
+    ;;
+  n|no|N|NO)
+    echo "Disagreed"
+    ;;
+  *)
+    echo "Unknown choice"
+    ;;
+esac
+
+echo "=== Test 4: Nested case ==="
+VAL1="fruit"
+VAL2="orange"
+case $VAL1 in
+  fruit)
+    case $VAL2 in
+      apple)
+        echo "Nested Apple"
+        ;;
+      orange)
+        echo "Nested Orange"
+        ;;
+    esac
+    ;;
+  *)
+    echo "Not fruit"
+    ;;
+esac
+
+echo "=== All case/esac tests passed ==="

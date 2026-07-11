@@ -1,0 +1,57 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/bin/aursh
+# Test break/continue in loops
+
+echo "=== Test 1: break in for loop ==="
+for i in 1 2 3 4 5; do
+  if [ $i -eq 3 ]; then
+    break
+  fi
+  echo $i
+done
+echo "After break loop"
+
+echo "=== Test 2: continue in for loop ==="
+for i in 1 2 3 4 5; do
+  if [ $i -eq 3 ]; then
+    continue
+  fi
+  echo $i
+done
+echo "After continue loop"
+
+echo "=== Test 3: break in while loop ==="
+COUNT=0
+while [ $COUNT -lt 10 ]; do
+  if [ $COUNT -eq 4 ]; then
+    break
+  fi
+  echo $COUNT
+  COUNT += 1
+done
+echo "After while break"
+
+echo "=== Test 4: continue in while loop ==="
+COUNT=0
+while [ $COUNT -lt 6 ]; do
+  COUNT += 1
+  if [ $COUNT -eq 3 ]; then
+    continue
+  fi
+  echo $COUNT
+done
+echo "After while continue"
+
+echo "=== Test 5: break 2 in nested loop ==="
+for i in 1 2 3; do
+  for j in a b c; do
+    if [ "$j" == "b" ]; then
+      break 2
+    fi
+    echo "$i-$j"
+  done
+  echo "inner done $i"
+done
+echo "After nested break 2"
+
+echo "=== All break/continue tests passed ==="

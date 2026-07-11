@@ -1,0 +1,24 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+# Test Array Expansion
+declare -a myarr
+myarr=(apple banana cherry)
+echo "Array element 2: ${myarr[1]}"
+
+# Test Advanced Parameter Expansion
+var="hello_world"
+echo "Substring: ${var:2:5}"
+echo "Prefix remove shortest: ${var#*_}"
+echo "Suffix remove longest: ${var%%_*}"
+echo "Pattern replace: ${var/world/earth}"
+
+# Test Process Substitution
+cat <(echo "This is from process substitution")
+
+# Test Here Doc
+cat <<EOF
+This is a here doc
+Line 2
+EOF
+
+# Test Here String
+cat <<< "This is a here string"

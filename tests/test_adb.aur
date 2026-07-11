@@ -1,0 +1,12 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+a=1
+b=2
+echo "a is $a"
+echo "b is $b"
+function myfunc() {
+    echo "Inside myfunc"
+    local c=3
+    echo "c is $c"
+}
+myfunc
+echo "Done"

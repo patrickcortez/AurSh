@@ -1,0 +1,15 @@
+#!C:\Program Files\AurShell\aursh.exe
+
+echo "Test 1: direct empty comparison"
+if [ "" == "" ]; then
+    echo "PASS: empty == empty is true"
+else
+    echo "FAIL: empty == empty is false"
+fi
+
+echo "Test 2: dollar-1 comparison"
+if [ "$1" == "" ]; then
+    echo "PASS: dollar-1 == empty is true"
+else
+    echo "FAIL: dollar-1 == empty is false"
+fi

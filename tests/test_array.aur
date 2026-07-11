@@ -1,0 +1,3 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+arr=(a b c)
+echo ${arr[1]}

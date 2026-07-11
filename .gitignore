@@ -24,18 +24,12 @@ concepts.txt
 .kiro
 src/Contexts/obj/*
 src/Contexts/bin/*
-*.aur
 CSharpTest
 MarkdigTest
-tests/assets/*
 .antigravitycli
 src/music-ui/node_modules/
 src/music-ui/dist/
 src-ise/AurShell.ISE/obj/*
 src-ise/AurShell.ISE/bin/*
-tests/AurShell.ISE.Tests/obj/*
-tests/AurShell.ISE.Tests/bin/*
-tests/obj/*
-tests/bin/*
 
-AurSh-ISE/
+

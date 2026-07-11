@@ -1,0 +1,23 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+let msg = "hello world"
+let len = msg.Length()
+echo "Length of msg is: $len"
+
+let upper = msg.ToUpper()
+echo "Uppercase: $upper"
+
+let my_list = [1, 2, "three", "four"]
+let list_len = my_list.Length()
+echo "List length: $list_len"
+
+my_list.Push("five")
+let new_len = my_list.Length()
+echo "List new length: $new_len"
+
+let combined = my_list.Join("-")
+echo "Joined list: $combined"
+
+let person = { "name": "Cortez", "age": 28, "isActive": true }
+echo "Person object: $person"
+person.age = 29
+echo "Updated age: ${person.age}"

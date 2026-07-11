@@ -1,0 +1,57 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/usr/bin/env aursh
+
+echo "==========================="
+echo "AurShell Edge Case Tester"
+echo "==========================="
+
+echo "--- 1. Testing Path Escaping ---"
+win_path="C:\Windows\System32\cmd.exe"
+echo "Original path: C:\Windows\System32\cmd.exe"
+echo "Variable path: $win_path"
+
+echo ""
+echo "--- 2. Testing Recursive Command Subshells ---"
+function get_depth() {
+    local d=$1
+    echo "d='$d'" >> debug.log
+    if [ "$d" -le 0 ]; then
+        echo "Bottom"
+        return 0
+    fi
+    local next_d=$(( d - 1 ))
+    local child_result=$(get_depth $next_d)
+    echo "Level_$d->$child_result"
+}
+
+res=$(get_depth 3)
+echo "Recursion output: $res"
+
+echo ""
+echo "--- 3. Testing Array Appends ---"
+declare -a my_list
+my_list=("one" "two")
+my_list=("${my_list[@]}" "three" "four")
+echo "Array contents: ${my_list[@]}"
+
+echo ""
+echo "--- 4. Testing Multi-line Strings ---"
+multi_line="This is a string
+that spans multiple
+lines"
+echo "$multi_line"
+
+echo ""
+echo "--- 5. Testing Nested Ifs and Math ---"
+a=15
+b=4
+if [ $a -gt 10 ]; then
+    if [ $(( a % b )) -eq 3 ]; then
+        echo "15 modulo 4 is 3. Correct."
+    else
+        echo "Modulo failed."
+    fi
+fi
+
+echo "==========================="
+echo "Test 2 finished."

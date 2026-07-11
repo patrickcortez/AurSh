@@ -1,0 +1,81 @@
+#!C:\Users\Cortez\Documents\Projects\AurSh\bin\aursh.exe
+#!/usr/bin/env aursh
+
+echo "==========================="
+echo "AurShell Complex Test Suite"
+echo "==========================="
+
+# 1. Variables and Arrays
+echo "[1] Testing Arrays and Variables..."
+users=("admin" "guest" "bot")
+echo "Users: ${users[@]}"
+echo "First user: ${users[0]}"
+
+declare -A scores
+scores["admin"]=100
+scores["guest"]=50
+echo "Admin score: ${scores["admin"]}"
+
+# 2. Math Evaluation
+echo ""
+echo "[2] Testing Math Evaluation..."
+x=10
+y=3
+result=$(( (x * y) + 5 - (x / y) ))
+echo "Result of ((10 * 3) + 5 - (10 / 3)): $result"
+if [ $result -eq 32 ]; then
+    echo "Math evaluation passed."
+else
+    echo "Math evaluation failed."
+fi
+
+# 3. Functions, Locality, and Recursion
+echo ""
+echo "[3] Testing Functions and Local Scope..."
+
+function factorial() {
+    local n=$1
+    if [ $n -le 1 ]; then
+        echo 1
+        return 0
+    fi
+    local prev=$(( n - 1 ))
+    local sub=$(factorial $prev)
+    local res=$(( n * sub ))
+    echo $res
+    return 0
+}
+
+fact_res=$(factorial 5)
+echo "Factorial of 5 is: $fact_res"
+
+# 4. Control Flow
+echo ""
+echo "[4] Testing Control Flow (Loops and Conditions)..."
+count=0
+for u in ${users[@]}; do
+    if [ "$u" == "admin" ]; then
+        echo "Found admin! Breaking early."
+        break
+    else
+        echo "Processing $u..."
+    fi
+done
+
+while [ $count -lt 3 ]; do
+    if [ $count -eq 1 ]; then
+        count=$(( count + 1 ))
+        continue
+    fi
+    echo "While loop count: $count"
+    count=$(( count + 1 ))
+done
+
+# 5. Piping and Command Substitution
+echo ""
+echo "[5] Testing Pipes and Subshells..."
+pipe_res=$(echo "apple banana cherry" | grep "banana")
+echo "Grep result: $pipe_res"
+
+echo "==========================="
+echo "All tests executed."

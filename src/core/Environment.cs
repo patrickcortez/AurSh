@@ -72,7 +72,7 @@ public class ShellEnvironment
 
     public Plugins.PluginManager? PluginManager { get; set; }
     
-    public DebuggerClient? Debugger { get; set; }
+    public AdbDebugger? Debugger { get; set; }
 
     public SuggestionProvider? Suggestions { get; set; }
 
@@ -87,7 +87,8 @@ public class ShellEnvironment
     public IReadOnlyDictionary<string, string> Variables => _variables;
     public IReadOnlyDictionary<string, Dictionary<string, string>> Objects => _objects;
     public IReadOnlyDictionary<string, string> Aliases => _aliases;
-
+    public IEnumerable<IReadOnlyDictionary<string, string>> LocalScopes => _localScopes;
+    
     public void PushScope()
     {
         _localScopes.Push(new Dictionary<string, string>(StringComparer.Ordinal));

@@ -5,12 +5,10 @@
 PROJECT := src/AurShell.csproj
 UPDATE_PROJECT := src/aursh-update/AurShUpdate.csproj
 CONTEXT_PROJECT := src/Contexts/Contexts.csproj
-ISE_PROJECT := src-ise/AurShell.ISE/AurShell.ISE.csproj
 BIN_DIR := bin
 APP_NAME := aursh
 UPDATE_APP_NAME := aursh-update
 CONTEXT_APP_NAME := aursh-context
-ISE_APP_NAME := aursh-ise
 FONTS_DIR := Assets/fonts
 FONT_FILE := JetBrainsMonoNLNerdFont-Light.ttf
 VERSION := 3.0.0
@@ -100,7 +98,6 @@ ifeq ($(DETECTED_OS),Windows)
     EXE := $(APP_NAME).exe
     UPDATE_EXE := $(UPDATE_APP_NAME).exe
     CONTEXT_EXE := $(CONTEXT_APP_NAME).exe
-    ISE_EXE := $(ISE_APP_NAME).exe
     INSTALL_DIR := C:/Program Files/AurShell
     USER_INSTALL_DIR := $(subst \,/,$(LOCALAPPDATA))/AurShell
     ifeq ($(USER_INSTALL_DIR),/AurShell)
@@ -113,7 +110,6 @@ else ifeq ($(DETECTED_OS),macOS)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
-    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -123,7 +119,6 @@ else ifeq ($(DETECTED_OS),Termux)
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
-    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := $(PREFIX)/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -134,7 +129,6 @@ else
     EXE := $(APP_NAME)
     UPDATE_EXE := $(UPDATE_APP_NAME)
     CONTEXT_EXE := $(CONTEXT_APP_NAME)
-    ISE_EXE := $(ISE_APP_NAME)
     INSTALL_DIR := /usr/local/bin
     USER_INSTALL_DIR := $(HOME)/.local/bin
     PUBLISH_DIR := publish/$(RID)
@@ -219,14 +213,12 @@ ifeq ($(WIN_ENV),native)
 	@echo [build] Compiling debug build...
 	dotnet build $(PROJECT) -c Debug
 	dotnet build $(CONTEXT_PROJECT) -c Debug
-	dotnet build $(ISE_PROJECT) -c Debug
-	@echo [build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE) + $(BIN_DIR)/$(ISE_EXE)
+	@echo [build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)
 else
 	@echo "[build] Compiling debug build..."
 	dotnet build $(PROJECT) -c Debug
 	dotnet build $(CONTEXT_PROJECT) -c Debug
-	dotnet build $(ISE_PROJECT) -c Debug
-	@echo "[build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE) + $(BIN_DIR)/$(ISE_EXE)"
+	@echo "[build] Output: $(BIN_DIR)/$(EXE) + $(BIN_DIR)/$(CONTEXT_EXE)"
 endif
 
 release:

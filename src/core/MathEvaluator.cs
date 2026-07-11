@@ -10,7 +10,7 @@ public static class MathEvaluator
     {
         if (string.IsNullOrWhiteSpace(expression)) return 0;
 
-        env.PushFrame(new StackFrame("math evaluation", 0, 0, FrameType.Arithmetic));
+        env.PushFrame(new StackFrame("math evaluation", 0, 0, "", FrameType.Arithmetic));
         try
         {
             var tokens = Tokenize(expression);

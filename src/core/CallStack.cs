@@ -13,13 +13,15 @@ public class StackFrame
     public string Name { get; }
     public int Line { get; }
     public int Column { get; }
+    public string File { get; }
     public FrameType Type { get; }
 
-    public StackFrame(string name, int line, int column, FrameType type)
+    public StackFrame(string name, int line, int column, string file, FrameType type)
     {
         Name = name;
         Line = line;
         Column = column;
+        File = file;
         Type = type;
     }
 

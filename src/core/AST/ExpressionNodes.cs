@@ -134,6 +134,7 @@ public class ObjectExpressionNode : ExpressionNode
 
 public class ExpressionStatementNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public ExpressionNode Expression { get; }
     public int Line { get; set; }
     public int Column { get; set; }
@@ -144,5 +145,6 @@ public class ExpressionStatementNode : ICommandNode
         Expression = expression;
     }
 
-    public override string ToString() => Expression.ToString();
+    public override string ToString() => Expression?.ToString() ?? "";
 }
+

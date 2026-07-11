@@ -124,7 +124,7 @@ public class Executor
                             ContextReader contextReader = new ContextReader();
                             resolved = contextReader.GetAttributeValue(contextName, attributeName);
                             resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
-                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
+                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].SourceFile, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw, tokens[i].HasLeadingSpace);
                         }
                     }
                 }
@@ -162,12 +162,12 @@ public class Executor
         return exitCode;
     }
 
-    public int ExecuteScript(string scriptContent)
+    public int ExecuteScript(string scriptContent, string sourceFile = "")
     {
         if (string.IsNullOrWhiteSpace(scriptContent))
             return 0;
 
-        Lexer lexer = new Lexer(scriptContent, _env);
+        Lexer lexer = new Lexer(scriptContent, _env, sourceFile);
         var tokens = lexer.Tokenize();
 
         for (int i = 0; i < tokens.Count; i++)
@@ -189,7 +189,7 @@ public class Executor
                             ContextReader contextReader = new ContextReader();
                             resolved = contextReader.GetAttributeValue(contextName, attributeName);
                             resolvedRaw = resolved; // Context replaces the whole token, so raw follows resolved
-                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw);
+                            tokens[i] = new Token(TokenType.Word, resolved, tokens[i].Line, tokens[i].Column, tokens[i].SourceFile, tokens[i].WasQuoted, tokens[i].WasSingleQuoted, resolvedRaw, tokens[i].HasLeadingSpace);
                         }
                     }
                 }
@@ -435,3 +435,4 @@ public class Executor
         return MathEvaluator.Evaluate(expression, _env);
     }
 }
+

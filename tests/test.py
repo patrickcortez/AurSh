@@ -61,7 +61,20 @@ def test_interpreter_regressions():
         "Grep result: apple banana cherry",
         "",
     ])
-    script_path = os.path.join("tests", "interpreter_regression.sh")
+    
+    script_path = os.path.join('tests', 'interpreter_regression.aur')
+    with open(script_path, 'r') as f:
+        content = f.read()
+    if not content.startswith('#!'):
+        import platform
+        expected_path = os.path.abspath(AURSH_CMD[0] if platform.system() == 'Windows' else AURSH_CMD[0])
+        if expected_path.endswith('dotnet') and len(AURSH_CMD) > 1:
+            expected_path = os.path.abspath(AURSH_CMD[1])
+        if platform.system() == 'Windows' and not expected_path.endswith('.exe') and not expected_path.endswith('.dll'):
+            expected_path += '.exe'
+        with open(script_path, 'w') as f:
+            f.write('#!' + expected_path + '\n' + content)
+
     executed = subprocess.run(AURSH_CMD + [script_path], capture_output=True, text=True)
 
     if executed.returncode != 0 or executed.stdout != expected:
@@ -117,3 +130,4 @@ if(__name__=="__main__"):
             print("AurSh is functional with argument {}".format(args))
         else:
             sys.exit(1)
+

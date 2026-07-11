@@ -26,6 +26,7 @@ public class Redirection
 
 public interface ICommandNode
 {
+    string File { get; set; }
     int Line { get; set; }
     int Column { get; set; }
     List<Redirection> Redirections { get; }
@@ -33,6 +34,7 @@ public interface ICommandNode
 
 public class SimpleCommandNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string Name { get; set; } = "";
@@ -57,6 +59,7 @@ public class SimpleCommandNode : ICommandNode
 
 public class IfNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
@@ -68,6 +71,7 @@ public class IfNode : ICommandNode
 
 public class WhileNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
@@ -77,6 +81,7 @@ public class WhileNode : ICommandNode
 
 public class UntilNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public ListNode Condition { get; set; } = new();
@@ -86,6 +91,7 @@ public class UntilNode : ICommandNode
 
 public class ForNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string VariableName { get; set; } = "";
@@ -96,6 +102,7 @@ public class ForNode : ICommandNode
 
 public class CaseNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string Value { get; set; } = "";
@@ -105,6 +112,7 @@ public class CaseNode : ICommandNode
 
 public class BlockNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public ListNode Body { get; set; } = new();
@@ -113,6 +121,7 @@ public class BlockNode : ICommandNode
 
 public class SubshellNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public ListNode Body { get; set; } = new();
@@ -121,6 +130,7 @@ public class SubshellNode : ICommandNode
 
 public class FunctionNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string Name { get; set; } = "";
@@ -131,6 +141,7 @@ public class FunctionNode : ICommandNode
 
 public class AssignmentNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string VariableName { get; set; } = "";
@@ -141,6 +152,7 @@ public class AssignmentNode : ICommandNode
 
 public class LetNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string VariableName { get; set; } = "";
@@ -151,6 +163,7 @@ public class LetNode : ICommandNode
 
 public class ConstNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string VariableName { get; set; } = "";
@@ -161,6 +174,7 @@ public class ConstNode : ICommandNode
 
 public class TryCatchNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public BlockNode TryBlock { get; set; } = new();
@@ -171,6 +185,7 @@ public class TryCatchNode : ICommandNode
 
 public class ArrayAssignmentNode : ICommandNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public string VariableName { get; set; } = "";
@@ -187,6 +202,7 @@ public enum ListOperator
 
 public class PipelineNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public List<ICommandNode> Commands { get; } = new();
@@ -207,6 +223,7 @@ public class ListEntry
 
 public class ListNode
 {
+    public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
     public List<ListEntry> Entries { get; } = new();
@@ -232,16 +249,19 @@ public class Parser
             {
                 cmdNode.Line = current.Line;
                 cmdNode.Column = current.Column;
+                cmdNode.File = current.SourceFile;
             }
             else if (node is ListNode listNode)
             {
                 listNode.Line = current.Line;
                 listNode.Column = current.Column;
+                listNode.File = current.SourceFile;
             }
             else if (node is PipelineNode pipeNode)
             {
                 pipeNode.Line = current.Line;
                 pipeNode.Column = current.Column;
+                pipeNode.File = current.SourceFile;
             }
         }
         return node;
@@ -1068,3 +1088,4 @@ public class Parser
             _pos++;
     }
 }
+

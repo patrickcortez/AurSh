@@ -40,13 +40,15 @@ public class Token
     public bool WasSingleQuoted { get; }
     public string RawExpandedValue { get; }
     public bool HasLeadingSpace { get; }
+    public string SourceFile { get; }
 
-    public Token(TokenType type, string value, int line, int column, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null, bool hasLeadingSpace = false)
+    public Token(TokenType type, string value, int line, int column, string sourceFile = "", bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null, bool hasLeadingSpace = false)
     {
         Type = type;
         Value = value;
         Line = line;
         Column = column;
+        SourceFile = sourceFile;
         WasQuoted = wasQuoted;
         WasSingleQuoted = wasSingleQuoted;
         RawExpandedValue = rawExpandedValue ?? value;
@@ -60,13 +62,15 @@ public class Lexer
 {
     private readonly string _input;
     private readonly ShellEnvironment _env;
+    private readonly string _sourceFile;
     private int _pos;
     private readonly List<int> _lineStarts;
 
-    public Lexer(string input, ShellEnvironment env)
+    public Lexer(string input, ShellEnvironment env, string sourceFile = "")
     {
         _input = input;
         _env = env;
+        _sourceFile = sourceFile;
         _pos = 0;
         _lineStarts = new List<int> { 0 };
         for (int i = 0; i < input.Length; i++)
@@ -86,7 +90,7 @@ public class Lexer
     private Token CreateToken(TokenType type, string value, int startPos, bool wasQuoted = false, bool wasSingleQuoted = false, string? rawExpandedValue = null, bool hasLeadingSpace = false)
     {
         var (line, col) = GetPosition(startPos);
-        return new Token(type, value, line, col, wasQuoted, wasSingleQuoted, rawExpandedValue, hasLeadingSpace);
+        return new Token(type, value, line, col, _sourceFile, wasQuoted, wasSingleQuoted, rawExpandedValue, hasLeadingSpace);
     }
 
     public List<Token> Tokenize(HashSet<string>? inheritedExpandedAliases = null)

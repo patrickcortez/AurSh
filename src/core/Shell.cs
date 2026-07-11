@@ -23,15 +23,14 @@ public class Shell
     public BlackBox BlackBox => _blackBox;
     public string WorkingDirectory => _executor.WorkingDirectory;
 
-    public Shell(bool forceInteractive = false, int debugPort = 0)
+    public Shell(bool forceInteractive = false, bool isDebug = false)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = new ShellEnvironment();
         
-        if (debugPort > 0)
+        if (isDebug)
         {
-            _env.Debugger = new DebuggerClient(debugPort);
-            _env.Debugger.Connect();
+            _env.Debugger = new AdbDebugger(_env);
         }
 
         _env.ImportFromSystem();
@@ -140,15 +139,14 @@ public class Shell
         AurshNetTransfer.StartReceiverDaemon();
     }
 
-    public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false, int debugPort = 0)
+    public Shell(ShellEnvironment env, string workingDirectory, bool forceInteractive = false, bool isDebug = false)
     {
         AurShell.Parser.Helper.EnsureConfigExists();
         _env = env;
         
-        if (debugPort > 0 && _env.Debugger == null)
+        if (isDebug && _env.Debugger == null)
         {
-            _env.Debugger = new DebuggerClient(debugPort);
-            _env.Debugger.Connect();
+            _env.Debugger = new AdbDebugger(_env);
         }
         
         _executor = new Executor(_env, workingDirectory);
@@ -519,7 +517,7 @@ public class Shell
                     return 1;
                 }
                 
-                return _executor.ExecuteScript(content);
+                return _executor.ExecuteScript(content, path);
             }
             finally
             {

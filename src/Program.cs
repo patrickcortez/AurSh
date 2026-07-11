@@ -25,19 +25,16 @@ public class Program
             args = args.Skip(1).ToArray();
         }
 
-        int debugPort = 0;
-        if (args.Length >= 2 && args[0] == "--debug-port")
+        bool isDebug = false;
+        if (args.Length >= 1 && (args[0] == "-d" || args[0] == "--debug"))
         {
-            if (int.TryParse(args[1], out int port))
-            {
-                debugPort = port;
-            }
-            args = args.Skip(2).ToArray();
+            isDebug = true;
+            args = args.Skip(1).ToArray();
         }
 
         if (args.Length == 0)
         {
-            var shell = new Core.Shell(forceInteractive, debugPort);
+            var shell = new Core.Shell(forceInteractive, isDebug);
             shell.Run();
             return 0;
         }
@@ -45,7 +42,7 @@ public class Program
         if (args[0] == "-c" && args.Length >= 2)
         {
             string command = args[1];
-            var shell = new Core.Shell(false, debugPort);
+            var shell = new Core.Shell(false, isDebug);
             return shell.ExecuteCommand(command);
         }
 
@@ -89,7 +86,7 @@ public class Program
             scriptPath = resolved;
         }
 
-        var runner = new Core.Shell(false, debugPort);
+        var runner = new Core.Shell(false, isDebug);
         return runner.RunScript(scriptPath, scriptArgs);
     }
 
@@ -102,6 +99,7 @@ public class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  -i, --interactive Force interactive mode even if input is redirected");
         Console.WriteLine("  -c COMMAND    Execute COMMAND and exit");
+        Console.WriteLine("  -d, --debug   Launch script in ADB (AurSh Debugging Bridge) interactive debugger");
         Console.WriteLine("  -v, --version Show version");
         Console.WriteLine("  -h, --help    Show this help");
         Console.WriteLine();

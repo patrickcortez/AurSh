@@ -156,9 +156,9 @@ public class AstEvaluator
 
     public int Visit(ICommandNode node)
     {
-        if (_env.Debugger != null && _env.Debugger.ShouldPause(node.Line))
+        if (_env.Debugger != null && _env.Debugger.ShouldPause(node.File, node.Line, _env.CallStack.Count))
         {
-            _env.Debugger.PauseAndBlock(node.Line, _env);
+            _env.Debugger.PauseAndBlock(node.File, node.Line, _env);
         }
 
         return node switch
@@ -286,15 +286,18 @@ public class AstEvaluator
                         var firstCmd = listNode.Entries[0].Pipeline.Commands[0];
                         if (firstCmd is LetNode letNode)
                         {
-                            _env.Exports[letNode.VariableName] = _env.GetAurValue(letNode.VariableName);
+                            var val = _env.GetAurValue(letNode.VariableName);
+                            if (val != null) _env.Exports[letNode.VariableName] = val;
                         }
                         else if (firstCmd is ConstNode constNode)
                         {
-                            _env.Exports[constNode.VariableName] = _env.GetAurValue(constNode.VariableName);
+                            var val = _env.GetAurValue(constNode.VariableName);
+                            if (val != null) _env.Exports[constNode.VariableName] = val;
                         }
                         else if (firstCmd is AssignmentNode assign)
                         {
-                            _env.Exports[assign.VariableName] = _env.GetAurValue(assign.VariableName);
+                            var val = _env.GetAurValue(assign.VariableName);
+                            if (val != null) _env.Exports[assign.VariableName] = val;
                         }
                         else if (firstCmd is FunctionNode func)
                         {
@@ -331,7 +334,7 @@ public class AstEvaluator
 
                 // Execute in a new environment
                 var childEnv = new ShellEnvironment();
-                var lexer = new Lexer(scriptContent, childEnv);
+                var lexer = new Lexer(scriptContent, childEnv, resolvedPath);
                 var tokens = lexer.Tokenize();
                 var parser = new Parser(tokens);
                 var ast = parser.Parse();
@@ -462,7 +465,7 @@ public class AstEvaluator
                                 args.Add(string.Join(" ", WordExpander.ExpandWord(arg.Trim(), _env)));
                         }
 
-                        _env.PushFrame(new StackFrame(funcName, execCmd.Line, execCmd.Column, FrameType.Function));
+                        _env.PushFrame(new StackFrame(funcName, execCmd.Line, execCmd.Column, execCmd.File, FrameType.Function));
                         _env.PushScope();
                         _env.PushPositionalArguments(args);
 
@@ -507,7 +510,7 @@ public class AstEvaluator
                 {
                     return ExecuteWithRedirections(execCmd, () =>
                     {
-                        _env.PushFrame(new StackFrame(execCmd.Name, execCmd.Line, execCmd.Column, FrameType.Function));
+                        _env.PushFrame(new StackFrame(execCmd.Name, execCmd.Line, execCmd.Column, execCmd.File, FrameType.Function));
                         _env.PushScope();
                         _env.PushPositionalArguments(execCmd.Args);
 
@@ -663,7 +666,7 @@ public class AstEvaluator
     private int Visit(SubshellNode node)
     {
         var clonedEnv = _env.Clone();
-        clonedEnv.PushFrame(new StackFrame("subshell", node.Line, node.Column, FrameType.Subshell));
+        clonedEnv.PushFrame(new StackFrame("subshell", node.Line, node.Column, node.File, FrameType.Subshell));
         var subEval = new AstEvaluator(clonedEnv, _executor, _workingDirectory);
         int exitCode = 1;
         try
@@ -971,7 +974,7 @@ public class AstEvaluator
                     
                     // Execute in a new environment
                     var childEnv = new ShellEnvironment();
-                    var lexer = new Lexer(scriptContent, childEnv);
+                    var lexer = new Lexer(scriptContent, childEnv, resolvedPath);
                     var tokens = lexer.Tokenize();
                     var parser = new Parser(tokens);
                     var ast = parser.Parse();
@@ -994,7 +997,7 @@ public class AstEvaluator
                     var args = new List<string>();
                     foreach (var a in call.Arguments) args.Add(EvaluateExpression(a).ToString()!);
 
-                    _env.PushFrame(new StackFrame(funcId.Name, 0, 0, FrameType.Function));
+                    _env.PushFrame(new StackFrame(funcId.Name, 0, 0, "", FrameType.Function));
                     _env.PushScope();
                     _env.PushPositionalArguments(args);
 
@@ -1407,3 +1410,5 @@ public class AstEvaluator
         return result;
     }
 }
+
+

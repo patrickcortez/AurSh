@@ -3,6 +3,7 @@ import sys
 import time
 import os
 import platform
+import tempfile
 
 def get_aursh_cmd():
     ext = ".exe" if platform.system() == "Windows" else ""
@@ -65,17 +66,27 @@ def test_interpreter_regressions():
     script_path = os.path.join('tests', 'interpreter_regression.aur')
     with open(script_path, 'r') as f:
         content = f.read()
-    if not content.startswith('#!'):
-        import platform
-        expected_path = os.path.abspath(AURSH_CMD[0] if platform.system() == 'Windows' else AURSH_CMD[0])
-        if expected_path.endswith('dotnet') and len(AURSH_CMD) > 1:
-            expected_path = os.path.abspath(AURSH_CMD[1])
-        if platform.system() == 'Windows' and not expected_path.endswith('.exe') and not expected_path.endswith('.dll'):
-            expected_path += '.exe'
-        with open(script_path, 'w') as f:
-            f.write('#!' + expected_path + '\n' + content)
+        
+    # Strip existing shebang if one was committed to the repository
+    if content.startswith('#!'):
+        content = content.split('\n', 1)[1] if '\n' in content else ''
 
-    executed = subprocess.run(AURSH_CMD + [script_path], capture_output=True, text=True)
+    expected_path = os.path.abspath(AURSH_CMD[0] if platform.system() == 'Windows' else AURSH_CMD[0])
+    if expected_path.endswith('dotnet') and len(AURSH_CMD) > 1:
+        expected_path = os.path.abspath(AURSH_CMD[1])
+    if platform.system() == 'Windows' and not expected_path.endswith('.exe') and not expected_path.endswith('.dll'):
+        expected_path += '.exe'
+        
+    # Write the script to a temporary file with the correct OS-specific shebang
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.aur') as temp_f:
+        temp_f.write('#!' + expected_path + '\n' + content)
+        temp_script_path = temp_f.name
+
+    try:
+        executed = subprocess.run(AURSH_CMD + [temp_script_path], capture_output=True, text=True)
+    finally:
+        if os.path.exists(temp_script_path):
+            os.remove(temp_script_path)
 
     if executed.returncode != 0 or executed.stdout != expected:
         print("ERROR: interpreter regression test failed.")

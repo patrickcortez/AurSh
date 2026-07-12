@@ -47,7 +47,7 @@ round edges.
 - A built in Network Helper tool for connecting,disconnecting and recieving/sending data through
 the command-line.
 - A music player that can be invoked in the command line `aursh-music` accessible at `http://127.0.0.1:7007`.
-- A Dedicated ISE called AurSh-ISE, which is installed seperately from AurSh. It is a Integrated Scripting Environment for AurSh, for creating,modifying and debugging scripts.
+- A Debugger for debugging .aur scripts.
 
 ---
 
